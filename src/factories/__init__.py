@@ -1,0 +1,1 @@
+"""Factory objects for Glance."""
