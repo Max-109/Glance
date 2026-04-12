@@ -98,6 +98,9 @@ Item {
                     sourceSize.height: Math.round(16 * root.pixelRatio)
                     fillMode: Image.PreserveAspectFit
                     smooth: true
+                    Layout.preferredWidth: 16
+                    Layout.preferredHeight: 16
+                    Layout.alignment: Qt.AlignVCenter
                     rotation: popup.opened ? 180 : 0
 
                     Behavior on rotation {

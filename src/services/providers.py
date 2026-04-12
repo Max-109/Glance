@@ -31,7 +31,11 @@ class OpenAICompatibleProvider:
             raise ProviderError("The 'openai' package is required for provider access.")
         if not api_key:
             raise ProviderError("Missing LLM API key.")
-        return OpenAI(base_url=base_url, api_key=api_key)
+        return OpenAI(
+            base_url=base_url,
+            api_key=api_key,
+            default_headers={"Accept-Encoding": "identity"},
+        )
 
     def generate_reply(
         self,
@@ -152,7 +156,11 @@ class NagaTranscriptionProvider:
             )
         if not api_key:
             raise ProviderError("Missing transcription API key.")
-        return OpenAI(base_url=base_url, api_key=api_key)
+        return OpenAI(
+            base_url=base_url,
+            api_key=api_key,
+            default_headers={"Accept-Encoding": "identity"},
+        )
 
     def transcribe(self, audio_path: str) -> str:
         path = Path(audio_path)
@@ -226,7 +234,11 @@ class NagaSpeechProvider:
             raise ProviderError("The 'openai' package is required for TTS access.")
         if not api_key:
             raise ProviderError("Missing TTS API key.")
-        return OpenAI(base_url=base_url, api_key=api_key)
+        return OpenAI(
+            base_url=base_url,
+            api_key=api_key,
+            default_headers={"Accept-Encoding": "identity"},
+        )
 
     def synthesize(self, text: str, output_path: Path) -> str:
         try:

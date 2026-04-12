@@ -7,7 +7,7 @@ from urllib.parse import urlparse
 from PySide6.QtCore import Property, QCoreApplication, QTimer, QObject, Signal, Slot
 
 from src.exceptions.app_exceptions import ValidationError
-from src.models.settings import AppSettings
+from src.models.settings import AppSettings, ELEVEN_V3_VOICES
 from src.services.history_manager import HistoryManager
 from src.services.keybinds import (
     keybinds_are_unique,
@@ -100,7 +100,7 @@ class SettingsViewModel(QObject):
 
     @Property("QStringList", constant=True)
     def voiceOptions(self) -> list[str]:
-        return ["alloy"]
+        return ELEVEN_V3_VOICES
 
     @Property("QStringList", constant=True)
     def languageOptions(self) -> list[str]:

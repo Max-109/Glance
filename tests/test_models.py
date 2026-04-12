@@ -2,7 +2,7 @@ import unittest
 
 from src.exceptions.app_exceptions import ValidationError
 from src.models.interactions import QuickInteraction, SessionRecord
-from src.models.settings import AppSettings
+from src.models.settings import AppSettings, DEFAULT_TTS_VOICE
 
 
 class AppSettingsTests(unittest.TestCase):
@@ -44,6 +44,18 @@ class AppSettingsTests(unittest.TestCase):
                     "screen_change_threshold": 2,
                 }
             )
+
+    def test_from_mapping_replaces_invalid_alloy_voice(self) -> None:
+        settings = AppSettings.from_mapping(
+            {
+                "llm_base_url": "https://api.example.com/v1",
+                "llm_model_name": "model-a",
+                "tts_base_url": "https://tts.example.com/v1",
+                "tts_voice_id": "alloy",
+            }
+        )
+
+        self.assertEqual(settings.tts_voice_id, DEFAULT_TTS_VOICE)
 
 
 class SessionRecordTests(unittest.TestCase):

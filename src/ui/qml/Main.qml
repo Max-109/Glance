@@ -550,9 +550,9 @@ ApplicationWindow {
 
         Rectangle {
             radius: 10
-            color: captureActive ? theme.surfaceBrandBase : theme.surfaceInsetBase
+            color: captureActive ? theme.surfaceRaisedBaseActive : theme.surfaceInsetBase
             border.width: 1
-            border.color: captureActive ? theme.borderSelected : theme.borderWeakBase
+            border.color: captureActive ? theme.borderBase : theme.borderWeakBase
             implicitHeight: 28
             implicitWidth: Math.min(164, keybindValue.implicitWidth + 20)
             Layout.preferredWidth: Math.min(164, keybindValue.implicitWidth + 20)
@@ -740,7 +740,7 @@ ApplicationWindow {
                         iconName: "mic"
                         label: "Voice"
                         helperText: "Voice used for spoken replies."
-                        value: settingsController.settings.tts_voice_id || "alloy"
+                        value: settingsController.settings.tts_voice_id || settingsController.voiceOptions[0]
                         options: settingsController.voiceOptions
                         Layout.fillWidth: true
                         onValueEdited: function(nextValue) { settingsController.setField("tts_voice_id", nextValue) }

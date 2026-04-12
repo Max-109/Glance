@@ -76,7 +76,7 @@ def run_settings_app() -> int:
         raise RuntimeError("Could not load the QML settings interface.")
 
     root_window = engine.rootObjects()[0]
-    tray = _build_tray_icon(app, root_window, controller, live_controller)
+    tray = _build_tray_icon(app, root_window, controller, live_controller, log_file)
     tray.show()
     hotkey_manager = GlobalHotkeyManager(
         callbacks={
@@ -128,6 +128,7 @@ def _build_tray_icon(
     root_window,
     controller: SettingsViewModel,
     live_controller: LiveSessionController,
+    log_file: Path,
 ) -> QSystemTrayIcon:
     tray = QSystemTrayIcon(_create_tray_icon(), app)
     tray.setToolTip("Glance")

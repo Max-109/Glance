@@ -6,6 +6,26 @@ from src.exceptions.app_exceptions import ValidationError
 from src.services.keybinds import keybinds_are_unique, normalize_keybind
 
 
+ELEVEN_V3_VOICES = [
+    "Bella - Professional, Bright, Warm",
+    "Roger - Laid-Back, Casual, Resonant",
+    "Sarah - Mature, Reassuring, Confident",
+    "Laura - Enthusiast, Quirky Attitude",
+    "Charlie - Deep, Confident, Energetic",
+    "George - Warm, Captivating Storyteller",
+    "Callum - Husky Trickster",
+    "River - Relaxed, Neutral, Informative",
+    "Harry - Fierce Warrior",
+    "Liam - Energetic, Social Media Creator",
+    "Alice - Clear, Engaging Educator",
+    "Matilda - Knowledgable, Professional",
+    "Will - Relaxed Optimist",
+    "Jessica - Playful, Bright, Warm",
+    "Eric - Smooth, Trustworthy",
+]
+DEFAULT_TTS_VOICE = ELEVEN_V3_VOICES[0]
+
+
 @dataclass
 class AppSettings:
     live_keybind: str = "CMD+SHIFT+L"
@@ -20,7 +40,7 @@ class AppSettings:
     tts_base_url: str = "https://api.naga.ac/v1"
     tts_api_key: str = ""
     tts_model: str = "eleven-v3"
-    tts_voice_id: str = "alloy"
+    tts_voice_id: str = DEFAULT_TTS_VOICE
     fallback_language: str = "en"
     history_length: int = 50
     screenshot_interval: float = 1.5
@@ -35,6 +55,7 @@ class AppSettings:
         self.live_keybind = normalize_keybind(self.live_keybind)
         self.quick_keybind = normalize_keybind(self.quick_keybind)
         self.ocr_keybind = normalize_keybind(self.ocr_keybind)
+        self.tts_voice_id = normalize_tts_voice_id(self.tts_voice_id)
         if not keybinds_are_unique(
             [self.live_keybind, self.quick_keybind, self.ocr_keybind]
         ):
@@ -94,7 +115,9 @@ class AppSettings:
             tts_base_url=data.get("tts_base_url", cls.tts_base_url),
             tts_api_key=data.get("tts_api_key", cls.tts_api_key),
             tts_model=data.get("tts_model", cls.tts_model),
-            tts_voice_id=data.get("tts_voice_id", cls.tts_voice_id),
+            tts_voice_id=normalize_tts_voice_id(
+                data.get("tts_voice_id", cls.tts_voice_id)
+            ),
             fallback_language=data.get("fallback_language", cls.fallback_language),
             history_length=int(data.get("history_length", cls.history_length)),
             screenshot_interval=float(
@@ -118,3 +141,18 @@ class AppSettings:
         if validate:
             settings.validate()
         return settings
+
+
+def normalize_tts_voice_id(value: str) -> str:
+    stripped_value = str(value).strip()
+    if not stripped_value:
+        return DEFAULT_TTS_VOICE
+
+    lowered_value = stripped_value.lower()
+    if lowered_value == "alloy":
+        return DEFAULT_TTS_VOICE
+
+    for voice_name in ELEVEN_V3_VOICES:
+        if voice_name.lower() == lowered_value:
+            return voice_name
+    return DEFAULT_TTS_VOICE

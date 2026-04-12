@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+import sys
 from threading import Lock
 
 from src.exceptions.app_exceptions import PermissionDeniedError
@@ -11,6 +12,16 @@ try:
     from pynput import keyboard
 except ImportError:  # pragma: no cover - optional runtime dependency.
     keyboard = None
+
+try:
+    import ApplicationServices
+except ImportError:  # pragma: no cover - only available on macOS with pyobjc.
+    ApplicationServices = None
+
+try:
+    import HIServices
+except ImportError:  # pragma: no cover - only available on macOS with pyobjc.
+    HIServices = None
 
 
 class GlobalHotkeyManager:
@@ -24,12 +35,24 @@ class GlobalHotkeyManager:
             raise PermissionDeniedError(
                 "Global hotkeys require the 'pynput' package and accessibility permission."
             )
+        if not _input_monitoring_is_trusted():
+            raise PermissionDeniedError(
+                "Global hotkeys require macOS Accessibility access for the app that launches Glance, such as Terminal or iTerm."
+            )
 
         with self._lock:
             self._stop_locked()
             hotkey_map = self._build_hotkey_map(settings)
-            self._listener = keyboard.GlobalHotKeys(hotkey_map)
-            self._listener.start()
+            try:
+                listener = keyboard.GlobalHotKeys(hotkey_map)
+                listener.start()
+            except Exception as exc:
+                if _is_accessibility_permission_error(exc):
+                    raise PermissionDeniedError(
+                        "Global hotkeys require macOS Accessibility access for the app that launches Glance, such as Terminal or iTerm."
+                    ) from exc
+                raise
+            self._listener = listener
 
     def stop(self) -> None:
         with self._lock:
@@ -52,3 +75,29 @@ class GlobalHotkeyManager:
             return
         self._listener.stop()
         self._listener = None
+
+
+def _input_monitoring_is_trusted() -> bool:
+    if sys.platform != "darwin":
+        return True
+    trust_function = _resolve_trust_function()
+    if trust_function is None:
+        return True
+    return bool(trust_function())
+
+
+def _resolve_trust_function():
+    for framework in (ApplicationServices, HIServices):
+        if framework is None:
+            continue
+        trust_function = getattr(framework, "AXIsProcessTrusted", None)
+        if trust_function is not None:
+            return trust_function
+    return None
+
+
+def _is_accessibility_permission_error(exc: Exception) -> bool:
+    if sys.platform != "darwin":
+        return False
+    message = str(exc)
+    return "AXIsProcessTrusted" in message or "accessibility" in message.lower()
