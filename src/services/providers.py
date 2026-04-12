@@ -4,6 +4,7 @@ import base64
 import logging
 import mimetypes
 from pathlib import Path
+from time import perf_counter
 
 from src.exceptions.app_exceptions import ProviderError
 from src.models.settings import AppSettings
@@ -57,6 +58,7 @@ class OpenAICompatibleProvider:
             content.append({"type": "text", "text": f"User transcript: {transcript}"})
 
         system_prompt = self._build_system_prompt(match_user_language)
+        started_at = perf_counter()
         try:
             response = self._client.chat.completions.create(
                 model=self._settings.llm_model_name,
@@ -67,12 +69,15 @@ class OpenAICompatibleProvider:
                 ],
             )
         except Exception as exc:  # pragma: no cover - depends on external service.
-            logger.exception("LLM request failed")
+            logger.exception(
+                "LLM request failed after %.1f ms", _elapsed_ms(started_at)
+            )
             raise ProviderError(f"LLM request failed: {exc}") from exc
 
         text = _extract_text_content(response.choices[0].message.content)
         if not text:
             raise ProviderError("LLM response was empty.")
+        logger.info("LLM reply completed in %.1f ms", _elapsed_ms(started_at))
         return text.strip()
 
     def extract_text(self, image_path: str) -> str:
@@ -80,6 +85,7 @@ class OpenAICompatibleProvider:
         return self.generate_reply(user_prompt=prompt, image_paths=[image_path])
 
     def prepare_speech_text(self, text: str) -> str:
+        started_at = perf_counter()
         try:
             response = self._client.chat.completions.create(
                 model=self._settings.llm_model_name,
@@ -93,12 +99,19 @@ class OpenAICompatibleProvider:
                 ],
             )
         except Exception as exc:  # pragma: no cover - depends on external service.
-            logger.exception("Speech text preparation failed")
+            logger.exception(
+                "Speech text preparation failed after %.1f ms",
+                _elapsed_ms(started_at),
+            )
             raise ProviderError(f"Speech text preparation failed: {exc}") from exc
 
         prepared_text = _extract_text_content(response.choices[0].message.content)
         if not prepared_text:
             raise ProviderError("Speech text preparation returned empty output.")
+        logger.info(
+            "Speech text preparation completed in %.1f ms",
+            _elapsed_ms(started_at),
+        )
         return prepared_text.strip()
 
     def _build_system_prompt(self, match_user_language: bool) -> str:
@@ -171,6 +184,7 @@ class NagaTranscriptionProvider:
             raise ProviderError("Audio file was empty.")
 
         audio_format = path.suffix.lower().lstrip(".") or "wav"
+        started_at = perf_counter()
         try:
             response = self._client.chat.completions.create(
                 model=self._settings.transcription_model_name,
@@ -201,12 +215,16 @@ class NagaTranscriptionProvider:
                 ],
             )
         except Exception as exc:  # pragma: no cover - depends on external service.
-            logger.exception("Transcription request failed")
+            logger.exception(
+                "Transcription request failed after %.1f ms",
+                _elapsed_ms(started_at),
+            )
             raise ProviderError(f"Transcription request failed: {exc}") from exc
 
         text = _extract_text_content(response.choices[0].message.content)
         if not text:
             raise ProviderError("Transcription response was empty.")
+        logger.info("Transcription completed in %.1f ms", _elapsed_ms(started_at))
         return text.strip()
 
     @staticmethod
@@ -241,6 +259,7 @@ class NagaSpeechProvider:
         )
 
     def synthesize(self, text: str, output_path: Path) -> str:
+        started_at = perf_counter()
         try:
             response = self._client.audio.speech.create(
                 model=self._settings.tts_model,
@@ -249,8 +268,11 @@ class NagaSpeechProvider:
             )
             response.stream_to_file(output_path)
         except Exception as exc:  # pragma: no cover - depends on external service.
-            logger.exception("TTS request failed")
+            logger.exception(
+                "TTS request failed after %.1f ms", _elapsed_ms(started_at)
+            )
             raise ProviderError(f"TTS request failed: {exc}") from exc
+        logger.info("Speech synthesis completed in %.1f ms", _elapsed_ms(started_at))
         return str(output_path)
 
 
@@ -299,3 +321,7 @@ def _extract_part_text(part) -> str | None:
     if hasattr(text_value, "value"):
         return text_value.value
     return text_value
+
+
+def _elapsed_ms(started_at: float) -> float:
+    return round((perf_counter() - started_at) * 1000, 1)

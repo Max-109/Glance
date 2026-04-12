@@ -50,6 +50,15 @@ class KeybindUtilityTests(unittest.TestCase):
         )
         self.assertEqual(keybind, "ALT+L")
 
+    @unittest.skipIf(Qt is None, "PySide6 is not installed")
+    def test_qt_event_to_keybind_maps_control_to_ctrl(self) -> None:
+        keybind = qt_event_to_keybind(
+            Qt.Key_K,
+            Qt.ControlModifier.value,
+            "k",
+        )
+        self.assertEqual(keybind, "CTRL+K")
+
 
 @unittest.skipIf(Qt is None, "PySide6 is not installed")
 class SettingsViewModelKeybindTests(unittest.TestCase):
@@ -131,6 +140,30 @@ class SettingsViewModelKeybindTests(unittest.TestCase):
 
         self.assertEqual(self.settings_manager.reload().history_length, 12)
         self.assertEqual(self.viewmodel.errors, {})
+
+    def test_regular_field_autosaves_without_manual_save(self) -> None:
+        self.viewmodel.setField("llm_model_name", "claude-sonnet-4.6")
+
+        self.assertEqual(
+            self.settings_manager.reload().llm_model_name,
+            "claude-sonnet-4.6",
+        )
+        self.assertFalse(self.viewmodel.dirty)
+
+    def test_invalid_autosave_keeps_last_valid_config(self) -> None:
+        original_threshold = self.settings_manager.reload().screen_change_threshold
+
+        self.viewmodel.setField("screen_change_threshold", "1.2")
+
+        self.assertEqual(
+            self.settings_manager.reload().screen_change_threshold,
+            original_threshold,
+        )
+        self.assertEqual(
+            self.viewmodel.errors["screen_change_threshold"],
+            "Use a value between 0 and 1.",
+        )
+        self.assertTrue(self.viewmodel.dirty)
 
 
 if __name__ == "__main__":

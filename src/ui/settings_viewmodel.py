@@ -1,23 +1,40 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from pathlib import Path
+from threading import Event, Thread
 from typing import Any
 from urllib.parse import urlparse
+from uuid import uuid4
 
 from PySide6.QtCore import Property, QCoreApplication, QTimer, QObject, Signal, Slot
 
 from src.exceptions.app_exceptions import ValidationError
 from src.models.settings import AppSettings, ELEVEN_V3_VOICES
+from src.services.audio_playback import QtAudioPlaybackService
 from src.services.history_manager import HistoryManager
 from src.services.keybinds import (
     keybinds_are_unique,
     normalize_keybind,
     qt_event_to_keybind,
 )
+from src.services.providers import NagaSpeechProvider
 from src.services.settings_manager import SettingsManager
 
 
 class SettingsViewModel(QObject):
+    _AUTOSAVE_DELAY_MS = 350
+    _IMMEDIATE_AUTOSAVE_FIELDS = {
+        "llm_reasoning",
+        "transcription_reasoning",
+        "tts_model",
+        "tts_voice_id",
+        "fallback_language",
+        "audio_input_device",
+        "audio_output_device",
+        "theme_preference",
+    }
+
     settingsChanged = Signal()
     savedSettingsChanged = Signal()
     errorsChanged = Signal()
@@ -26,25 +43,41 @@ class SettingsViewModel(QObject):
     statusChanged = Signal()
     currentSectionChanged = Signal()
     bindingChanged = Signal()
+    previewChanged = Signal()
+    _previewStatusRequested = Signal(str, str)
+    _previewStarted = Signal(str)
+    _previewFinished = Signal(str)
 
     def __init__(
         self,
         settings_manager: SettingsManager,
         history_manager: HistoryManager,
+        audio_dir: Path | None = None,
     ) -> None:
         super().__init__()
         self._settings_manager = settings_manager
         self._history_manager = history_manager
+        self._audio_dir = audio_dir
         current_settings = settings_manager.load()
         self._baseline_map = current_settings.to_dict()
         self._settings_map = deepcopy(self._baseline_map)
         self._errors: dict[str, str] = {}
         self._dirty = False
         self._saving = False
-        self._status_message = "Settings loaded from your local config."
+        self._status_message = ""
         self._status_kind = "neutral"
-        self._current_section = "llm"
+        self._current_section = "api"
         self._binding_field = ""
+        self._previewing_voice = ""
+        self._preview_thread: Thread | None = None
+        self._preview_stop_event: Event | None = None
+        self._preview_playback_service: QtAudioPlaybackService | None = None
+        self._previewStatusRequested.connect(self._apply_status_update)
+        self._previewStarted.connect(self._handle_preview_started)
+        self._previewFinished.connect(self._handle_preview_finished)
+        self._autosave_timer = QTimer(self)
+        self._autosave_timer.setSingleShot(True)
+        self._autosave_timer.timeout.connect(self._apply_autosave)
 
     @Property("QVariantMap", notify=settingsChanged)
     def settings(self) -> dict[str, Any]:
@@ -82,6 +115,14 @@ class SettingsViewModel(QObject):
     def bindingActive(self) -> bool:
         return bool(self._binding_field)
 
+    @Property(str, notify=previewChanged)
+    def previewingVoice(self) -> str:
+        return self._previewing_voice
+
+    @Property(bool, notify=previewChanged)
+    def previewActive(self) -> bool:
+        return bool(self._previewing_voice)
+
     @Property("QStringList", constant=True)
     def themeOptions(self) -> list[str]:
         return ["dark", "light", "system"]
@@ -114,6 +155,8 @@ class SettingsViewModel(QObject):
     def setCurrentSection(self, section: str) -> None:
         if section == self._current_section:
             return
+        if section != "voice":
+            self.stopVoicePreview()
         self._current_section = section
         self.currentSectionChanged.emit()
 
@@ -134,24 +177,19 @@ class SettingsViewModel(QObject):
             self.errorsChanged.emit()
         self._recompute_dirty()
         self.settingsChanged.emit()
+        if field_name.endswith("_keybind"):
+            return
+        self._schedule_autosave(field_name)
 
     @Slot()
     def save(self) -> None:
+        self._autosave_timer.stop()
         settings = self._validate_current_settings()
         if settings is None:
             return
         self._set_saving(True)
         try:
-            self._settings_manager.save(settings, validate=False)
-            self._baseline_map = settings.to_dict()
-            self._settings_map = deepcopy(self._baseline_map)
-            self._errors = {}
-            self._set_status("Settings saved.", "success")
-            self._dirty = False
-            self.savedSettingsChanged.emit()
-            self.settingsChanged.emit()
-            self.errorsChanged.emit()
-            self.dirtyChanged.emit()
+            self._persist_settings(settings, status_message="Settings saved.")
         finally:
             if QCoreApplication.instance() is None:
                 self._clear_saving()
@@ -160,6 +198,7 @@ class SettingsViewModel(QObject):
 
     @Slot()
     def reset(self) -> None:
+        self._autosave_timer.stop()
         self._settings_map = deepcopy(self._baseline_map)
         self._errors = {}
         self._dirty = False
@@ -170,12 +209,13 @@ class SettingsViewModel(QObject):
 
     @Slot()
     def validateDraft(self) -> None:
+        self._autosave_timer.stop()
         settings = self._validate_current_settings()
         if settings is None:
             return
         del settings
         self._set_status(
-            "These settings look valid. Save them to use them next time Glance starts.",
+            "These settings look valid and will be used the next time Glance starts.",
             "success",
         )
 
@@ -227,7 +267,46 @@ class SettingsViewModel(QObject):
             f"{self._binding_label(field_name)} shortcut set to {keybind}.", "success"
         )
 
-    def _validate_current_settings(self) -> AppSettings | None:
+    @Slot(str)
+    def previewVoice(self, voice_name: str) -> None:
+        if self._previewing_voice == voice_name:
+            self.stopVoicePreview()
+            return
+
+        preview_settings = self._build_preview_settings(voice_name)
+        if preview_settings is None:
+            return
+
+        try:
+            self._ensure_preview_playback_service()
+        except Exception as exc:
+            self._set_status(f"Voice preview unavailable: {exc}", "error")
+            return
+
+        self.stopVoicePreview()
+        stop_event = Event()
+        self._preview_stop_event = stop_event
+        preview_thread = Thread(
+            target=self._run_voice_preview,
+            args=(preview_settings, voice_name, stop_event),
+            name="glance-voice-preview",
+            daemon=True,
+        )
+        self._preview_thread = preview_thread
+        self._previewStarted.emit(voice_name)
+        preview_thread.start()
+
+    @Slot()
+    def stopVoicePreview(self) -> None:
+        stop_event = self._preview_stop_event
+        if stop_event is not None:
+            stop_event.set()
+        if self._preview_playback_service is not None:
+            self._preview_playback_service.stop()
+
+    def _validate_current_settings(
+        self, *, show_status: bool = True
+    ) -> AppSettings | None:
         payload = deepcopy(self._settings_map)
         errors: dict[str, str] = {}
 
@@ -269,7 +348,8 @@ class SettingsViewModel(QObject):
         if errors:
             self._errors = errors
             self.errorsChanged.emit()
-            self._set_status("Fix the highlighted fields before saving.", "error")
+            if show_status:
+                self._set_status("Fix the highlighted fields before saving.", "error")
             return None
 
         try:
@@ -277,7 +357,8 @@ class SettingsViewModel(QObject):
         except (ValidationError, ValueError) as exc:
             self._errors = {"general": str(exc)}
             self.errorsChanged.emit()
-            self._set_status(str(exc), "error")
+            if show_status:
+                self._set_status(str(exc), "error")
             return None
 
         self._errors = {}
@@ -305,6 +386,27 @@ class SettingsViewModel(QObject):
     def _clear_saving(self) -> None:
         self._set_saving(False)
 
+    @Slot(str, str)
+    def _apply_status_update(self, message: str, kind: str) -> None:
+        self._set_status(message, kind)
+
+    @Slot(str)
+    def _handle_preview_started(self, voice_name: str) -> None:
+        self._previewing_voice = voice_name
+        self.previewChanged.emit()
+        self._set_status(
+            f"Previewing {self._voice_preview_label(voice_name)}.", "neutral"
+        )
+
+    @Slot(str)
+    def _handle_preview_finished(self, voice_name: str) -> None:
+        if self._previewing_voice != voice_name:
+            return
+        self._previewing_voice = ""
+        self._preview_stop_event = None
+        self._preview_thread = None
+        self.previewChanged.emit()
+
     def _find_keybind_conflict(self, current_field: str, value: str) -> str | None:
         for field_name in ("live_keybind", "quick_keybind", "ocr_keybind"):
             if field_name == current_field:
@@ -329,6 +431,110 @@ class SettingsViewModel(QObject):
         self._settings_manager.save(settings, validate=False)
         self._baseline_map[field_name] = value
         self._recompute_dirty()
+
+    def _build_preview_settings(self, voice_name: str) -> AppSettings | None:
+        if voice_name not in ELEVEN_V3_VOICES:
+            self._set_status("Choose a valid voice to preview.", "error")
+            return None
+
+        payload = deepcopy(self._settings_map)
+        payload["tts_voice_id"] = voice_name
+        missing_fields: list[str] = []
+        for field_name, label in (
+            ("tts_base_url", "speech base URL"),
+            ("tts_api_key", "speech API key"),
+            ("tts_model", "speech model"),
+        ):
+            if not str(payload.get(field_name, "")).strip():
+                missing_fields.append(label)
+        if missing_fields:
+            self._set_status(
+                f"Voice preview needs {', '.join(missing_fields)}.", "error"
+            )
+            return None
+
+        try:
+            return AppSettings.from_mapping(payload, validate=False)
+        except (ValidationError, ValueError) as exc:
+            self._set_status(f"Voice preview failed: {exc}", "error")
+            return None
+
+    def _ensure_preview_playback_service(self) -> QtAudioPlaybackService:
+        if self._audio_dir is None:
+            raise ValidationError("audio output is not available in settings")
+        if self._preview_playback_service is None:
+            self._preview_playback_service = QtAudioPlaybackService()
+        return self._preview_playback_service
+
+    def _run_voice_preview(
+        self, settings: AppSettings, voice_name: str, stop_event: Event
+    ) -> None:
+        output_path = self._audio_dir / f"voice-preview-{uuid4().hex}.mp3"
+        try:
+            provider = NagaSpeechProvider(settings)
+            provider.synthesize(
+                text=(
+                    f"Hello, I am {self._voice_preview_label(voice_name)}. "
+                    "This is how I sound in Glance."
+                ),
+                output_path=output_path,
+            )
+            if stop_event.is_set():
+                return
+            self._preview_playback_service.play_blocking(
+                str(output_path), stop_event=stop_event
+            )
+            if not stop_event.is_set():
+                self._previewStatusRequested.emit(
+                    f"Previewed {self._voice_preview_label(voice_name)}.",
+                    "success",
+                )
+        except Exception as exc:
+            if not stop_event.is_set():
+                self._previewStatusRequested.emit(
+                    f"Voice preview failed: {exc}", "error"
+                )
+        finally:
+            try:
+                output_path.unlink(missing_ok=True)
+            except OSError:
+                pass
+            self._previewFinished.emit(voice_name)
+
+    @staticmethod
+    def _voice_preview_label(voice_name: str) -> str:
+        return voice_name.split(" - ", 1)[0].strip() or voice_name
+
+    def _schedule_autosave(self, field_name: str) -> None:
+        if self._settings_map == self._baseline_map:
+            self._autosave_timer.stop()
+            return
+        if (
+            QCoreApplication.instance() is None
+            or field_name in self._IMMEDIATE_AUTOSAVE_FIELDS
+        ):
+            self._autosave_timer.stop()
+            self._apply_autosave()
+            return
+        self._autosave_timer.start(self._AUTOSAVE_DELAY_MS)
+
+    def _apply_autosave(self) -> None:
+        settings = self._validate_current_settings(show_status=False)
+        if settings is None or self._settings_map == self._baseline_map:
+            return
+        self._persist_settings(settings, status_message="Settings updated.")
+
+    def _persist_settings(self, settings: AppSettings, *, status_message: str) -> None:
+        self._settings_manager.save(settings, validate=False)
+        self._baseline_map = settings.to_dict()
+        self._settings_map = deepcopy(self._baseline_map)
+        self._errors = {}
+        self._set_status(status_message, "success")
+        self._dirty = False
+        self.savedSettingsChanged.emit()
+        self.settingsChanged.emit()
+        self.errorsChanged.emit()
+        self.dirtyChanged.emit()
 
     @staticmethod
     def _require_text(

@@ -33,6 +33,9 @@ class GlobalHotkeyManager:
         self._callbacks = callbacks
         self._listener = None
         self._lock = Lock()
+        self._enabled = True
+        self._hotkey_specs: list[tuple[str, Callable[[], None]]] = []
+        self._hotkeys = []
 
     def update_bindings(self, settings: AppSettings) -> None:
         if keyboard is None:
@@ -46,46 +49,106 @@ class GlobalHotkeyManager:
             )
 
         with self._lock:
-            self._stop_locked()
-            hotkey_map = self._build_hotkey_map(settings)
-            logger.info("Registering hotkeys: %s", ", ".join(sorted(hotkey_map.keys())))
-            try:
-                listener = keyboard.GlobalHotKeys(hotkey_map)
-                listener.start()
-            except Exception as exc:
-                if _is_accessibility_permission_error(exc):
-                    logger.info(
-                        "Hotkey registration failed because Accessibility access is not granted"
-                    )
-                    raise PermissionDeniedError(
-                        "Global hotkeys require macOS Accessibility access for the app that launches Glance, such as Terminal or iTerm."
-                    ) from exc
-                raise
-            self._listener = listener
-            logger.info("Hotkeys registered successfully")
+            self._ensure_listener_locked()
+            self._hotkey_specs = self._build_hotkey_specs(settings)
+            self._rebuild_hotkeys_locked()
+            logger.info(
+                "Active hotkeys updated in place: %s",
+                ", ".join(description for description, _ in self._hotkey_specs),
+            )
+
+    def set_enabled(self, enabled: bool) -> None:
+        with self._lock:
+            if self._enabled == enabled:
+                return
+            self._enabled = enabled
+            self._rebuild_hotkeys_locked()
+            logger.info("Hotkeys %s", "enabled" if enabled else "suspended")
 
     def stop(self) -> None:
         with self._lock:
             self._stop_locked()
 
-    def _build_hotkey_map(self, settings: AppSettings) -> dict[str, Callable[[], None]]:
+    def _build_hotkey_specs(
+        self, settings: AppSettings
+    ) -> list[tuple[str, Callable[[], None]]]:
         mapping = {
             settings.live_keybind: self._callbacks.get("live"),
             settings.quick_keybind: self._callbacks.get("quick"),
             settings.ocr_keybind: self._callbacks.get("ocr"),
         }
-        return {
-            to_pynput_hotkey(keybind): callback
+        return [
+            (to_pynput_hotkey(keybind), callback)
             for keybind, callback in mapping.items()
             if callback is not None
-        }
+        ]
+
+    def _ensure_listener_locked(self) -> None:
+        if self._listener is not None:
+            return
+        try:
+            listener = keyboard.Listener(
+                on_press=self._on_press,
+                on_release=self._on_release,
+            )
+            logger.info("Starting hotkey listener")
+            listener.start()
+            wait_method = getattr(listener, "wait", None)
+            if callable(wait_method):
+                logger.info("Waiting for hotkey listener to become active")
+                wait_method()
+        except Exception as exc:
+            if _is_accessibility_permission_error(exc):
+                logger.info(
+                    "Hotkey registration failed because Accessibility access is not granted"
+                )
+                raise PermissionDeniedError(
+                    "Global hotkeys require macOS Accessibility access for the app that launches Glance, such as Terminal or iTerm."
+                ) from exc
+            raise
+        self._listener = listener
+        logger.info("Hotkey listener active")
+
+    def _rebuild_hotkeys_locked(self) -> None:
+        if keyboard is None:
+            self._hotkeys = []
+            return
+        self._hotkeys = [
+            keyboard.HotKey(keyboard.HotKey.parse(description), callback)
+            for description, callback in self._hotkey_specs
+        ]
+
+    def _on_press(self, key) -> None:
+        with self._lock:
+            if not self._enabled or self._listener is None:
+                return
+            canonical_key = self._listener.canonical(key)
+            hotkeys = list(self._hotkeys)
+        for hotkey in hotkeys:
+            hotkey.press(canonical_key)
+
+    def _on_release(self, key) -> None:
+        with self._lock:
+            if self._listener is None:
+                return
+            canonical_key = self._listener.canonical(key)
+            hotkeys = list(self._hotkeys)
+        for hotkey in hotkeys:
+            hotkey.release(canonical_key)
 
     def _stop_locked(self) -> None:
         if self._listener is None:
             return
         logger.info("Stopping hotkeys")
-        self._listener.stop()
+        listener = self._listener
+        listener.stop()
+        join_method = getattr(listener, "join", None)
+        if callable(join_method):
+            logger.info("Waiting for hotkey listener to stop")
+            join_method(timeout=1.0)
+        logger.info("Hotkey listener stopped")
         self._listener = None
+        self._hotkeys = []
 
 
 def _input_monitoring_is_trusted() -> bool:

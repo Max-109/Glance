@@ -4,6 +4,7 @@ from collections.abc import Callable
 import logging
 from pathlib import Path
 from threading import Event, Lock, Thread, current_thread
+from time import perf_counter
 from uuid import uuid4
 
 from src.core.orchestrator import Orchestrator
@@ -91,7 +92,9 @@ class LiveSessionController:
         try:
             while not self._stop_event.is_set():
                 recording_path = self._audio_dir / f"live-input-{uuid4().hex}.wav"
+                turn_started_at = perf_counter()
                 self._set_status("listening", "Listening for your next spoken turn.")
+                capture_started_at = perf_counter()
                 try:
                     self._recorder.capture_turn(
                         str(recording_path),
@@ -105,10 +108,14 @@ class LiveSessionController:
                     self._set_status("idle", str(exc))
                     break
 
+                capture_elapsed_ms = _elapsed_ms(capture_started_at)
+                logger.info("Audio capture completed in %.1f ms", capture_elapsed_ms)
+
                 if self._stop_event.is_set():
                     break
 
                 self._set_status("processing", "Transcribing and preparing a reply.")
+                pipeline_started_at = perf_counter()
                 try:
                     interaction = self._orchestrator.run_mode(
                         "live",
@@ -120,10 +127,16 @@ class LiveSessionController:
                     self._set_status("idle", f"Live mode failed: {exc}")
                     break
 
+                pipeline_elapsed_ms = _elapsed_ms(pipeline_started_at)
+                logger.info(
+                    "Assistant pipeline completed in %.1f ms", pipeline_elapsed_ms
+                )
+
                 if self._stop_event.is_set():
                     break
 
                 self._set_status("speaking", "Speaking the reply.")
+                playback_started_at = perf_counter()
                 try:
                     self._playback_service.play_blocking(
                         interaction.speech_path,
@@ -139,6 +152,13 @@ class LiveSessionController:
                     logger.exception("Unexpected playback failure")
                     self._set_status("idle", f"Playback failed: {exc}")
                     break
+
+                playback_elapsed_ms = _elapsed_ms(playback_started_at)
+                logger.info("Playback completed in %.1f ms", playback_elapsed_ms)
+                logger.info(
+                    "Live turn completed in %.1f ms total",
+                    _elapsed_ms(turn_started_at),
+                )
         except Exception as exc:  # pragma: no cover - defensive runtime logging.
             logger.exception("Unexpected live session failure")
             self._set_status("idle", f"Live mode failed: {exc}")
@@ -152,3 +172,7 @@ class LiveSessionController:
         self._state = state
         if self._on_status is not None:
             self._on_status(state, message)
+
+
+def _elapsed_ms(started_at: float) -> float:
+    return round((perf_counter() - started_at) * 1000, 1)

@@ -116,7 +116,7 @@ ApplicationWindow {
             spacing: 0
 
             Rectangle {
-                Layout.preferredWidth: 183
+                Layout.preferredWidth: 205
                 Layout.fillHeight: true
                 color: theme.sidebarSurface
                 radius: 18
@@ -185,11 +185,11 @@ ApplicationWindow {
                         SidebarItem {
                             theme: window.appTheme
                             iconLibrary: window.iconLibrary
-                            iconName: "brain-circuit"
-                            text: "LLM"
-                            selected: settingsController.currentSection === "llm"
+                            iconName: "link-2"
+                            text: "API"
+                            selected: settingsController.currentSection === "api"
                             Layout.fillWidth: true
-                            onClicked: settingsController.setCurrentSection("llm")
+                            onClicked: settingsController.setCurrentSection("api")
                         }
 
                         SidebarItem {
@@ -316,7 +316,7 @@ ApplicationWindow {
                         }
 
                         Text {
-                            text: "0.01"
+                            text: "v0.1 Alpha"
                             color: theme.textWeak
                             font.pixelSize: 11
                             font.weight: 400
@@ -419,8 +419,9 @@ ApplicationWindow {
                         iconLibrary: window.iconLibrary
                         kind: settingsController.statusKind
                         message: settingsController.statusMessage
+                        visible: settingsController.statusMessage.length > 0
                         Layout.fillWidth: true
-                        implicitHeight: 42
+                        implicitHeight: visible ? 42 : 0
                     }
 
                     ScrollView {
@@ -436,7 +437,7 @@ ApplicationWindow {
 
                             ColumnLayout {
                                 id: contentColumn
-                                width: Math.min(scrollArea.availableWidth, 640)
+                                width: Math.min(scrollArea.availableWidth, 720)
                                 anchors.horizontalCenter: parent.horizontalCenter
                                 spacing: 12
 
@@ -444,8 +445,8 @@ ApplicationWindow {
                                     id: sectionLoader
                                     Layout.fillWidth: true
                                     width: contentColumn.width
-                                    sourceComponent: settingsController.currentSection === "llm"
-                                        ? llmSection
+                                    sourceComponent: settingsController.currentSection === "api"
+                                        ? apiSection
                                         : settingsController.currentSection === "voice"
                                             ? voiceSection
                                             : settingsController.currentSection === "capture"
@@ -585,98 +586,269 @@ ApplicationWindow {
         Item { Layout.fillWidth: true }
     }
 
+    component ApiTabButton: Button {
+        id: apiTabButton
+
+        property var theme
+        property bool selected: false
+
+        implicitHeight: 34
+        hoverEnabled: true
+        Accessible.name: text
+
+        contentItem: Text {
+            text: apiTabButton.text
+            color: apiTabButton.selected ? theme.textStrong : theme.textBase
+            font.pixelSize: 13
+            font.weight: 600
+            horizontalAlignment: Text.AlignHCenter
+            verticalAlignment: Text.AlignVCenter
+        }
+
+        background: Rectangle {
+            radius: 8
+            color: apiTabButton.selected
+                ? theme.surfaceRaisedBaseActive
+                : (apiTabButton.hovered ? theme.surfaceBaseHover : "transparent")
+            border.width: apiTabButton.selected ? 1 : 0
+            border.color: apiTabButton.selected ? theme.controlOutline : "transparent"
+
+            Behavior on color { ColorAnimation { duration: 140 } }
+            Behavior on border.color { ColorAnimation { duration: 140 } }
+        }
+    }
+
     Component {
-        id: llmSection
+        id: apiSection
 
         ColumnLayout {
+            id: apiSectionRoot
+            property string currentApiPanel: "llm"
             spacing: 14
 
             FieldCard {
                 theme: window.appTheme
-                title: "LLM"
-                description: "Settings for the LLM endpoint."
+                title: "Providers"
+                description: "Different settings for different parts of pipeline."
                 Layout.fillWidth: true
+
+                Rectangle {
+                    Layout.fillWidth: true
+                    radius: 10
+                    color: theme.surfaceBase
+                    border.width: 1
+                    border.color: theme.borderWeakBase
+                    implicitHeight: apiTabRow.implicitHeight + 12
+
+                    RowLayout {
+                        id: apiTabRow
+                        anchors.fill: parent
+                        anchors.margins: 6
+                        spacing: 6
+
+                        ApiTabButton {
+                            theme: window.appTheme
+                            text: "LLM"
+                            selected: apiSectionRoot.currentApiPanel === "llm"
+                            Layout.fillWidth: true
+                            onClicked: apiSectionRoot.currentApiPanel = "llm"
+                        }
+
+                        ApiTabButton {
+                            theme: window.appTheme
+                            text: "Speech Engine"
+                            selected: apiSectionRoot.currentApiPanel === "speech"
+                            Layout.fillWidth: true
+                            onClicked: apiSectionRoot.currentApiPanel = "speech"
+                        }
+
+                        ApiTabButton {
+                            theme: window.appTheme
+                            text: "Transcription"
+                            selected: apiSectionRoot.currentApiPanel === "transcription"
+                            Layout.fillWidth: true
+                            onClicked: apiSectionRoot.currentApiPanel = "transcription"
+                        }
+                    }
+                }
+
+                Loader {
+                    Layout.fillWidth: true
+                    sourceComponent: apiSectionRoot.currentApiPanel === "llm"
+                        ? llmApiPanel
+                        : apiSectionRoot.currentApiPanel === "speech"
+                            ? speechEngineApiPanel
+                            : transcriptionApiPanel
+                }
+            }
+        }
+    }
+
+    Component {
+        id: llmApiPanel
+
+        ColumnLayout {
+            spacing: 12
+
+            LabeledTextField {
+                theme: window.appTheme
+                iconLibrary: window.iconLibrary
+                iconName: "link-2"
+                label: "Base URL"
+                helperText: "Full URL for your LLM API endpoint."
+                errorText: settingsController.errors.llm_base_url || ""
+                value: settingsController.settings.llm_base_url || ""
+                Layout.fillWidth: true
+                onValueEdited: function(nextValue) { settingsController.setField("llm_base_url", nextValue) }
+            }
+
+            LabeledTextField {
+                theme: window.appTheme
+                iconLibrary: window.iconLibrary
+                iconName: "key-round"
+                label: "Key for the API"
+                helperText: "Saved locally on this device."
+                value: settingsController.settings.llm_api_key || ""
+                secret: true
+                Layout.fillWidth: true
+                onValueEdited: function(nextValue) { settingsController.setField("llm_api_key", nextValue) }
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 12
 
                 LabeledTextField {
                     theme: window.appTheme
                     iconLibrary: window.iconLibrary
-                    iconName: "link-2"
-                    label: "Base URL"
-                    helperText: "Full URL for your LLM API endpoint."
-                    errorText: settingsController.errors.llm_base_url || ""
-                    value: settingsController.settings.llm_base_url || ""
+                    iconName: "bot"
+                    label: "Model"
+                    helperText: "Model name to use for responses."
+                    errorText: settingsController.errors.llm_model_name || ""
+                    value: settingsController.settings.llm_model_name || ""
                     Layout.fillWidth: true
-                    onValueEdited: function(nextValue) { settingsController.setField("llm_base_url", nextValue) }
+                    Layout.preferredWidth: 3
+                    Layout.minimumWidth: 0
+                    onValueEdited: function(nextValue) { settingsController.setField("llm_model_name", nextValue) }
                 }
+
+                LabeledComboBox {
+                    theme: window.appTheme
+                    iconLibrary: window.iconLibrary
+                    iconName: "gauge"
+                    label: "Reasoning"
+                    helperText: "Reasoning effort for replies."
+                    value: settingsController.settings.llm_reasoning || "medium"
+                    options: settingsController.reasoningOptions
+                    optionIcons: ({
+                        "low": "zap",
+                        "medium": "brain",
+                        "high": "brain-circuit"
+                    })
+                    Layout.fillWidth: true
+                    Layout.preferredWidth: 2
+                    Layout.minimumWidth: 0
+                    onValueEdited: function(nextValue) { settingsController.setField("llm_reasoning", nextValue) }
+                }
+            }
+        }
+    }
+
+    Component {
+        id: transcriptionApiPanel
+
+        ColumnLayout {
+            spacing: 12
+
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 12
+
+                LabeledTextField {
+                    theme: window.appTheme
+                    iconLibrary: window.iconLibrary
+                    iconName: "audio-lines"
+                    label: "Model"
+                    helperText: "A model which is used for transcribing."
+                    errorText: settingsController.errors.transcription_model_name || ""
+                    value: settingsController.settings.transcription_model_name || "gemini-3.1-flash-lite-preview"
+                    Layout.fillWidth: true
+                    Layout.preferredWidth: 3
+                    Layout.minimumWidth: 0
+                    onValueEdited: function(nextValue) { settingsController.setField("transcription_model_name", nextValue) }
+                }
+
+                LabeledComboBox {
+                    theme: window.appTheme
+                    iconLibrary: window.iconLibrary
+                    iconName: "zap"
+                    label: "Reasoning"
+                    helperText: "Reasoning effort per turn."
+                    value: settingsController.settings.transcription_reasoning || "medium"
+                    options: settingsController.transcriptionReasoningOptions
+                    optionIcons: ({
+                        "minimal": "zap",
+                        "low": "zap",
+                        "medium": "brain",
+                        "high": "brain-circuit"
+                    })
+                    Layout.fillWidth: true
+                    Layout.preferredWidth: 2
+                    Layout.minimumWidth: 0
+                    onValueEdited: function(nextValue) { settingsController.setField("transcription_reasoning", nextValue) }
+                }
+            }
+        }
+    }
+
+    Component {
+        id: speechEngineApiPanel
+
+        ColumnLayout {
+            spacing: 12
+
+            LabeledTextField {
+                theme: window.appTheme
+                iconLibrary: window.iconLibrary
+                iconName: "link-2"
+                label: "Base URL"
+                helperText: "Full URL for your speech API endpoint."
+                errorText: settingsController.errors.tts_base_url || ""
+                value: settingsController.settings.tts_base_url || ""
+                Layout.fillWidth: true
+                onValueEdited: function(nextValue) { settingsController.setField("tts_base_url", nextValue) }
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 12
 
                 LabeledTextField {
                     theme: window.appTheme
                     iconLibrary: window.iconLibrary
                     iconName: "key-round"
-                    label: "API key"
-                    helperText: "Saved locally on this device."
-                    value: settingsController.settings.llm_api_key || ""
+                    label: "Key for the API"
+                    helperText: "Used by speech synthesis and transcription."
+                    value: settingsController.settings.tts_api_key || ""
                     secret: true
                     Layout.fillWidth: true
-                    onValueEdited: function(nextValue) { settingsController.setField("llm_api_key", nextValue) }
+                    Layout.preferredWidth: 3
+                    Layout.minimumWidth: 0
+                    onValueEdited: function(nextValue) { settingsController.setField("tts_api_key", nextValue) }
                 }
 
-                ColumnLayout {
+                LabeledComboBox {
+                    theme: window.appTheme
+                    iconLibrary: window.iconLibrary
+                    iconName: "speech"
+                    label: "Model"
+                    helperText: "Speech generation model."
+                    value: settingsController.settings.tts_model || "eleven-v3"
+                    options: settingsController.ttsModelOptions
                     Layout.fillWidth: true
-                    spacing: 12
-
-                    LabeledTextField {
-                        theme: window.appTheme
-                        iconLibrary: window.iconLibrary
-                        iconName: "bot"
-                        label: "Model"
-                        helperText: "Model name to use for responses."
-                        errorText: settingsController.errors.llm_model_name || ""
-                        value: settingsController.settings.llm_model_name || ""
-                        Layout.fillWidth: true
-                        onValueEdited: function(nextValue) { settingsController.setField("llm_model_name", nextValue) }
-                    }
-
-                    LabeledComboBox {
-                        theme: window.appTheme
-                        iconLibrary: window.iconLibrary
-                        iconName: "gauge"
-                        label: "Reasoning level"
-                        helperText: "How much reasoning effort the model should use."
-                        value: settingsController.settings.llm_reasoning || "medium"
-                        options: settingsController.reasoningOptions
-                        optionIcons: ({
-                            "low": "zap",
-                            "medium": "brain",
-                            "high": "brain-circuit"
-                        })
-                        Layout.fillWidth: true
-                        onValueEdited: function(nextValue) { settingsController.setField("llm_reasoning", nextValue) }
-                    }
-
-                    LabeledTextField {
-                        theme: window.appTheme
-                        iconLibrary: window.iconLibrary
-                        iconName: "audio-lines"
-                        label: "Transcription model"
-                        helperText: "Audio turns are transcribed with Gemini before Claude responds."
-                        errorText: settingsController.errors.transcription_model_name || ""
-                        value: settingsController.settings.transcription_model_name || "gemini-3.1-flash-lite-preview"
-                        Layout.fillWidth: true
-                        onValueEdited: function(nextValue) { settingsController.setField("transcription_model_name", nextValue) }
-                    }
-
-                    LabeledComboBox {
-                        theme: window.appTheme
-                        iconLibrary: window.iconLibrary
-                        iconName: "zap"
-                        label: "Transcription reasoning"
-                        helperText: "Reasoning effort for Gemini transcription turns."
-                        value: settingsController.settings.transcription_reasoning || "medium"
-                        options: settingsController.transcriptionReasoningOptions
-                        Layout.fillWidth: true
-                        onValueEdited: function(nextValue) { settingsController.setField("transcription_reasoning", nextValue) }
-                    }
+                    Layout.preferredWidth: 2
+                    Layout.minimumWidth: 0
+                    onValueEdited: function(nextValue) { settingsController.setField("tts_model", nextValue) }
                 }
             }
         }
@@ -691,60 +863,20 @@ ApplicationWindow {
             FieldCard {
                 theme: window.appTheme
                 title: "Speech"
-                description: "Settings for the speech endpoint and voice."
+                description: "Choose how Glance should sound when it speaks back."
                 Layout.fillWidth: true
 
-                LabeledTextField {
+                VoiceSelectionRow {
                     theme: window.appTheme
                     iconLibrary: window.iconLibrary
-                    iconName: "link-2"
-                    label: "Base URL"
-                    helperText: "Full URL for your speech API endpoint."
-                    errorText: settingsController.errors.tts_base_url || ""
-                    value: settingsController.settings.tts_base_url || ""
+                    label: "Voice"
+                    helperText: "Voice used for spoken replies. Use the play icon inside the menu to preview a voice."
+                    value: settingsController.settings.tts_voice_id || settingsController.voiceOptions[0]
+                    options: settingsController.voiceOptions
+                    previewingVoice: settingsController.previewingVoice || ""
                     Layout.fillWidth: true
-                    onValueEdited: function(nextValue) { settingsController.setField("tts_base_url", nextValue) }
-                }
-
-                LabeledTextField {
-                    theme: window.appTheme
-                    iconLibrary: window.iconLibrary
-                    iconName: "key-round"
-                    label: "API key"
-                    helperText: "Used for Gemini transcription and Eleven v3 speech generation."
-                    value: settingsController.settings.tts_api_key || ""
-                    secret: true
-                    Layout.fillWidth: true
-                    onValueEdited: function(nextValue) { settingsController.setField("tts_api_key", nextValue) }
-                }
-
-                ColumnLayout {
-                    Layout.fillWidth: true
-                    spacing: 12
-
-                    LabeledComboBox {
-                        theme: window.appTheme
-                        iconLibrary: window.iconLibrary
-                        iconName: "bot"
-                        label: "Model"
-                        helperText: "Speech model to use."
-                        value: settingsController.settings.tts_model || "eleven-v3"
-                        options: settingsController.ttsModelOptions
-                        Layout.fillWidth: true
-                        onValueEdited: function(nextValue) { settingsController.setField("tts_model", nextValue) }
-                    }
-
-                    LabeledComboBox {
-                        theme: window.appTheme
-                        iconLibrary: window.iconLibrary
-                        iconName: "mic"
-                        label: "Voice"
-                        helperText: "Voice used for spoken replies."
-                        value: settingsController.settings.tts_voice_id || settingsController.voiceOptions[0]
-                        options: settingsController.voiceOptions
-                        Layout.fillWidth: true
-                        onValueEdited: function(nextValue) { settingsController.setField("tts_voice_id", nextValue) }
-                    }
+                    onValueEdited: function(nextValue) { settingsController.setField("tts_voice_id", nextValue) }
+                    onPreviewClicked: function(voiceName) { settingsController.previewVoice(voiceName) }
                 }
 
                 LabeledComboBox {
@@ -752,7 +884,7 @@ ApplicationWindow {
                     iconLibrary: window.iconLibrary
                     iconName: "languages"
                     label: "Fallback language"
-                    helperText: "Used when no language is specified."
+                    helperText: "Used when the reply should be spoken in a default language."
                     value: settingsController.settings.fallback_language || "en"
                     options: settingsController.languageOptions
                     Layout.fillWidth: true
@@ -951,7 +1083,7 @@ ApplicationWindow {
     }
 
     function sectionTitle(section) {
-        if (section === "llm") return "LLM"
+        if (section === "api") return "API"
         if (section === "voice") return "Speech"
         if (section === "capture") return "Capture"
         if (section === "audio") return "Audio"
@@ -960,8 +1092,8 @@ ApplicationWindow {
     }
 
     function sectionDescription(section) {
-        if (section === "llm") return "Choose the Claude response model and the Gemini transcription settings for live mode."
-        if (section === "voice") return "Set the shared NagaAI endpoint, Eleven voice, and language fallback."
+        if (section === "api") return "Switch between compact provider panels for the response, transcription, and speech stack."
+        if (section === "voice") return "Choose the speaking voice, preview it from the dropdown, and set the fallback language."
         if (section === "capture") return "Control screen sampling and response batching."
         if (section === "audio") return "Choose the default input and output devices."
         if (section === "history") return "Manage locally saved sessions."

@@ -32,6 +32,22 @@ Item {
         return ""
     }
 
+    function popupParent() {
+        return Overlay.overlay ? Overlay.overlay : root
+    }
+
+    function popupX() {
+        var target = popupParent()
+        var point = trigger.mapToItem(target, 0, trigger.height + 6)
+        return Math.max(12, Math.min(point.x, target.width - popup.width - 12))
+    }
+
+    function popupY() {
+        var target = popupParent()
+        var point = trigger.mapToItem(target, 0, trigger.height + 6)
+        return Math.max(12, point.y)
+    }
+
     Layout.fillWidth: true
     implicitWidth: 620
     implicitHeight: column.implicitHeight
@@ -122,8 +138,9 @@ Item {
 
         Popup {
             id: popup
-            x: trigger.x
-            y: trigger.y + trigger.height + 6
+            parent: root.popupParent()
+            x: root.popupX()
+            y: root.popupY()
             width: trigger.width
             padding: 4
             closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutsideParent

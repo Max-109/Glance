@@ -7,7 +7,7 @@ from pathlib import Path
 
 os.environ.setdefault("QT_QUICK_CONTROLS_STYLE", "Basic")
 
-from PySide6.QtCore import QObject, QTimer, QUrl, Signal
+from PySide6.QtCore import QCoreApplication, QObject, Qt, QTimer, QUrl, Signal
 from PySide6.QtGui import QAction, QColor, QCursor, QFont, QIcon, QPainter, QPixmap
 from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtQuickControls2 import QQuickStyle
@@ -40,6 +40,7 @@ class LiveStatusBridge(QObject):
 
 
 def run_settings_app() -> int:
+    QCoreApplication.setAttribute(Qt.AA_MacDontSwapCtrlAndMeta, True)
     app = QApplication(sys.argv)
     app.setApplicationName("Glance")
     app.setOrganizationName("Glance")
@@ -56,7 +57,11 @@ def run_settings_app() -> int:
         JsonHistoryRepository(paths.history_file),
         history_limit=settings.history_length,
     )
-    controller = SettingsViewModel(settings_manager, history_manager)
+    controller = SettingsViewModel(
+        settings_manager,
+        history_manager,
+        audio_dir=paths.audio_dir,
+    )
     icon_library = IconLibrary()
     live_controller = _build_live_controller(
         settings_manager=settings_manager,
@@ -117,6 +122,7 @@ def run_settings_app() -> int:
             tray.showMessage("Glance", f"Live mode unavailable: {exc}")
         try:
             hotkey_manager.update_bindings(persisted_settings)
+            hotkey_manager.set_enabled(True)
         except Exception as exc:
             logger.exception("Hotkeys unavailable during refresh")
             tray.showMessage("Glance", f"Hotkeys unavailable: {exc}")
@@ -137,14 +143,14 @@ def run_settings_app() -> int:
             return
         pending_hotkey_refresh = False
         logger.info("Settings window hidden; scheduling hotkey refresh")
-        schedule_runtime_refresh(0)
+        schedule_runtime_refresh(300)
 
     def handle_binding_change() -> None:
         if controller.bindingActive:
             logger.info(
                 "Suspending hotkeys for keybind capture: %s", controller.bindingField
             )
-            hotkey_manager.stop()
+            hotkey_manager.set_enabled(False)
             runtime_refresh_timer.stop()
             return
         logger.info("Keybind capture ended; waiting for window hide before refresh")
