@@ -9,9 +9,9 @@ ApplicationWindow {
 
     visible: false
     width: 760
-    height: 540
+    height: 680
     minimumWidth: 700
-    minimumHeight: 500
+    minimumHeight: 625
     color: "transparent"
     title: "Glance"
     flags: Qt.Tool | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint
@@ -136,7 +136,7 @@ ApplicationWindow {
                         Layout.fillWidth: true
 
                         Text {
-                            text: "Desktop"
+                            text: "Input"
                             color: theme.textWeak
                             font.pixelSize: 14
                             font.weight: 500
@@ -146,7 +146,7 @@ ApplicationWindow {
                         SidebarItem {
                             theme: window.appTheme
                             iconLibrary: window.iconLibrary
-                            iconName: "window-cursor"
+                            iconName: "scan-search"
                             text: "Capture"
                             selected: settingsController.currentSection === "capture"
                             Layout.fillWidth: true
@@ -156,7 +156,7 @@ ApplicationWindow {
                         SidebarItem {
                             theme: window.appTheme
                             iconLibrary: window.iconLibrary
-                            iconName: "sliders"
+                            iconName: "audio-lines"
                             text: "Audio"
                             selected: settingsController.currentSection === "audio"
                             Layout.fillWidth: true
@@ -166,7 +166,7 @@ ApplicationWindow {
                         Item { implicitHeight: 6 }
 
                         Text {
-                            text: "Server"
+                            text: "Runtime"
                             color: theme.textWeak
                             font.pixelSize: 14
                             font.weight: 500
@@ -176,18 +176,18 @@ ApplicationWindow {
                         SidebarItem {
                             theme: window.appTheme
                             iconLibrary: window.iconLibrary
-                            iconName: "server"
-                            text: "Providers"
-                            selected: settingsController.currentSection === "providers"
+                            iconName: "brain-circuit"
+                            text: "LLM"
+                            selected: settingsController.currentSection === "llm"
                             Layout.fillWidth: true
-                            onClicked: settingsController.setCurrentSection("providers")
+                            onClicked: settingsController.setCurrentSection("llm")
                         }
 
                         SidebarItem {
                             theme: window.appTheme
                             iconLibrary: window.iconLibrary
-                            iconName: "glasses"
-                            text: "Voice"
+                            iconName: "speech"
+                            text: "Speech"
                             selected: settingsController.currentSection === "voice"
                             Layout.fillWidth: true
                             onClicked: settingsController.setCurrentSection("voice")
@@ -196,8 +196,8 @@ ApplicationWindow {
                         SidebarItem {
                             theme: window.appTheme
                             iconLibrary: window.iconLibrary
-                            iconName: "shield"
-                            text: "Advanced"
+                            iconName: "settings-2"
+                            text: "General"
                             selected: settingsController.currentSection === "advanced"
                             Layout.fillWidth: true
                             onClicked: settingsController.setCurrentSection("advanced")
@@ -206,7 +206,7 @@ ApplicationWindow {
                         Item { implicitHeight: 6 }
 
                         Text {
-                            text: "Data"
+                            text: "Storage"
                             color: theme.textWeak
                             font.pixelSize: 14
                             font.weight: 500
@@ -216,7 +216,7 @@ ApplicationWindow {
                         SidebarItem {
                             theme: window.appTheme
                             iconLibrary: window.iconLibrary
-                            iconName: "task"
+                            iconName: "history"
                             text: "History"
                             selected: settingsController.currentSection === "history"
                             Layout.fillWidth: true
@@ -242,7 +242,7 @@ ApplicationWindow {
                             spacing: 4
 
                             Text {
-                                text: "Keybinds"
+                                text: "Shortcuts"
                                 color: theme.textStrong
                                 font.pixelSize: 12
                                 font.weight: 500
@@ -357,9 +357,9 @@ ApplicationWindow {
                                 theme: window.appTheme
                                 iconLibrary: window.iconLibrary
                                 variant: "ghost"
-                                iconName: "close-small"
+                                iconName: "x"
                                 text: ""
-                                accessibleLabel: "Close"
+                                accessibleLabel: "Close settings"
                                 onClicked: window.hide()
                             }
                         }
@@ -395,8 +395,8 @@ ApplicationWindow {
                                     id: sectionLoader
                                     Layout.fillWidth: true
                                     width: contentColumn.width
-                                    sourceComponent: settingsController.currentSection === "providers"
-                                        ? providersSection
+                                    sourceComponent: settingsController.currentSection === "llm"
+                                        ? llmSection
                                         : settingsController.currentSection === "voice"
                                             ? voiceSection
                                             : settingsController.currentSection === "capture"
@@ -445,8 +445,8 @@ ApplicationWindow {
                                 theme: window.appTheme
                                 iconLibrary: window.iconLibrary
                                 variant: "secondary"
-                                iconName: "warning"
-                                text: "Validate"
+                                iconName: "circle-question-mark"
+                                text: "Check settings"
                                 onClicked: settingsController.validateDraft()
                             }
 
@@ -454,7 +454,7 @@ ApplicationWindow {
                                 theme: window.appTheme
                                 iconLibrary: window.iconLibrary
                                 variant: "ghost"
-                                iconName: "reset"
+                                iconName: "rotate-ccw"
                                 text: "Reset"
                                 enabled: settingsController.dirty
                                 onClicked: settingsController.reset()
@@ -518,23 +518,23 @@ ApplicationWindow {
     }
 
     Component {
-        id: providersSection
+        id: llmSection
 
         ColumnLayout {
             spacing: 14
 
             FieldCard {
                 theme: window.appTheme
-                title: "Wellflow LLM"
-                description: "Connection settings for the main reasoning endpoint."
+                title: "LLM"
+                description: "Settings for the LLM endpoint."
                 Layout.fillWidth: true
 
                 LabeledTextField {
                     theme: window.appTheme
                     iconLibrary: window.iconLibrary
-                    iconName: "server"
+                    iconName: "link-2"
                     label: "Base URL"
-                    helperText: "Full endpoint root."
+                    helperText: "Full URL for your LLM API endpoint."
                     errorText: settingsController.errors.llm_base_url || ""
                     value: settingsController.settings.llm_base_url || ""
                     Layout.fillWidth: true
@@ -544,9 +544,9 @@ ApplicationWindow {
                 LabeledTextField {
                     theme: window.appTheme
                     iconLibrary: window.iconLibrary
-                    iconName: "shield"
+                    iconName: "key-round"
                     label: "API key"
-                    helperText: "Locally persisted unless seeded from elsewhere."
+                    helperText: "Saved locally on this device."
                     value: settingsController.settings.llm_api_key || ""
                     secret: true
                     Layout.fillWidth: true
@@ -560,9 +560,9 @@ ApplicationWindow {
                     LabeledTextField {
                         theme: window.appTheme
                         iconLibrary: window.iconLibrary
-                        iconName: "models"
+                        iconName: "bot"
                         label: "Model"
-                        helperText: "Current runtime pin."
+                        helperText: "Model name to use for responses."
                         errorText: settingsController.errors.llm_model_name || ""
                         value: settingsController.settings.llm_model_name || ""
                         Layout.fillWidth: true
@@ -572,10 +572,16 @@ ApplicationWindow {
                     LabeledComboBox {
                         theme: window.appTheme
                         iconLibrary: window.iconLibrary
-                        label: "Reasoning"
-                        helperText: "Stored policy level."
+                        iconName: "gauge"
+                        label: "Reasoning level"
+                        helperText: "How much reasoning effort the model should use."
                         value: settingsController.settings.llm_reasoning || "medium"
                         options: settingsController.reasoningOptions
+                        optionIcons: ({
+                            "low": "zap",
+                            "medium": "brain",
+                            "high": "brain-circuit"
+                        })
                         Layout.fillWidth: true
                         onValueEdited: function(nextValue) { settingsController.setField("llm_reasoning", nextValue) }
                     }
@@ -593,15 +599,15 @@ ApplicationWindow {
             FieldCard {
                 theme: window.appTheme
                 title: "Speech"
-                description: "Compact controls for the TTS endpoint and voice profile."
+                description: "Settings for the speech endpoint and voice."
                 Layout.fillWidth: true
 
                 LabeledTextField {
                     theme: window.appTheme
                     iconLibrary: window.iconLibrary
-                    iconName: "server"
-                    label: "TTS base URL"
-                    helperText: "Speech endpoint root."
+                    iconName: "link-2"
+                    label: "Base URL"
+                    helperText: "Full URL for your speech API endpoint."
                     errorText: settingsController.errors.tts_base_url || ""
                     value: settingsController.settings.tts_base_url || ""
                     Layout.fillWidth: true
@@ -611,9 +617,9 @@ ApplicationWindow {
                 LabeledTextField {
                     theme: window.appTheme
                     iconLibrary: window.iconLibrary
-                    iconName: "shield"
-                    label: "TTS API key"
-                    helperText: "Used for spoken replies."
+                    iconName: "key-round"
+                    label: "API key"
+                    helperText: "Used for speech generation."
                     value: settingsController.settings.tts_api_key || ""
                     secret: true
                     Layout.fillWidth: true
@@ -627,8 +633,9 @@ ApplicationWindow {
                     LabeledComboBox {
                         theme: window.appTheme
                         iconLibrary: window.iconLibrary
+                        iconName: "bot"
                         label: "Model"
-                        helperText: "Speech model."
+                        helperText: "Speech model to use."
                         value: settingsController.settings.tts_model || "eleven-v3"
                         options: settingsController.ttsModelOptions
                         Layout.fillWidth: true
@@ -638,8 +645,9 @@ ApplicationWindow {
                     LabeledComboBox {
                         theme: window.appTheme
                         iconLibrary: window.iconLibrary
+                        iconName: "mic"
                         label: "Voice"
-                        helperText: "Voice ID."
+                        helperText: "Voice used for spoken replies."
                         value: settingsController.settings.tts_voice_id || "alloy"
                         options: settingsController.voiceOptions
                         Layout.fillWidth: true
@@ -650,8 +658,9 @@ ApplicationWindow {
                 LabeledComboBox {
                     theme: window.appTheme
                     iconLibrary: window.iconLibrary
+                    iconName: "languages"
                     label: "Fallback language"
-                    helperText: "Used when a request is language-neutral."
+                    helperText: "Used when no language is specified."
                     value: settingsController.settings.fallback_language || "en"
                     options: settingsController.languageOptions
                     Layout.fillWidth: true
@@ -670,7 +679,7 @@ ApplicationWindow {
             FieldCard {
                 theme: window.appTheme
                 title: "Capture"
-                description: "Sampling and deduplication controls for Live mode."
+                description: "Control how often Glance checks the screen and groups updates."
                 Layout.fillWidth: true
 
                 ColumnLayout {
@@ -680,9 +689,9 @@ ApplicationWindow {
                     LabeledTextField {
                         theme: window.appTheme
                         iconLibrary: window.iconLibrary
-                        iconName: "window-cursor"
-                        label: "Interval"
-                        helperText: "Seconds."
+                        iconName: "clock-3"
+                        label: "Capture interval"
+                        helperText: "How often Glance checks the screen, in seconds."
                         errorText: settingsController.errors.screenshot_interval || ""
                         value: String(settingsController.settings.screenshot_interval || "")
                         Layout.fillWidth: true
@@ -692,9 +701,9 @@ ApplicationWindow {
                     LabeledTextField {
                         theme: window.appTheme
                         iconLibrary: window.iconLibrary
-                        iconName: "models"
-                        label: "Threshold"
-                        helperText: "0 to 1."
+                        iconName: "gauge"
+                        label: "Change threshold"
+                        helperText: "How much the screen must change before Glance reacts."
                         errorText: settingsController.errors.screen_change_threshold || ""
                         value: String(settingsController.settings.screen_change_threshold || "")
                         Layout.fillWidth: true
@@ -705,9 +714,9 @@ ApplicationWindow {
                 LabeledTextField {
                     theme: window.appTheme
                     iconLibrary: window.iconLibrary
-                    iconName: "task"
+                    iconName: "history"
                     label: "Batch window"
-                    helperText: "Seconds grouped into one reply."
+                    helperText: "How long to group updates into one reply, in seconds."
                     errorText: settingsController.errors.batch_window_duration || ""
                     value: String(settingsController.settings.batch_window_duration || "")
                     Layout.fillWidth: true
@@ -726,7 +735,7 @@ ApplicationWindow {
             FieldCard {
                 theme: window.appTheme
                 title: "Audio"
-                description: "The current build exposes the stable default devices."
+                description: "Choose the default devices for listening and playback."
                 Layout.fillWidth: true
 
                 ColumnLayout {
@@ -736,8 +745,9 @@ ApplicationWindow {
                     LabeledComboBox {
                         theme: window.appTheme
                         iconLibrary: window.iconLibrary
-                        label: "Input"
-                        helperText: "Capture route."
+                        iconName: "mic"
+                        label: "Input device"
+                        helperText: "Microphone or system input used for capture."
                         value: settingsController.settings.audio_input_device || "default"
                         options: settingsController.audioDeviceOptions
                         Layout.fillWidth: true
@@ -747,8 +757,9 @@ ApplicationWindow {
                     LabeledComboBox {
                         theme: window.appTheme
                         iconLibrary: window.iconLibrary
-                        label: "Output"
-                        helperText: "Playback route."
+                        iconName: "headphones"
+                        label: "Output device"
+                        helperText: "Speaker or headphones used for playback."
                         value: settingsController.settings.audio_output_device || "default"
                         options: settingsController.audioDeviceOptions
                         Layout.fillWidth: true
@@ -768,15 +779,15 @@ ApplicationWindow {
             FieldCard {
                 theme: window.appTheme
                 title: "History"
-                description: "JSON persistence keeps the coursework I/O path explicit and inspectable."
+                description: "Manage how much session history stays on this device."
                 Layout.fillWidth: true
 
                 LabeledTextField {
                     theme: window.appTheme
                     iconLibrary: window.iconLibrary
-                    iconName: "task"
+                    iconName: "history"
                     label: "History length"
-                    helperText: "Maximum stored sessions."
+                    helperText: "Maximum number of saved sessions."
                     errorText: settingsController.errors.history_length || ""
                     value: String(settingsController.settings.history_length || "")
                     Layout.fillWidth: true
@@ -787,7 +798,7 @@ ApplicationWindow {
                     Layout.fillWidth: true
 
                     Text {
-                        text: "Clear existing history"
+                        text: "Delete saved history"
                         color: theme.textStrong
                         font.pixelSize: 13
                         font.weight: 500
@@ -799,8 +810,8 @@ ApplicationWindow {
                         theme: window.appTheme
                         iconLibrary: window.iconLibrary
                         variant: "danger"
-                        iconName: "warning"
-                        text: "Clear history"
+                        iconName: "trash-2"
+                        text: "Delete history"
                         onClicked: settingsController.clearHistory()
                     }
                 }
@@ -816,15 +827,16 @@ ApplicationWindow {
 
             FieldCard {
                 theme: window.appTheme
-                title: "Advanced"
-                description: "Runtime appearance and prompt overrides live here."
+                title: "General"
+                description: "Appearance and prompt settings for this device."
                 Layout.fillWidth: true
 
                 LabeledComboBox {
                     theme: window.appTheme
                     iconLibrary: window.iconLibrary
-                    label: "Theme preference"
-                    helperText: "Light, dark, or system."
+                    iconName: "sun-moon"
+                    label: "Theme"
+                    helperText: "Choose light, dark, or system."
                     value: settingsController.settings.theme_preference || "dark"
                     options: settingsController.themeOptions
                     Layout.fillWidth: true
@@ -834,9 +846,9 @@ ApplicationWindow {
                 LabeledTextField {
                     theme: window.appTheme
                     iconLibrary: window.iconLibrary
-                    iconName: "models"
+                    iconName: "message-square-quote"
                     label: "System prompt override"
-                    helperText: "Optional assistant override."
+                    helperText: "Optional custom system prompt."
                     value: settingsController.settings.system_prompt_override || ""
                     multiline: true
                     Layout.fillWidth: true
@@ -847,20 +859,20 @@ ApplicationWindow {
     }
 
     function sectionTitle(section) {
-        if (section === "providers") return "Providers"
-        if (section === "voice") return "Voice"
+        if (section === "llm") return "LLM"
+        if (section === "voice") return "Speech"
         if (section === "capture") return "Capture"
         if (section === "audio") return "Audio"
         if (section === "history") return "History"
-        return "Advanced"
+        return "General"
     }
 
     function sectionDescription(section) {
-        if (section === "providers") return "Keep the model endpoint explicit and easy to verify."
-        if (section === "voice") return "Compact TTS controls for spoken replies."
-        if (section === "capture") return "Tune Live mode capture cadence and batching."
-        if (section === "audio") return "Stable default routing for input and output."
-        if (section === "history") return "Local persistence, retention, and safe clearing."
-        return "Theme and prompt customization for the runtime."
+        if (section === "llm") return "Choose the endpoint, key, model, and reasoning level for text responses."
+        if (section === "voice") return "Set the speech endpoint, voice, and language fallback."
+        if (section === "capture") return "Control screen sampling and response batching."
+        if (section === "audio") return "Choose the default input and output devices."
+        if (section === "history") return "Manage locally saved sessions."
+        return "Adjust the theme and optional prompt override."
     }
 }

@@ -10,7 +10,7 @@ Button {
     property var iconLibrary
     property bool selected: false
 
-    implicitHeight: 40
+    implicitHeight: 50
     hoverEnabled: true
     Accessible.name: text
 

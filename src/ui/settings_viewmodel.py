@@ -34,9 +34,9 @@ class SettingsViewModel(QObject):
         self._errors: dict[str, str] = {}
         self._dirty = False
         self._saving = False
-        self._status_message = "Settings loaded from your local runtime profile."
+        self._status_message = "Settings loaded from your local config."
         self._status_kind = "neutral"
-        self._current_section = "providers"
+        self._current_section = "llm"
 
     @Property("QVariantMap", notify=settingsChanged)
     def settings(self) -> dict[str, Any]:
@@ -124,7 +124,7 @@ class SettingsViewModel(QObject):
             self._baseline_map = settings.to_dict()
             self._settings_map = deepcopy(self._baseline_map)
             self._errors = {}
-            self._set_status("Settings saved to config.json.", "success")
+            self._set_status("Settings saved.", "success")
             self._dirty = False
             self.settingsChanged.emit()
             self.errorsChanged.emit()
@@ -137,7 +137,7 @@ class SettingsViewModel(QObject):
         self._settings_map = deepcopy(self._baseline_map)
         self._errors = {}
         self._dirty = False
-        self._set_status("Unsaved changes were reverted.", "neutral")
+        self._set_status("Changes reset.", "neutral")
         self.settingsChanged.emit()
         self.errorsChanged.emit()
         self.dirtyChanged.emit()
@@ -149,14 +149,14 @@ class SettingsViewModel(QObject):
             return
         del settings
         self._set_status(
-            "Configuration looks valid. Save to apply it on the next runtime.",
+            "These settings look valid. Save them to use them next time Glance starts.",
             "success",
         )
 
     @Slot()
     def clearHistory(self) -> None:
         self._history_manager.clear()
-        self._set_status("Stored session history was cleared.", "success")
+        self._set_status("Saved history cleared.", "success")
 
     def _validate_current_settings(self) -> AppSettings | None:
         payload = deepcopy(self._settings_map)
@@ -234,7 +234,7 @@ class SettingsViewModel(QObject):
         value = str(payload.get(field_name, "")).strip()
         payload[field_name] = value
         if not value:
-            errors[field_name] = "Enter a full HTTPS URL."
+            errors[field_name] = "Enter the full URL."
             return
         parsed = urlparse(value)
         if parsed.scheme not in {"http", "https"} or not parsed.netloc:

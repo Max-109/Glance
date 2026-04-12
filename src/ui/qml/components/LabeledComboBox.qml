@@ -9,10 +9,26 @@ Item {
     property var iconLibrary
     property string label: ""
     property string helperText: ""
+    property string iconName: ""
     property string value: ""
     property var options: []
+    property var optionIcons: ({})
 
     signal valueEdited(string value)
+
+    function currentValue() {
+        if (root.value.length > 0) {
+            return root.value
+        }
+        return root.options.length > 0 ? root.options[0] : "Select"
+    }
+
+    function optionIcon(optionValue) {
+        if (root.optionIcons && root.optionIcons[optionValue]) {
+            return root.optionIcons[optionValue]
+        }
+        return ""
+    }
 
     Layout.fillWidth: true
     implicitWidth: 620
@@ -47,13 +63,26 @@ Item {
                 anchors.fill: parent
                 anchors.leftMargin: 12
                 anchors.rightMargin: 12
-                spacing: 8
+                spacing: 10
+
+                Image {
+                    readonly property string displayIcon: {
+                        var optionIconName = root.optionIcon(root.currentValue())
+                        return optionIconName.length > 0 ? optionIconName : root.iconName
+                    }
+                    visible: displayIcon.length > 0
+                    source: root.iconLibrary ? root.iconLibrary.svgData(displayIcon, theme.iconBase) : ""
+                    sourceSize.width: 16
+                    sourceSize.height: 16
+                    fillMode: Image.PreserveAspectFit
+                    Layout.preferredWidth: visible ? 16 : 0
+                    Layout.preferredHeight: visible ? 16 : 0
+                    Accessible.ignored: true
+                }
 
                 Text {
                     Layout.fillWidth: true
-                    text: root.value.length > 0
-                        ? root.value
-                        : (root.options.length > 0 ? root.options[0] : "Select")
+                    text: root.currentValue()
                     font.pixelSize: 14
                     color: theme.textStrong
                     elide: Text.ElideRight
@@ -122,22 +151,38 @@ Item {
 
                 delegate: Rectangle {
                     width: optionList.width
-                    height: 34
+                    height: 38
                     radius: 6
                     color: delegateArea.containsMouse || root.value === modelData
                         ? theme.surfaceBaseActive
                         : "transparent"
 
-                    Text {
-                        anchors.verticalCenter: parent.verticalCenter
-                        anchors.left: parent.left
+                    RowLayout {
+                        anchors.fill: parent
                         anchors.leftMargin: 12
-                        anchors.right: parent.right
                         anchors.rightMargin: 12
-                        text: modelData
-                        color: theme.textStrong
-                        font.pixelSize: 14
-                        elide: Text.ElideRight
+                        spacing: 10
+
+                        Image {
+                            readonly property string optionIconName: root.optionIcon(modelData)
+                            visible: optionIconName.length > 0
+                            source: root.iconLibrary ? root.iconLibrary.svgData(optionIconName, theme.iconBase) : ""
+                            sourceSize.width: 16
+                            sourceSize.height: 16
+                            fillMode: Image.PreserveAspectFit
+                            Layout.preferredWidth: visible ? 16 : 0
+                            Layout.preferredHeight: visible ? 16 : 0
+                            Accessible.ignored: true
+                        }
+
+                        Text {
+                            Layout.fillWidth: true
+                            text: modelData
+                            color: theme.textStrong
+                            font.pixelSize: 14
+                            elide: Text.ElideRight
+                            verticalAlignment: Text.AlignVCenter
+                        }
                     }
 
                     MouseArea {

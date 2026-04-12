@@ -42,9 +42,9 @@ Rectangle {
             return "check"
         }
         if (kind === "error") {
-            return "warning"
+            return "triangle-alert"
         }
-        return "help"
+        return "circle-question-mark"
     }
 
     function _backgroundColor() {
