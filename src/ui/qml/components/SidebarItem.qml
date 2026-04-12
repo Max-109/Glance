@@ -1,6 +1,7 @@
 import QtQuick 2.15
 import QtQuick.Controls 2.15
 import QtQuick.Layouts 1.15
+import QtQuick.Window 2.15
 
 Button {
     id: root
@@ -9,6 +10,7 @@ Button {
     property string iconName: ""
     property var iconLibrary
     property bool selected: false
+    readonly property real pixelRatio: Screen.devicePixelRatio > 0 ? Screen.devicePixelRatio : 1
 
     implicitHeight: 50
     hoverEnabled: true
@@ -32,9 +34,10 @@ Button {
 
         Image {
             source: root.iconLibrary ? root.iconLibrary.svgData(root.iconName, root.selected ? theme.iconStrongBase : theme.iconBase) : ""
-            sourceSize.width: 18
-            sourceSize.height: 18
+            sourceSize.width: Math.round(18 * root.pixelRatio)
+            sourceSize.height: Math.round(18 * root.pixelRatio)
             fillMode: Image.PreserveAspectFit
+            smooth: true
             Layout.preferredWidth: 18
             Layout.preferredHeight: 18
             Accessible.ignored: true

@@ -1,6 +1,7 @@
 import QtQuick 2.15
 import QtQuick.Controls 2.15
 import QtQuick.Layouts 1.15
+import QtQuick.Window 2.15
 
 Button {
     id: root
@@ -10,6 +11,7 @@ Button {
     property string iconName: ""
     property var iconLibrary
     property string accessibleLabel: ""
+    readonly property real pixelRatio: Screen.devicePixelRatio > 0 ? Screen.devicePixelRatio : 1
 
     implicitHeight: 34
     implicitWidth: root.text.length > 0
@@ -25,8 +27,8 @@ Button {
         Image {
             visible: root.iconName.length > 0
             source: root.iconLibrary ? root.iconLibrary.svgData(root.iconName, root._foregroundColor()) : ""
-            sourceSize.width: 16
-            sourceSize.height: 16
+            sourceSize.width: Math.round(16 * root.pixelRatio)
+            sourceSize.height: Math.round(16 * root.pixelRatio)
             fillMode: Image.PreserveAspectFit
             Layout.preferredWidth: visible ? 16 : 0
             Layout.preferredHeight: visible ? 16 : 0

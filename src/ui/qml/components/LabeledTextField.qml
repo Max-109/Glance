@@ -1,6 +1,7 @@
 import QtQuick 2.15
 import QtQuick.Controls 2.15
 import QtQuick.Layouts 1.15
+import QtQuick.Window 2.15
 
 Item {
     id: root
@@ -14,6 +15,7 @@ Item {
     property string value: ""
     property bool secret: false
     property bool multiline: false
+    readonly property real pixelRatio: Screen.devicePixelRatio > 0 ? Screen.devicePixelRatio : 1
 
     signal valueEdited(string value)
 
@@ -67,9 +69,10 @@ Item {
                 Image {
                     visible: root.iconName.length > 0
                     source: root.iconLibrary ? root.iconLibrary.svgData(root.iconName, theme.iconBase) : ""
-                    sourceSize.width: 16
-                    sourceSize.height: 16
+                    sourceSize.width: Math.round(16 * root.pixelRatio)
+                    sourceSize.height: Math.round(16 * root.pixelRatio)
                     fillMode: Image.PreserveAspectFit
+                    smooth: true
                     Layout.preferredWidth: visible ? 16 : 0
                     Layout.preferredHeight: visible ? 16 : 0
                     Layout.alignment: root.multiline ? Qt.AlignTop : Qt.AlignVCenter
@@ -127,9 +130,10 @@ Item {
                     Accessible.name: checked ? "Hide secret" : "Show secret"
                     contentItem: Image {
                         source: root.iconLibrary ? root.iconLibrary.svgData("eye", revealToggle.hovered ? theme.iconHover : theme.iconBase) : ""
-                        sourceSize.width: 16
-                        sourceSize.height: 16
+                        sourceSize.width: Math.round(16 * root.pixelRatio)
+                        sourceSize.height: Math.round(16 * root.pixelRatio)
                         fillMode: Image.PreserveAspectFit
+                        smooth: true
                         Accessible.ignored: true
                     }
                     background: Rectangle {

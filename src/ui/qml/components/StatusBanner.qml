@@ -1,5 +1,6 @@
 import QtQuick 2.15
 import QtQuick.Layouts 1.15
+import QtQuick.Window 2.15
 
 Rectangle {
     id: root
@@ -8,6 +9,7 @@ Rectangle {
     property string kind: "neutral"
     property string message: ""
     property var iconLibrary
+    readonly property real pixelRatio: Screen.devicePixelRatio > 0 ? Screen.devicePixelRatio : 1
 
     radius: 8
     border.width: 1
@@ -21,9 +23,12 @@ Rectangle {
 
         Image {
             source: root.iconLibrary ? root.iconLibrary.svgData(root._iconName(), root._iconColor()) : ""
-            sourceSize.width: 16
-            sourceSize.height: 16
+            sourceSize.width: Math.round(16 * root.pixelRatio)
+            sourceSize.height: Math.round(16 * root.pixelRatio)
             fillMode: Image.PreserveAspectFit
+            smooth: true
+            Layout.preferredWidth: 16
+            Layout.preferredHeight: 16
             Accessible.ignored: true
         }
 
