@@ -26,6 +26,7 @@ class AppSettings:
     audio_input_device: str = "default"
     audio_output_device: str = "default"
     system_prompt_override: str = ""
+    theme_preference: str = "dark"
 
     def validate(self) -> None:
         if not self.llm_base_url.strip():
@@ -34,6 +35,12 @@ class AppSettings:
             raise ValidationError("llm_model_name cannot be empty.")
         if not self.tts_base_url.strip():
             raise ValidationError("tts_base_url cannot be empty.")
+        if not self.tts_model.strip():
+            raise ValidationError("tts_model cannot be empty.")
+        if not self.tts_voice_id.strip():
+            raise ValidationError("tts_voice_id cannot be empty.")
+        if not self.fallback_language.strip():
+            raise ValidationError("fallback_language cannot be empty.")
         if self.history_length <= 0:
             raise ValidationError("history_length must be positive.")
         if self.screenshot_interval <= 0:
@@ -42,6 +49,8 @@ class AppSettings:
             raise ValidationError("screen_change_threshold must be between 0 and 1.")
         if self.batch_window_duration <= 0:
             raise ValidationError("batch_window_duration must be positive.")
+        if self.theme_preference not in {"dark", "light", "system"}:
+            raise ValidationError("theme_preference must be dark, light, or system.")
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -78,6 +87,7 @@ class AppSettings:
             system_prompt_override=data.get(
                 "system_prompt_override", cls.system_prompt_override
             ),
+            theme_preference=data.get("theme_preference", cls.theme_preference),
         )
         settings.validate()
         return settings

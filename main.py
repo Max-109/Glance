@@ -1,10 +1,28 @@
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
 from src.core.orchestrator import build_orchestrator
 from src.ui.console_ui import ConsoleUI
 
 
 def main() -> None:
-    orchestrator = build_orchestrator()
-    ConsoleUI(orchestrator).run()
+    if "--cli" in sys.argv:
+        orchestrator = build_orchestrator()
+        ConsoleUI(orchestrator).run()
+        return
+
+    try:
+        from src.ui.qt_app import run_settings_app
+    except ModuleNotFoundError as exc:
+        if exc.name and exc.name.startswith("PySide6"):
+            orchestrator = build_orchestrator()
+            ConsoleUI(orchestrator).run()
+            return
+        raise
+
+    run_settings_app(env_file=Path(".env"))
 
 
 if __name__ == "__main__":

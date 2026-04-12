@@ -4,19 +4,19 @@ from pathlib import Path
 
 
 ENV_KEY_MAP = {
-    "GLANCE_LLM_BASE_URL": "llm_base_url",
-    "GLANCE_LLM_API_KEY": "llm_api_key",
-    "GLANCE_LLM_MODEL": "llm_model_name",
-    "GLANCE_LLM_REASONING": "llm_reasoning",
-    "GLANCE_TTS_BASE_URL": "tts_base_url",
-    "GLANCE_TTS_API_KEY": "tts_api_key",
-    "GLANCE_TTS_MODEL": "tts_model",
-    "GLANCE_TTS_VOICE": "tts_voice_id",
-    "GLANCE_FALLBACK_LANGUAGE": "fallback_language",
-    "GLANCE_HISTORY_LENGTH": "history_length",
-    "GLANCE_SCREENSHOT_INTERVAL": "screenshot_interval",
-    "GLANCE_SCREEN_CHANGE_THRESHOLD": "screen_change_threshold",
-    "GLANCE_BATCH_WINDOW_DURATION": "batch_window_duration",
+    "LLM_BASE_URL": "llm_base_url",
+    "LLM_API_KEY": "llm_api_key",
+    "LLM_MODEL": "llm_model_name",
+    "LLM_REASONING": "llm_reasoning",
+    "TTS_BASE_URL": "tts_base_url",
+    "TTS_API_KEY": "tts_api_key",
+    "TTS_MODEL": "tts_model",
+    "TTS_VOICE": "tts_voice_id",
+    "FALLBACK_LANGUAGE": "fallback_language",
+    "HISTORY_LENGTH": "history_length",
+    "SCREENSHOT_INTERVAL": "screenshot_interval",
+    "SCREEN_CHANGE_THRESHOLD": "screen_change_threshold",
+    "BATCH_WINDOW_DURATION": "batch_window_duration",
 }
 
 

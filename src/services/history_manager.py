@@ -26,3 +26,7 @@ class HistoryManager:
 
     def list_sessions(self) -> list[SessionRecord]:
         return list(self._sessions)
+
+    def clear(self) -> None:
+        self._repository.save([])
+        self._sessions = []

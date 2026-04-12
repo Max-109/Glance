@@ -17,8 +17,8 @@ class SettingsManager:
         persisted_values = self._store.load()
         env_values = translate_env_values(load_env_file(self._env_file))
         merged = {}
-        merged.update(persisted_values)
         merged.update(env_values)
+        merged.update(persisted_values)
         settings = AppSettings.from_mapping(merged)
         self._store.save(settings)
         self._settings = settings
@@ -33,3 +33,7 @@ class SettingsManager:
         if self._settings is None:
             return self.load()
         return self._settings
+
+    def reload(self) -> AppSettings:
+        self._settings = None
+        return self.load()
