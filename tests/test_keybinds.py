@@ -111,6 +111,18 @@ class SettingsViewModelKeybindTests(unittest.TestCase):
 
         self.assertEqual(self.settings_manager.reload().quick_keybind, "ALT+K")
 
+    def test_escape_cancels_capture_without_changing_saved_keybind(self) -> None:
+        emitted = []
+        self.viewmodel.savedSettingsChanged.connect(lambda: emitted.append(True))
+        original_keybind = self.settings_manager.reload().live_keybind
+        self.viewmodel.startKeybindCapture("live_keybind")
+
+        self.viewmodel.captureKeybind(Qt.Key_Escape, 0, "")
+
+        self.assertFalse(self.viewmodel.bindingActive)
+        self.assertEqual(self.settings_manager.reload().live_keybind, original_keybind)
+        self.assertEqual(emitted, [])
+
     def test_save_allows_unset_llm_base_url(self) -> None:
         self.viewmodel.setField("llm_base_url", "")
         self.viewmodel.setField("history_length", "12")

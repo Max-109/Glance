@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+import logging
 import sys
 from threading import Lock
 
@@ -24,6 +25,9 @@ except ImportError:  # pragma: no cover - only available on macOS with pyobjc.
     HIServices = None
 
 
+logger = logging.getLogger("glance.hotkeys")
+
+
 class GlobalHotkeyManager:
     def __init__(self, callbacks: dict[str, Callable[[], None]]) -> None:
         self._callbacks = callbacks
@@ -36,6 +40,7 @@ class GlobalHotkeyManager:
                 "Global hotkeys require the 'pynput' package and accessibility permission."
             )
         if not _input_monitoring_is_trusted():
+            logger.info("Hotkeys disabled because Accessibility access is not granted")
             raise PermissionDeniedError(
                 "Global hotkeys require macOS Accessibility access for the app that launches Glance, such as Terminal or iTerm."
             )
@@ -43,16 +48,21 @@ class GlobalHotkeyManager:
         with self._lock:
             self._stop_locked()
             hotkey_map = self._build_hotkey_map(settings)
+            logger.info("Registering hotkeys: %s", ", ".join(sorted(hotkey_map.keys())))
             try:
                 listener = keyboard.GlobalHotKeys(hotkey_map)
                 listener.start()
             except Exception as exc:
                 if _is_accessibility_permission_error(exc):
+                    logger.info(
+                        "Hotkey registration failed because Accessibility access is not granted"
+                    )
                     raise PermissionDeniedError(
                         "Global hotkeys require macOS Accessibility access for the app that launches Glance, such as Terminal or iTerm."
                     ) from exc
                 raise
             self._listener = listener
+            logger.info("Hotkeys registered successfully")
 
     def stop(self) -> None:
         with self._lock:
@@ -73,6 +83,7 @@ class GlobalHotkeyManager:
     def _stop_locked(self) -> None:
         if self._listener is None:
             return
+        logger.info("Stopping hotkeys")
         self._listener.stop()
         self._listener = None
 

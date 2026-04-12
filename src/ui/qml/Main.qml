@@ -8,9 +8,9 @@ ApplicationWindow {
     id: window
 
     visible: false
-    width: 760
+    width: 840
     height: 680
-    minimumWidth: 700
+    minimumWidth: 780
     minimumHeight: 625
     color: "transparent"
     title: "Glance"
@@ -116,7 +116,7 @@ ApplicationWindow {
             spacing: 0
 
             Rectangle {
-                Layout.preferredWidth: 178
+                Layout.preferredWidth: 183
                 Layout.fillHeight: true
                 color: theme.sidebarSurface
                 radius: 18
@@ -554,9 +554,9 @@ ApplicationWindow {
             border.width: 1
             border.color: captureActive ? theme.borderBase : theme.borderWeakBase
             implicitHeight: 28
-            implicitWidth: Math.min(164, keybindValue.implicitWidth + 20)
-            Layout.preferredWidth: Math.min(164, keybindValue.implicitWidth + 20)
-            Layout.maximumWidth: 164
+            implicitWidth: Math.min(200, keybindValue.implicitWidth + 20)
+            Layout.preferredWidth: Math.min(200, keybindValue.implicitWidth + 20)
+            Layout.maximumWidth: 200
 
             Behavior on color { ColorAnimation { duration: 120 } }
             Behavior on border.color { ColorAnimation { duration: 120 } }

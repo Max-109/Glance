@@ -138,6 +138,9 @@ def qt_event_to_keybind(key: int, modifiers: int, text: str) -> str | None:
     key_value = _enum_value(key)
     modifier_value = _enum_value(modifiers)
 
+    if key_value == _enum_value(Qt.Key_Escape):
+        return "ESC"
+
     if key_value in {
         _enum_value(Qt.Key_Control),
         _enum_value(Qt.Key_Meta),

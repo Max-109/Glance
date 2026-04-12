@@ -329,7 +329,6 @@ class SettingsViewModel(QObject):
         self._settings_manager.save(settings, validate=False)
         self._baseline_map[field_name] = value
         self._recompute_dirty()
-        self.savedSettingsChanged.emit()
 
     @staticmethod
     def _require_text(

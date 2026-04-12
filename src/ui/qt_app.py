@@ -7,7 +7,7 @@ from pathlib import Path
 
 os.environ.setdefault("QT_QUICK_CONTROLS_STYLE", "Basic")
 
-from PySide6.QtCore import QObject, QUrl, Signal
+from PySide6.QtCore import QObject, QTimer, QUrl, Signal
 from PySide6.QtGui import QAction, QColor, QCursor, QFont, QIcon, QPainter, QPixmap
 from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtQuickControls2 import QQuickStyle
@@ -48,6 +48,8 @@ def run_settings_app() -> int:
     paths = build_app_paths()
     log_file = configure_app_logging(paths.root_dir)
     logger = logging.getLogger("glance.ui")
+    logger.info("================ launch pid=%s ================", os.getpid())
+    logger.info("Log file: %s", log_file)
     settings_manager = SettingsManager(store=JsonSettingsStore(paths.config_file))
     settings = settings_manager.load()
     history_manager = HistoryManager(
@@ -91,9 +93,13 @@ def run_settings_app() -> int:
             ),
         }
     )
+    runtime_refresh_timer = QTimer(app)
+    runtime_refresh_timer.setSingleShot(True)
+    pending_hotkey_refresh = False
 
     def refresh_runtime() -> None:
         persisted_settings = settings_manager.reload()
+        logger.info("Refreshing runtime from saved settings")
         history_manager.set_history_limit(persisted_settings.history_length)
         try:
             live_controller.set_orchestrator(
@@ -115,7 +121,38 @@ def run_settings_app() -> int:
             logger.exception("Hotkeys unavailable during refresh")
             tray.showMessage("Glance", f"Hotkeys unavailable: {exc}")
 
-    controller.savedSettingsChanged.connect(refresh_runtime)
+    runtime_refresh_timer.timeout.connect(refresh_runtime)
+
+    def schedule_runtime_refresh(delay_ms: int = 0) -> None:
+        runtime_refresh_timer.stop()
+        runtime_refresh_timer.start(delay_ms)
+
+    def schedule_hotkey_refresh_when_window_hides() -> None:
+        nonlocal pending_hotkey_refresh
+        pending_hotkey_refresh = True
+
+    def restore_hotkeys_if_pending() -> None:
+        nonlocal pending_hotkey_refresh
+        if not pending_hotkey_refresh or root_window.isVisible():
+            return
+        pending_hotkey_refresh = False
+        logger.info("Settings window hidden; scheduling hotkey refresh")
+        schedule_runtime_refresh(0)
+
+    def handle_binding_change() -> None:
+        if controller.bindingActive:
+            logger.info(
+                "Suspending hotkeys for keybind capture: %s", controller.bindingField
+            )
+            hotkey_manager.stop()
+            runtime_refresh_timer.stop()
+            return
+        logger.info("Keybind capture ended; waiting for window hide before refresh")
+        schedule_hotkey_refresh_when_window_hides()
+
+    controller.savedSettingsChanged.connect(schedule_runtime_refresh)
+    controller.bindingChanged.connect(handle_binding_change)
+    root_window.visibleChanged.connect(restore_hotkeys_if_pending)
     app.aboutToQuit.connect(hotkey_manager.stop)
     app.aboutToQuit.connect(live_controller.stop)
     refresh_runtime()
