@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import sys
-from pathlib import Path
 
 from src.core.orchestrator import build_orchestrator
 from src.ui.console_ui import ConsoleUI
@@ -22,7 +21,7 @@ def main() -> None:
             return
         raise
 
-    run_settings_app(env_file=Path(".env"))
+    run_settings_app()
 
 
 if __name__ == "__main__":

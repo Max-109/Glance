@@ -74,6 +74,7 @@ class OCRInteraction(BaseInteraction):
 
 @dataclass
 class LiveInteraction(BaseInteraction):
+    recording_path: str = ""
     transcript: str = ""
     response: str = ""
     frame_paths: list[str] = field(default_factory=list)
@@ -81,10 +82,9 @@ class LiveInteraction(BaseInteraction):
 
     def __post_init__(self) -> None:
         super().__post_init__()
+        self.recording_path = self.require_text(self.recording_path, "recording_path")
         self.transcript = self.require_text(self.transcript, "transcript")
         self.response = self.require_text(self.response, "response")
-        if not self.frame_paths:
-            raise ValidationError("frame_paths cannot be empty.")
 
     def summary(self) -> str:
         return f"Live: {self.transcript[:40]}"
@@ -95,6 +95,7 @@ class LiveInteraction(BaseInteraction):
             "entity_id": self.entity_id,
             "created_at": self.created_at,
             "mode": self.mode,
+            "recording_path": self.recording_path,
             "transcript": self.transcript,
             "response": self.response,
             "frame_paths": list(self.frame_paths),
@@ -162,9 +163,10 @@ def interaction_from_dict(payload: dict) -> BaseInteraction:
         )
     if interaction_type == "live":
         return LiveInteraction(
+            recording_path=payload.get("recording_path", payload.get("audio_path", "")),
             transcript=payload["transcript"],
             response=payload["response"],
-            frame_paths=list(payload["frame_paths"]),
+            frame_paths=list(payload.get("frame_paths", [])),
             speech_path=payload.get("speech_path", ""),
             **common,
         )

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import logging
 import mimetypes
 from pathlib import Path
 
@@ -11,6 +12,9 @@ try:
     from openai import OpenAI
 except ImportError:  # pragma: no cover - exercised only without optional dependency.
     OpenAI = None
+
+
+logger = logging.getLogger("glance.providers")
 
 
 class OpenAICompatibleProvider:
@@ -52,15 +56,17 @@ class OpenAICompatibleProvider:
         try:
             response = self._client.chat.completions.create(
                 model=self._settings.llm_model_name,
+                reasoning_effort=self._settings.llm_reasoning,
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": content},
                 ],
             )
         except Exception as exc:  # pragma: no cover - depends on external service.
-            raise ProviderError("LLM request failed.") from exc
+            logger.exception("LLM request failed")
+            raise ProviderError(f"LLM request failed: {exc}") from exc
 
-        text = response.choices[0].message.content
+        text = _extract_text_content(response.choices[0].message.content)
         if not text:
             raise ProviderError("LLM response was empty.")
         return text.strip()
@@ -73,6 +79,7 @@ class OpenAICompatibleProvider:
         try:
             response = self._client.chat.completions.create(
                 model=self._settings.llm_model_name,
+                reasoning_effort=self._settings.llm_reasoning,
                 messages=[
                     {
                         "role": "system",
@@ -82,17 +89,20 @@ class OpenAICompatibleProvider:
                 ],
             )
         except Exception as exc:  # pragma: no cover - depends on external service.
-            raise ProviderError("Speech text preparation failed.") from exc
+            logger.exception("Speech text preparation failed")
+            raise ProviderError(f"Speech text preparation failed: {exc}") from exc
 
-        prepared_text = response.choices[0].message.content
+        prepared_text = _extract_text_content(response.choices[0].message.content)
         if not prepared_text:
             raise ProviderError("Speech text preparation returned empty output.")
         return prepared_text.strip()
 
     def _build_system_prompt(self, match_user_language: bool) -> str:
         prompt = self._settings.system_prompt_override.strip() or (
-            "You are Glance, a concise desktop assistant. Keep answers brief, clear, useful, "
-            "and easy to speak aloud."
+            "You are Glance, a live desktop voice assistant. Respond like a helpful person in a "
+            "real spoken conversation. Keep answers brief, clear, accurate, and easy to speak "
+            "aloud. Prefer natural sentences over lists. Do not use markdown, code fences, or "
+            "visual formatting unless the user explicitly asks for them."
         )
         if match_user_language:
             prompt += " Reply in the same language used by the user transcript."
@@ -101,20 +111,104 @@ class OpenAICompatibleProvider:
                 f" Reply in {self._settings.fallback_language} unless the user explicitly asks "
                 "for another language."
             )
+        prompt += (
+            " Use subtle vocal cues only when they genuinely improve the delivery for TTS, and "
+            "never force them into every answer."
+        )
         return prompt
 
     @staticmethod
     def _build_tts_preparation_prompt() -> str:
         return (
-            "You rewrite assistant text so it sounds natural with Eleven v3 text to speech. "
-            "Return only the final speech text. Preserve meaning and do not add facts. Keep it "
-            "concise. Expand abbreviations, symbols, dates, times, currencies, shortcuts, URLs, "
-            "and other hard-to-speak text into clear spoken forms. Remove markdown, code fences, "
-            "tables, bullets when possible, and visual-only formatting. Use natural punctuation "
-            "and sentence structure for pacing. Do not use SSML. Use Eleven v3-style audio tags "
-            "only when they clearly improve delivery, keep them sparse, and only use vocal tags "
-            "such as [whispers], [sighs], [excited], or [curious]. Default to a neutral, helpful "
-            "assistant tone without tags unless emotion is clearly helpful."
+            "You rewrite assistant text so it performs well with Eleven v3 text to speech. Return "
+            "only the final speech text. Preserve meaning and do not add facts. Keep it concise, "
+            "natural, and conversational. Normalize hard-to-speak text into spoken forms: expand "
+            "abbreviations, symbols, dates, times, currencies, shortcuts, URLs, percentages, and "
+            "similar text when helpful. Remove markdown, code fences, tables, bullets, and other "
+            "visual-only formatting. Eleven v3 does not support SSML, so never use SSML tags. Use "
+            "punctuation, ellipses, capitalization, and line breaks for pacing only when they help. "
+            "You may use Eleven v3 vocal tags when they genuinely improve delivery, but keep them "
+            "sparse and contextual. Allowed vocal tags include [laughs], [laughs harder], [starts "
+            "laughing], [wheezing], [whispers], [sighs], [exhales], [sarcastic], [curious], "
+            "[excited], [crying], [snorts], [mischievously], [swallows], [gulps], [sings], [woo], "
+            "[strong X accent], and [fart]. Default to neutral speech when tags are not clearly "
+            "useful. Never add sound-effect tags unless the source text strongly calls for them."
+        )
+
+
+class NagaTranscriptionProvider:
+    def __init__(self, settings: AppSettings) -> None:
+        self._settings = settings
+        self._client = self._build_client(
+            base_url=settings.tts_base_url,
+            api_key=settings.tts_api_key,
+        )
+
+    @staticmethod
+    def _build_client(base_url: str, api_key: str):
+        if OpenAI is None:
+            raise ProviderError(
+                "The 'openai' package is required for transcription access."
+            )
+        if not api_key:
+            raise ProviderError("Missing transcription API key.")
+        return OpenAI(base_url=base_url, api_key=api_key)
+
+    def transcribe(self, audio_path: str) -> str:
+        path = Path(audio_path)
+        if not path.exists():
+            raise ProviderError(f"Audio file does not exist: {audio_path}")
+        audio_bytes = path.read_bytes()
+        if not audio_bytes:
+            raise ProviderError("Audio file was empty.")
+
+        audio_format = path.suffix.lower().lstrip(".") or "wav"
+        try:
+            response = self._client.chat.completions.create(
+                model=self._settings.transcription_model_name,
+                reasoning_effort=self._settings.transcription_reasoning,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": self._build_transcription_prompt(),
+                    },
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Transcribe this audio faithfully.",
+                            },
+                            {
+                                "type": "input_audio",
+                                "input_audio": {
+                                    "data": base64.b64encode(audio_bytes).decode(
+                                        "ascii"
+                                    ),
+                                    "format": audio_format,
+                                },
+                            },
+                        ],
+                    },
+                ],
+            )
+        except Exception as exc:  # pragma: no cover - depends on external service.
+            logger.exception("Transcription request failed")
+            raise ProviderError(f"Transcription request failed: {exc}") from exc
+
+        text = _extract_text_content(response.choices[0].message.content)
+        if not text:
+            raise ProviderError("Transcription response was empty.")
+        return text.strip()
+
+    @staticmethod
+    def _build_transcription_prompt() -> str:
+        return (
+            "You are an automatic speech recognition model. Transcribe the user's spoken audio "
+            "faithfully and return only the transcript text. Do not answer the user, do not "
+            "summarize, do not explain, and do not add extra commentary. Preserve the original "
+            "language. If a short segment is unclear, mark it conservatively rather than inventing "
+            "content."
         )
 
 
@@ -143,7 +237,8 @@ class NagaSpeechProvider:
             )
             response.stream_to_file(output_path)
         except Exception as exc:  # pragma: no cover - depends on external service.
-            raise ProviderError("TTS request failed.") from exc
+            logger.exception("TTS request failed")
+            raise ProviderError(f"TTS request failed: {exc}") from exc
         return str(output_path)
 
 
@@ -154,3 +249,41 @@ def _file_to_data_url(file_path: Path) -> str:
     mime_type = mime_type or "application/octet-stream"
     payload = base64.b64encode(file_path.read_bytes()).decode("ascii")
     return f"data:{mime_type};base64,{payload}"
+
+
+def _extract_text_content(content) -> str:
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts: list[str] = []
+        for part in content:
+            text = _extract_part_text(part)
+            if text:
+                parts.append(text)
+        return "\n".join(parts).strip()
+    text = _extract_part_text(content)
+    return text or ""
+
+
+def _extract_part_text(part) -> str | None:
+    if isinstance(part, str):
+        return part
+    if isinstance(part, dict):
+        if part.get("type") == "text":
+            text_value = part.get("text")
+            if isinstance(text_value, dict):
+                return text_value.get("value")
+            return text_value
+        return part.get("text")
+
+    part_type = getattr(part, "type", None)
+    if part_type == "text":
+        text_value = getattr(part, "text", None)
+        if hasattr(text_value, "value"):
+            return text_value.value
+        return text_value
+
+    text_value = getattr(part, "text", None)
+    if hasattr(text_value, "value"):
+        return text_value.value
+    return text_value

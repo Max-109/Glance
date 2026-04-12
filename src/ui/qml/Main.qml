@@ -91,7 +91,16 @@ ApplicationWindow {
     }
 
     Rectangle {
+        id: shell
         anchors.fill: parent
+        focus: settingsController.bindingActive
+        Keys.onPressed: function(event) {
+            if (!settingsController.bindingActive) {
+                return
+            }
+            settingsController.captureKeybind(event.key, event.modifiers, event.text)
+            event.accepted = true
+        }
         radius: 18
         color: theme.backgroundPanel
         border.width: 1
@@ -248,9 +257,49 @@ ApplicationWindow {
                                 font.weight: 500
                             }
 
-                            KeybindRow { label: "Live"; value: settingsController.settings.live_keybind || "-"; theme: window.appTheme }
-                            KeybindRow { label: "Quick"; value: settingsController.settings.quick_keybind || "-"; theme: window.appTheme }
-                            KeybindRow { label: "OCR"; value: settingsController.settings.ocr_keybind || "-"; theme: window.appTheme }
+                            Text {
+                                text: settingsController.bindingActive
+                                    ? "Capture mode is active. Press a shortcut, or Escape to cancel."
+                                    : "Click a row to override the shortcut."
+                                color: settingsController.bindingActive ? theme.textStrong : theme.textWeak
+                                font.pixelSize: 11
+                                wrapMode: Text.Wrap
+                                Layout.fillWidth: true
+                            }
+
+                            KeybindRow {
+                                label: "Live"
+                                value: settingsController.settings.live_keybind || "-"
+                                theme: window.appTheme
+                                captureField: "live_keybind"
+                                captureActive: settingsController.bindingField === captureField
+                                onClicked: {
+                                    settingsController.startKeybindCapture(captureField)
+                                    shell.forceActiveFocus()
+                                }
+                            }
+                            KeybindRow {
+                                label: "Quick"
+                                value: settingsController.settings.quick_keybind || "-"
+                                theme: window.appTheme
+                                captureField: "quick_keybind"
+                                captureActive: settingsController.bindingField === captureField
+                                onClicked: {
+                                    settingsController.startKeybindCapture(captureField)
+                                    shell.forceActiveFocus()
+                                }
+                            }
+                            KeybindRow {
+                                label: "OCR"
+                                value: settingsController.settings.ocr_keybind || "-"
+                                theme: window.appTheme
+                                captureField: "ocr_keybind"
+                                captureActive: settingsController.bindingField === captureField
+                                onClicked: {
+                                    settingsController.startKeybindCapture(captureField)
+                                    shell.forceActiveFocus()
+                                }
+                            }
                         }
                     }
 
@@ -476,9 +525,17 @@ ApplicationWindow {
     }
 
     component KeybindRow: RowLayout {
+        id: keybindRowRoot
         property string label: ""
         property string value: ""
+        property string captureField: ""
+        property bool captureActive: false
         property var theme
+        readonly property string displayValue: captureActive
+            ? "PRESS SHORTCUT"
+            : (value && value.length > 0 ? value : "-")
+
+        signal clicked()
 
         Layout.fillWidth: true
         spacing: 8
@@ -492,25 +549,36 @@ ApplicationWindow {
         }
 
         Rectangle {
-            radius: 8
-            color: theme.surfaceInsetBase
+            radius: 10
+            color: captureActive ? theme.surfaceBrandBase : theme.surfaceInsetBase
             border.width: 1
-            border.color: theme.borderWeakBase
-            implicitHeight: 22
-            implicitWidth: Math.min(96, keybindValue.implicitWidth + 16)
-            Layout.preferredWidth: Math.min(96, keybindValue.implicitWidth + 16)
-            Layout.maximumWidth: 96
+            border.color: captureActive ? theme.borderSelected : theme.borderWeakBase
+            implicitHeight: 28
+            implicitWidth: Math.min(164, keybindValue.implicitWidth + 20)
+            Layout.preferredWidth: Math.min(164, keybindValue.implicitWidth + 20)
+            Layout.maximumWidth: 164
+
+            Behavior on color { ColorAnimation { duration: 120 } }
+            Behavior on border.color { ColorAnimation { duration: 120 } }
 
             Text {
                 id: keybindValue
-                anchors.centerIn: parent
-                text: value
+                anchors.fill: parent
+                anchors.leftMargin: 10
+                anchors.rightMargin: 10
+                text: keybindRowRoot.displayValue
                 color: theme.textStrong
                 font.pixelSize: 11
-                font.weight: 500
-                width: Math.min(80, implicitWidth)
+                font.weight: 600
                 elide: Text.ElideRight
-                horizontalAlignment: Text.AlignHCenter
+                verticalAlignment: Text.AlignVCenter
+            }
+
+            MouseArea {
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: keybindRowRoot.clicked()
             }
         }
 
@@ -585,6 +653,30 @@ ApplicationWindow {
                         Layout.fillWidth: true
                         onValueEdited: function(nextValue) { settingsController.setField("llm_reasoning", nextValue) }
                     }
+
+                    LabeledTextField {
+                        theme: window.appTheme
+                        iconLibrary: window.iconLibrary
+                        iconName: "audio-lines"
+                        label: "Transcription model"
+                        helperText: "Audio turns are transcribed with Gemini before Claude responds."
+                        errorText: settingsController.errors.transcription_model_name || ""
+                        value: settingsController.settings.transcription_model_name || "gemini-3.1-flash-lite-preview"
+                        Layout.fillWidth: true
+                        onValueEdited: function(nextValue) { settingsController.setField("transcription_model_name", nextValue) }
+                    }
+
+                    LabeledComboBox {
+                        theme: window.appTheme
+                        iconLibrary: window.iconLibrary
+                        iconName: "zap"
+                        label: "Transcription reasoning"
+                        helperText: "Reasoning effort for Gemini transcription turns."
+                        value: settingsController.settings.transcription_reasoning || "medium"
+                        options: settingsController.transcriptionReasoningOptions
+                        Layout.fillWidth: true
+                        onValueEdited: function(nextValue) { settingsController.setField("transcription_reasoning", nextValue) }
+                    }
                 }
             }
         }
@@ -619,7 +711,7 @@ ApplicationWindow {
                     iconLibrary: window.iconLibrary
                     iconName: "key-round"
                     label: "API key"
-                    helperText: "Used for speech generation."
+                    helperText: "Used for Gemini transcription and Eleven v3 speech generation."
                     value: settingsController.settings.tts_api_key || ""
                     secret: true
                     Layout.fillWidth: true
@@ -868,8 +960,8 @@ ApplicationWindow {
     }
 
     function sectionDescription(section) {
-        if (section === "llm") return "Choose the endpoint, key, model, and reasoning level for text responses."
-        if (section === "voice") return "Set the speech endpoint, voice, and language fallback."
+        if (section === "llm") return "Choose the Claude response model and the Gemini transcription settings for live mode."
+        if (section === "voice") return "Set the shared NagaAI endpoint, Eleven voice, and language fallback."
         if (section === "capture") return "Control screen sampling and response batching."
         if (section === "audio") return "Choose the default input and output devices."
         if (section === "history") return "Manage locally saved sessions."

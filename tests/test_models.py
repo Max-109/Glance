@@ -18,6 +18,22 @@ class AppSettingsTests(unittest.TestCase):
         self.assertEqual(settings.llm_model_name, "model-a")
         self.assertEqual(settings.history_length, 50)
 
+    def test_from_mapping_normalizes_keybinds_to_uppercase(self) -> None:
+        settings = AppSettings.from_mapping(
+            {
+                "live_keybind": "cmd+shift+l",
+                "quick_keybind": "ctrl+alt+q",
+                "ocr_keybind": "cmd+o",
+                "llm_base_url": "https://api.example.com/v1",
+                "llm_model_name": "model-a",
+                "tts_base_url": "https://tts.example.com/v1",
+            }
+        )
+
+        self.assertEqual(settings.live_keybind, "CMD+SHIFT+L")
+        self.assertEqual(settings.quick_keybind, "CTRL+ALT+Q")
+        self.assertEqual(settings.ocr_keybind, "CMD+O")
+
     def test_validate_rejects_invalid_threshold(self) -> None:
         with self.assertRaises(ValidationError):
             AppSettings.from_mapping(

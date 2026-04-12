@@ -55,14 +55,11 @@ class ConsoleUI:
         print(interaction.extracted_text)
 
     def _run_live_mode(self) -> None:
-        transcript = input("Transcript text: ").strip()
-        raw_paths = input("Comma-separated frame image paths: ").strip()
-        image_paths = [path.strip() for path in raw_paths.split(",") if path.strip()]
+        recording_path = input("Recorded audio path: ").strip()
         try:
             interaction = self._orchestrator.run_mode(
                 "live",
-                transcript=transcript,
-                image_paths=image_paths,
+                recording_path=recording_path,
             )
         except GlanceError as exc:
             print(f"Live mode failed: {exc}")

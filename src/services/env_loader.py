@@ -8,6 +8,8 @@ ENV_KEY_MAP = {
     "LLM_API_KEY": "llm_api_key",
     "LLM_MODEL": "llm_model_name",
     "LLM_REASONING": "llm_reasoning",
+    "TRANSCRIPTION_MODEL": "transcription_model_name",
+    "TRANSCRIPTION_REASONING": "transcription_reasoning",
     "TTS_BASE_URL": "tts_base_url",
     "TTS_API_KEY": "tts_api_key",
     "TTS_MODEL": "tts_model",

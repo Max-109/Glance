@@ -3,17 +3,20 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 
 from src.exceptions.app_exceptions import ValidationError
+from src.services.keybinds import keybinds_are_unique, normalize_keybind
 
 
 @dataclass
 class AppSettings:
-    live_keybind: str = "cmd+shift+l"
-    quick_keybind: str = "cmd+shift+q"
-    ocr_keybind: str = "cmd+shift+o"
+    live_keybind: str = "CMD+SHIFT+L"
+    quick_keybind: str = "CMD+SHIFT+Q"
+    ocr_keybind: str = "CMD+SHIFT+O"
     llm_base_url: str = ""
     llm_api_key: str = ""
     llm_model_name: str = "claude-opus-4.6"
-    llm_reasoning: str = "medium"
+    llm_reasoning: str = "low"
+    transcription_model_name: str = "gemini-3.1-flash-lite-preview"
+    transcription_reasoning: str = "medium"
     tts_base_url: str = "https://api.naga.ac/v1"
     tts_api_key: str = ""
     tts_model: str = "eleven-v3"
@@ -29,16 +32,31 @@ class AppSettings:
     theme_preference: str = "dark"
 
     def validate(self) -> None:
+        self.live_keybind = normalize_keybind(self.live_keybind)
+        self.quick_keybind = normalize_keybind(self.quick_keybind)
+        self.ocr_keybind = normalize_keybind(self.ocr_keybind)
+        if not keybinds_are_unique(
+            [self.live_keybind, self.quick_keybind, self.ocr_keybind]
+        ):
+            raise ValidationError("Each shortcut must be unique.")
         if not self.llm_base_url.strip():
             raise ValidationError("llm_base_url cannot be empty.")
         if not self.llm_model_name.strip():
             raise ValidationError("llm_model_name cannot be empty.")
+        if not self.transcription_model_name.strip():
+            raise ValidationError("transcription_model_name cannot be empty.")
         if not self.tts_base_url.strip():
             raise ValidationError("tts_base_url cannot be empty.")
         if not self.tts_model.strip():
             raise ValidationError("tts_model cannot be empty.")
         if not self.tts_voice_id.strip():
             raise ValidationError("tts_voice_id cannot be empty.")
+        if self.llm_reasoning not in {"low", "medium", "high"}:
+            raise ValidationError("llm_reasoning must be low, medium, or high.")
+        if self.transcription_reasoning not in {"minimal", "low", "medium", "high"}:
+            raise ValidationError(
+                "transcription_reasoning must be minimal, low, medium, or high."
+            )
         if not self.fallback_language.strip():
             raise ValidationError("fallback_language cannot be empty.")
         if self.history_length <= 0:
@@ -56,15 +74,23 @@ class AppSettings:
         return asdict(self)
 
     @classmethod
-    def from_mapping(cls, data: dict) -> "AppSettings":
+    def from_mapping(cls, data: dict, *, validate: bool = True) -> "AppSettings":
         settings = cls(
-            live_keybind=data.get("live_keybind", cls.live_keybind),
-            quick_keybind=data.get("quick_keybind", cls.quick_keybind),
-            ocr_keybind=data.get("ocr_keybind", cls.ocr_keybind),
+            live_keybind=normalize_keybind(data.get("live_keybind", cls.live_keybind)),
+            quick_keybind=normalize_keybind(
+                data.get("quick_keybind", cls.quick_keybind)
+            ),
+            ocr_keybind=normalize_keybind(data.get("ocr_keybind", cls.ocr_keybind)),
             llm_base_url=data.get("llm_base_url", cls.llm_base_url),
             llm_api_key=data.get("llm_api_key", cls.llm_api_key),
             llm_model_name=data.get("llm_model_name", cls.llm_model_name),
             llm_reasoning=data.get("llm_reasoning", cls.llm_reasoning),
+            transcription_model_name=data.get(
+                "transcription_model_name", cls.transcription_model_name
+            ),
+            transcription_reasoning=data.get(
+                "transcription_reasoning", cls.transcription_reasoning
+            ),
             tts_base_url=data.get("tts_base_url", cls.tts_base_url),
             tts_api_key=data.get("tts_api_key", cls.tts_api_key),
             tts_model=data.get("tts_model", cls.tts_model),
@@ -89,5 +115,6 @@ class AppSettings:
             ),
             theme_preference=data.get("theme_preference", cls.theme_preference),
         )
-        settings.validate()
+        if validate:
+            settings.validate()
         return settings

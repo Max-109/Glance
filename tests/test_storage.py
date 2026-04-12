@@ -3,7 +3,7 @@ import unittest
 from pathlib import Path
 
 from src.exceptions.app_exceptions import StorageError
-from src.models.interactions import QuickInteraction, SessionRecord
+from src.models.interactions import LiveInteraction, QuickInteraction, SessionRecord
 from src.storage.json_storage import JsonHistoryRepository
 
 
@@ -35,6 +35,27 @@ class JsonHistoryRepositoryTests(unittest.TestCase):
 
             with self.assertRaises(StorageError):
                 repo.load()
+
+    def test_live_interaction_round_trip_preserves_recording_path(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = JsonHistoryRepository(Path(temp_dir) / "history.json")
+            session = SessionRecord(mode="live")
+            session.add_interaction(
+                LiveInteraction(
+                    mode="live",
+                    recording_path="turn.wav",
+                    transcript="hello",
+                    response="hi there",
+                    speech_path="reply.mp3",
+                )
+            )
+
+            repo.save([session])
+            loaded = repo.load()
+
+        interaction = loaded[0].interactions[0]
+        self.assertEqual(interaction.recording_path, "turn.wav")
+        self.assertEqual(interaction.speech_path, "reply.mp3")
 
 
 if __name__ == "__main__":

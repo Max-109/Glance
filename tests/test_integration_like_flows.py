@@ -25,6 +25,11 @@ class FakeAudioCaptureAgent:
         return transcript.strip()
 
 
+class FakeTranscriptionAgent:
+    def run(self, *, audio_path):
+        return f"transcribed:{Path(audio_path).name}"
+
+
 class FakeLLMAgent:
     def run(
         self,
@@ -81,6 +86,7 @@ class OrchestratorFlowTests(unittest.TestCase):
             screen_capture_agent=FakeScreenCaptureAgent(),
             screen_diff_agent=FakeScreenDiffAgent(),
             audio_capture_agent=FakeAudioCaptureAgent(),
+            transcription_agent=FakeTranscriptionAgent(),
             llm_agent=FakeLLMAgent(),
             ocr_agent=FakeOCRAgent(),
             tts_agent=FakeTTSAgent(),
@@ -107,15 +113,32 @@ class OrchestratorFlowTests(unittest.TestCase):
         self.assertEqual(interaction.extracted_text, "ocr:sample.png")
         self.assertEqual(self.clipboard.last_copied_text, "ocr:sample.png")
 
-    def test_live_mode_filters_duplicate_frames(self) -> None:
+    def test_live_mode_transcribes_audio_and_generates_reply(self) -> None:
+        recording_path = Path(self.temp_dir.name) / "turn.wav"
+        recording_path.write_bytes(b"audio")
         interaction = self.orchestrator.run_mode(
-            "live",
-            transcript="Need help",
-            image_paths=["a.png", "a.png", "b.png"],
+            "live", recording_path=str(recording_path)
         )
 
-        self.assertEqual(interaction.frame_paths, ["a.png", "b.png"])
-        self.assertEqual(interaction.response, "live:Need help:2")
+        self.assertEqual(interaction.recording_path, str(recording_path))
+        self.assertEqual(interaction.transcript, "transcribed:turn.wav")
+        self.assertEqual(interaction.response, "live:transcribed:turn.wav:0")
+
+    def test_live_mode_reuses_same_session_when_provided(self) -> None:
+        recording_path = Path(self.temp_dir.name) / "turn.wav"
+        recording_path.write_bytes(b"audio")
+        session = self.orchestrator.open_session("live")
+
+        self.orchestrator.run_mode(
+            "live", session=session, recording_path=str(recording_path)
+        )
+        self.orchestrator.run_mode(
+            "live", session=session, recording_path=str(recording_path)
+        )
+
+        history = self.orchestrator.list_history()
+        self.assertEqual(len(history), 1)
+        self.assertEqual(len(history[0].interactions), 2)
 
 
 if __name__ == "__main__":

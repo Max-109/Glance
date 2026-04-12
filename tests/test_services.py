@@ -7,6 +7,7 @@ from src.agents.ocr_agent import OCRAgent
 from src.agents.screen_capture_agent import ScreenCaptureAgent
 from src.agents.screen_diff_agent import ScreenDiffAgent
 from src.agents.tts_agent import TTSAgent
+from src.agents.transcription_agent import TranscriptionAgent
 from src.exceptions.app_exceptions import ValidationError
 from src.factories.strategy_factory import ModeStrategyFactory
 from src.services.clipboard import ClipboardService
@@ -25,6 +26,9 @@ class DummyProvider:
     def extract_text(self, image_path: str) -> str:
         return image_path
 
+    def transcribe(self, audio_path: str) -> str:
+        return audio_path
+
     def synthesize(self, text: str, output_path: Path) -> str:
         return str(output_path)
 
@@ -37,6 +41,7 @@ class ModeStrategyFactoryTests(unittest.TestCase):
             "screen_capture_agent": ScreenCaptureAgent(),
             "screen_diff_agent": ScreenDiffAgent(),
             "audio_capture_agent": AudioCaptureAgent(),
+            "transcription_agent": TranscriptionAgent(provider),
             "llm_agent": LLMAgent(provider),
             "ocr_agent": OCRAgent(provider),
             "tts_agent": TTSAgent(provider),

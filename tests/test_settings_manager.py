@@ -11,14 +11,6 @@ class SettingsManagerTests(unittest.TestCase):
     def test_persisted_values_override_env_seed(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
-            env_file = temp_path / ".env"
-            env_file.write_text(
-                "LLM_BASE_URL=https://env.example/v1\n"
-                "LLM_MODEL=claude-opus-4.6\n"
-                "TTS_BASE_URL=https://tts.example/v1\n",
-                encoding="utf-8",
-            )
-
             store = JsonSettingsStore(temp_path / "config.json")
             store.save(
                 AppSettings.from_mapping(
@@ -30,10 +22,26 @@ class SettingsManagerTests(unittest.TestCase):
                 )
             )
 
-            manager = SettingsManager(store=store, env_file=env_file)
+            manager = SettingsManager(store=store)
             settings = manager.load()
 
         self.assertEqual(settings.llm_base_url, "https://persisted.example/v1")
+        self.assertEqual(
+            settings.transcription_model_name,
+            "gemini-3.1-flash-lite-preview",
+        )
+
+    def test_load_creates_defaults_without_validation(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            manager = SettingsManager(
+                store=JsonSettingsStore(temp_path / "config.json")
+            )
+
+            settings = manager.load()
+
+        self.assertEqual(settings.llm_base_url, "")
+        self.assertEqual(settings.tts_base_url, "https://api.naga.ac/v1")
 
 
 if __name__ == "__main__":

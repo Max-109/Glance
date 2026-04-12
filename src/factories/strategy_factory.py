@@ -8,6 +8,7 @@ from src.agents.ocr_agent import OCRAgent
 from src.agents.screen_capture_agent import ScreenCaptureAgent
 from src.agents.screen_diff_agent import ScreenDiffAgent
 from src.agents.tts_agent import TTSAgent
+from src.agents.transcription_agent import TranscriptionAgent
 from src.exceptions.app_exceptions import ValidationError
 from src.services.clipboard import ClipboardService
 from src.strategies.live_strategy import LiveStrategy
@@ -24,6 +25,7 @@ class ModeStrategyFactory:
         screen_capture_agent: ScreenCaptureAgent,
         screen_diff_agent: ScreenDiffAgent,
         audio_capture_agent: AudioCaptureAgent,
+        transcription_agent: TranscriptionAgent,
         llm_agent: LLMAgent,
         ocr_agent: OCRAgent,
         tts_agent: TTSAgent,
@@ -46,9 +48,7 @@ class ModeStrategyFactory:
             )
         if normalized_mode == "live":
             return LiveStrategy(
-                screen_capture_agent=screen_capture_agent,
-                screen_diff_agent=screen_diff_agent,
-                audio_capture_agent=audio_capture_agent,
+                transcription_agent=transcription_agent,
                 llm_agent=llm_agent,
                 tts_agent=tts_agent,
                 audio_dir=audio_dir,
