@@ -1025,15 +1025,6 @@ ApplicationWindow {
                         Layout.fillWidth: true
                         spacing: 10
 
-                        Text {
-                            Layout.fillWidth: true
-                            text: settingsController.audioDeviceStatusMessage
-                            color: theme.textWeak
-                            font.pixelSize: 13
-                            font.weight: 400
-                            wrapMode: Text.Wrap
-                        }
-
                         OcButton {
                             theme: window.appTheme
                             iconLibrary: window.iconLibrary
@@ -1041,118 +1032,6 @@ ApplicationWindow {
                             iconName: "rotate-ccw"
                             text: "Refresh devices"
                             onClicked: settingsController.refreshAudioDevices()
-                        }
-                    }
-                }
-            }
-
-            FieldCard {
-                theme: window.appTheme
-                title: "Live Input"
-                description: "Tune how live mode decides when speech starts and when a turn should end."
-                Layout.fillWidth: true
-
-                ColumnLayout {
-                    Layout.fillWidth: true
-                    spacing: 12
-
-                    LabeledTextField {
-                        theme: window.appTheme
-                        iconLibrary: window.iconLibrary
-                        iconName: "gauge"
-                        label: "Mic sensitivity"
-                        helperText: "Lower values catch quieter speech. Higher values ignore more background noise."
-                        errorText: settingsController.errors.audio_activation_threshold || ""
-                        value: String(settingsController.settings.audio_activation_threshold || "")
-                        Layout.fillWidth: true
-                        onValueEdited: function(nextValue) { settingsController.setField("audio_activation_threshold", nextValue) }
-                    }
-
-                    LabeledTextField {
-                        theme: window.appTheme
-                        iconLibrary: window.iconLibrary
-                        iconName: "history"
-                        label: "Silence timeout"
-                        helperText: "How long silence must last before Glance finishes the current spoken turn, in seconds."
-                        errorText: settingsController.errors.audio_silence_seconds || ""
-                        value: String(settingsController.settings.audio_silence_seconds || "")
-                        Layout.fillWidth: true
-                        onValueEdited: function(nextValue) { settingsController.setField("audio_silence_seconds", nextValue) }
-                    }
-
-                    LabeledTextField {
-                        theme: window.appTheme
-                        iconLibrary: window.iconLibrary
-                        iconName: "clock-3"
-                        label: "Wait for speech"
-                        helperText: "Maximum time to wait for speech before live mode returns to listening, in seconds."
-                        errorText: settingsController.errors.audio_max_wait_seconds || ""
-                        value: String(settingsController.settings.audio_max_wait_seconds || "")
-                        Layout.fillWidth: true
-                        onValueEdited: function(nextValue) { settingsController.setField("audio_max_wait_seconds", nextValue) }
-                    }
-
-                    LabeledTextField {
-                        theme: window.appTheme
-                        iconLibrary: window.iconLibrary
-                        iconName: "audio-lines"
-                        label: "Max turn length"
-                        helperText: "Hard limit for one captured spoken turn, in seconds."
-                        errorText: settingsController.errors.audio_max_record_seconds || ""
-                        value: String(settingsController.settings.audio_max_record_seconds || "")
-                        Layout.fillWidth: true
-                        onValueEdited: function(nextValue) { settingsController.setField("audio_max_record_seconds", nextValue) }
-                    }
-
-                    LabeledTextField {
-                        theme: window.appTheme
-                        iconLibrary: window.iconLibrary
-                        iconName: "mic"
-                        label: "Pre-roll"
-                        helperText: "Extra audio kept just before speech starts, in seconds."
-                        errorText: settingsController.errors.audio_preroll_seconds || ""
-                        value: String(settingsController.settings.audio_preroll_seconds || "")
-                        Layout.fillWidth: true
-                        onValueEdited: function(nextValue) { settingsController.setField("audio_preroll_seconds", nextValue) }
-                    }
-                }
-            }
-
-            FieldCard {
-                theme: window.appTheme
-                title: "Testing"
-                description: "Check microphone and speaker behavior locally before starting a live session."
-                Layout.fillWidth: true
-
-                ColumnLayout {
-                    Layout.fillWidth: true
-                    spacing: 14
-
-                    AudioLevelMeter {
-                        theme: window.appTheme
-                        level: settingsController.audioInputLevel
-                        threshold: Number(settingsController.settings.audio_activation_threshold || 0.02)
-                        active: settingsController.audioInputTestActive
-                        Layout.fillWidth: true
-                    }
-
-                    RowLayout {
-                        Layout.fillWidth: true
-                        spacing: 10
-
-                        OcButton {
-                            theme: window.appTheme
-                            iconLibrary: window.iconLibrary
-                            variant: "secondary"
-                            iconName: settingsController.audioInputTestActive ? "audio-lines" : "mic"
-                            text: settingsController.audioInputTestActive ? "Stop mic test" : "Start mic test"
-                            onClicked: {
-                                if (settingsController.audioInputTestActive) {
-                                    settingsController.stopAudioInputTest()
-                                } else {
-                                    settingsController.startAudioInputTest()
-                                }
-                            }
                         }
 
                         OcButton {
@@ -1169,6 +1048,147 @@ ApplicationWindow {
                                 }
                             }
                         }
+
+                        Item { Layout.fillWidth: true }
+
+                        Text {
+                            text: settingsController.audioDeviceStatusMessage
+                            color: theme.textWeak
+                            font.pixelSize: 13
+                            font.weight: 400
+                            wrapMode: Text.Wrap
+                            horizontalAlignment: Text.AlignRight
+                            Layout.preferredWidth: 250
+                        }
+                    }
+                }
+            }
+
+            FieldCard {
+                theme: window.appTheme
+                title: "Mic Calibration"
+                description: "Test the microphone and drag the trigger marker until normal speech crosses it without reacting to room noise."
+                Layout.fillWidth: true
+
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    spacing: 14
+
+                    AudioLevelMeter {
+                        theme: window.appTheme
+                        level: settingsController.audioInputLevel
+                        threshold: Number(settingsController.settings.audio_activation_threshold || 0.02)
+                        active: settingsController.audioInputTestActive
+                        editable: true
+                        Layout.fillWidth: true
+                        onThresholdEdited: function(nextValue) {
+                            settingsController.setField("audio_activation_threshold", Number(nextValue.toFixed(3)))
+                        }
+                    }
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 10
+
+                        Text {
+                            text: "Mic sensitivity"
+                            color: theme.textStrong
+                            font.pixelSize: 13
+                            font.weight: 500
+                        }
+
+                        Text {
+                            text: Number(settingsController.settings.audio_activation_threshold || 0.02).toFixed(3)
+                            color: theme.textWeak
+                            font.pixelSize: 13
+                            font.weight: 500
+                        }
+
+                        Item { Layout.fillWidth: true }
+
+                        OcButton {
+                            theme: window.appTheme
+                            iconLibrary: window.iconLibrary
+                            variant: "secondary"
+                            iconName: settingsController.audioInputTestActive ? "audio-lines" : "mic"
+                            text: settingsController.audioInputTestActive ? "Stop mic test" : "Start mic test"
+                            onClicked: {
+                                if (settingsController.audioInputTestActive) {
+                                    settingsController.stopAudioInputTest()
+                                } else {
+                                    settingsController.startAudioInputTest()
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            FieldCard {
+                theme: window.appTheme
+                title: "Turn Timing"
+                description: "Adjust how long Glance waits, listens, and keeps pre-speech context for each spoken turn."
+                Layout.fillWidth: true
+
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    spacing: 12
+
+                    LabeledTextField {
+                        theme: window.appTheme
+                        iconLibrary: window.iconLibrary
+                        iconName: "history"
+                        label: "Silence timeout"
+                        helperText: "How long silence must last before Glance finishes the current spoken turn, in seconds."
+                        errorText: settingsController.errors.audio_silence_seconds || ""
+                        value: String(settingsController.settings.audio_silence_seconds || "")
+                        suffixText: "s"
+                        Layout.fillWidth: true
+                        onValueEdited: function(nextValue) { settingsController.setField("audio_silence_seconds", nextValue) }
+                    }
+
+                    LabeledTextField {
+                        theme: window.appTheme
+                        iconLibrary: window.iconLibrary
+                        iconName: "clock-3"
+                        label: "Wait for speech"
+                        helperText: "Maximum time to wait for speech before live mode returns to listening, in seconds."
+                        errorText: settingsController.errors.audio_max_wait_seconds || ""
+                        value: String(settingsController.settings.audio_max_wait_seconds || "")
+                        suffixText: "s"
+                        Layout.fillWidth: true
+                        onValueEdited: function(nextValue) { settingsController.setField("audio_max_wait_seconds", nextValue) }
+                    }
+
+                    LabeledTextField {
+                        theme: window.appTheme
+                        iconLibrary: window.iconLibrary
+                        iconName: "audio-lines"
+                        label: "Max turn length"
+                        helperText: "Hard limit for one captured spoken turn, in seconds."
+                        errorText: settingsController.errors.audio_max_record_seconds || ""
+                        value: String(settingsController.settings.audio_max_record_seconds || "")
+                        suffixText: "s"
+                        Layout.fillWidth: true
+                        onValueEdited: function(nextValue) { settingsController.setField("audio_max_record_seconds", nextValue) }
+                    }
+
+                    LabeledTextField {
+                        theme: window.appTheme
+                        iconLibrary: window.iconLibrary
+                        iconName: "mic"
+                        label: "Pre-roll"
+                        helperText: "Extra audio kept just before speech starts, in seconds."
+                        errorText: settingsController.errors.audio_preroll_seconds || ""
+                        value: String(settingsController.settings.audio_preroll_seconds || "")
+                        suffixText: "s"
+                        Layout.fillWidth: true
+                        onValueEdited: function(nextValue) { settingsController.setField("audio_preroll_seconds", nextValue) }
+                    }
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 10
 
                         Item { Layout.fillWidth: true }
 
@@ -1287,7 +1307,7 @@ ApplicationWindow {
         if (section === "api") return "Switch between compact provider panels for the response, transcription, and speech stack."
         if (section === "voice") return "Choose the speaking voice, preview it from the dropdown, and set the fallback language."
         if (section === "capture") return "Control screen sampling and response batching."
-        if (section === "audio") return "Choose devices, tune live listening thresholds, and run local audio tests."
+        if (section === "audio") return "Choose devices, calibrate the microphone, and tune spoken turn timing."
         if (section === "history") return "Manage locally saved sessions."
         return "Adjust the theme and optional prompt override."
     }

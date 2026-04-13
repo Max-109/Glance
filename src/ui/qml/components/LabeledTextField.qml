@@ -13,6 +13,7 @@ Item {
     property string errorText: ""
     property string iconName: ""
     property string value: ""
+    property string suffixText: ""
     property bool secret: false
     property bool multiline: false
     readonly property real pixelRatio: Screen.devicePixelRatio > 0 ? Screen.devicePixelRatio : 1
@@ -88,6 +89,15 @@ Item {
                     background: null
                     Accessible.name: root.label
                     onTextEdited: root.valueEdited(text)
+                }
+
+                Text {
+                    visible: !root.multiline && root.suffixText.length > 0
+                    text: root.suffixText
+                    color: root.theme.textWeak
+                    font.pixelSize: 13
+                    font.weight: 500
+                    Layout.alignment: Qt.AlignVCenter
                 }
 
                 TextArea {

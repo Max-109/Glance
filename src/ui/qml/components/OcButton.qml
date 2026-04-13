@@ -13,11 +13,13 @@ Button {
     readonly property real pixelRatio: Screen.devicePixelRatio > 0 ? Screen.devicePixelRatio : 1
     readonly property bool iconOnly: root.text.length === 0
     readonly property bool activePress: root.down || root.checked
+    readonly property int iconVisualWidth: root.iconName.length > 0 ? 16 : 0
+    readonly property int contentGap: root.iconName.length > 0 && root.text.length > 0 ? 8 : 0
 
     implicitHeight: iconOnly ? 32 : 34
     implicitWidth: iconOnly
         ? 32
-        : Math.max(96, contentRow.implicitWidth + leftPadding + rightPadding)
+        : Math.max(96, labelMetrics.implicitWidth + leftPadding + rightPadding + iconVisualWidth + contentGap)
 
     padding: 0
     leftPadding: iconOnly ? 8 : 12
@@ -29,51 +31,62 @@ Button {
     Accessible.name: root.accessibleLabel.length > 0 ? root.accessibleLabel : (root.text.length > 0 ? root.text : root.iconName)
 
     contentItem: Item {
-        anchors.fill: parent
-        implicitWidth: contentRow.implicitWidth
-        implicitHeight: contentRow.implicitHeight
-        y: root.activePress ? 1 : 0
+        x: root.leftPadding
+        y: root.topPadding + (root.activePress ? 1 : 0)
+        width: root.availableWidth
+        height: root.availableHeight
+        implicitWidth: Math.max(icon.implicitWidth, labelMetrics.implicitWidth)
+        implicitHeight: Math.max(icon.implicitHeight, label.implicitHeight)
 
         Behavior on y {
             NumberAnimation { duration: 70; easing.type: Easing.OutCubic }
         }
 
-        Row {
-            id: contentRow
-            anchors.centerIn: parent
-            spacing: icon.visible && label.visible ? 8 : 0
+        Image {
+            id: icon
+            visible: root.iconName.length > 0
+            width: visible ? 16 : 0
+            height: visible ? 16 : 0
+            x: root.iconOnly
+                ? Math.round((parent.width - width) / 2)
+                : 0
+            y: Math.round((parent.height - height) / 2)
+            source: root.iconLibrary ? root.iconLibrary.svgData(root.iconName, root._foregroundColor()) : ""
+            sourceSize.width: Math.round(16 * root.pixelRatio)
+            sourceSize.height: Math.round(16 * root.pixelRatio)
+            fillMode: Image.PreserveAspectFit
+            smooth: true
+            Accessible.ignored: true
+        }
 
-            Image {
-                id: icon
-                visible: root.iconName.length > 0
-                width: visible ? 16 : 0
-                height: visible ? 16 : 0
-                anchors.verticalCenter: parent.verticalCenter
-                source: root.iconLibrary ? root.iconLibrary.svgData(root.iconName, root._foregroundColor()) : ""
-                sourceSize.width: Math.round(16 * root.pixelRatio)
-                sourceSize.height: Math.round(16 * root.pixelRatio)
-                fillMode: Image.PreserveAspectFit
-                smooth: true
-                Accessible.ignored: true
-            }
+        Text {
+            id: label
+            visible: root.text.length > 0
+            text: root.text
+            color: root._foregroundColor()
+            font.pixelSize: 13
+            font.weight: 500
+            renderType: Text.NativeRendering
+            width: Math.min(labelMetrics.implicitWidth, parent.width - root.rightPadding - (root.iconOnly ? 0 : 0))
+            height: implicitHeight
+            x: Math.round((parent.width - width) / 2)
+            y: Math.round((parent.height - height) / 2)
+            horizontalAlignment: Text.AlignHCenter
+            verticalAlignment: Text.AlignVCenter
+            elide: Text.ElideRight
+        }
 
-            Text {
-                id: label
-                visible: root.text.length > 0
-                anchors.verticalCenter: parent.verticalCenter
-                text: root.text
-                color: root._foregroundColor()
-                font.pixelSize: 13
-                font.weight: 500
-                renderType: Text.QtRendering
-                horizontalAlignment: Text.AlignHCenter
-                verticalAlignment: Text.AlignVCenter
-            }
+        Text {
+            id: labelMetrics
+            visible: false
+            text: root.text
+            font.pixelSize: 13
+            font.weight: 500
         }
     }
 
     background: Rectangle {
-        radius: iconOnly ? 4 : 6
+        radius: root.iconOnly ? 4 : 6
         color: root._backgroundColor()
         border.width: root._borderWidth()
         border.color: root._borderColor()
