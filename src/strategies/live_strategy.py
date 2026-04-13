@@ -26,9 +26,10 @@ class LiveStrategy(ModeStrategy):
         recording_path = str(context["recording_path"])
         transcript = self._transcription_agent.run(audio_path=recording_path)
         prompt = (
-            "You are replying inside a live desktop voice conversation. Answer the user's last "
-            "spoken request briefly, clearly, and naturally so the reply sounds good when spoken "
-            "aloud."
+            "You are replying inside a live desktop voice conversation. Help the user with their "
+            "last spoken request in a natural back-and-forth way. Be clear, direct, and friendly. "
+            "Be brief by default, but include enough detail to actually help. Make the reply easy "
+            "to understand in one listen and easy to speak aloud."
         )
         response = self._llm_agent.run(
             user_prompt=prompt,

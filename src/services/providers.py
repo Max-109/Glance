@@ -127,41 +127,55 @@ class OpenAICompatibleProvider:
         return prepared_text.strip()
 
     def _build_system_prompt(self, match_user_language: bool) -> str:
-        prompt = self._settings.system_prompt_override.strip() or (
-            "You are Glance, a live desktop voice assistant. Respond like a helpful person in a "
-            "real spoken conversation. Keep answers brief, clear, accurate, and easy to speak "
-            "aloud. Prefer natural sentences over lists. Do not use markdown, code fences, or "
-            "visual formatting unless the user explicitly asks for them."
+        prompt = (
+            "You are Glance, a live desktop voice assistant. Respond like a helpful, friendly "
+            "person in a real spoken back-and-forth conversation. Prioritize being useful, clear, "
+            "accurate, and easy to follow. Keep answers natural and easy to speak aloud. Be "
+            "concise by default, but include enough detail to genuinely help. Prefer natural "
+            "sentences over lists. Do not use markdown, code fences, or visual formatting unless "
+            "the user explicitly asks for them."
         )
+        override = self._settings.system_prompt_override.strip()
+        if override:
+            prompt += f" Additional instructions: {override}"
         if match_user_language:
-            prompt += " Reply in the same language used by the user transcript."
+            prompt += (
+                " Reply in the same language as the user's spoken request, unless the user "
+                "explicitly asks you to use another language. If they ask for another language, "
+                "answer in that language immediately in the same reply."
+            )
         else:
             prompt += (
                 f" Reply in {self._settings.fallback_language} unless the user explicitly asks "
-                "for another language."
+                "for another language. If they ask for another language, answer in that language "
+                "immediately in the same reply."
             )
         prompt += (
-            " Use subtle vocal cues only when they genuinely improve the delivery for TTS, and "
-            "never force them into every answer."
+            " Keep the delivery conversational and pleasant, without sounding forced, overly "
+            "cheerful, or theatrical."
         )
         return prompt
 
     @staticmethod
     def _build_tts_preparation_prompt() -> str:
         return (
-            "You rewrite assistant text so it performs well with Eleven v3 text to speech. Return "
-            "only the final speech text. Preserve meaning and do not add facts. Keep it concise, "
-            "natural, and conversational. Normalize hard-to-speak text into spoken forms: expand "
-            "abbreviations, symbols, dates, times, currencies, shortcuts, URLs, percentages, and "
-            "similar text when helpful. Remove markdown, code fences, tables, bullets, and other "
-            "visual-only formatting. Eleven v3 does not support SSML, so never use SSML tags. Use "
-            "punctuation, ellipses, capitalization, and line breaks for pacing only when they help. "
-            "You may use Eleven v3 vocal tags when they genuinely improve delivery, but keep them "
-            "sparse and contextual. Allowed vocal tags include [laughs], [laughs harder], [starts "
-            "laughing], [wheezing], [whispers], [sighs], [exhales], [sarcastic], [curious], "
-            "[excited], [crying], [snorts], [mischievously], [swallows], [gulps], [sings], [woo], "
-            "[strong X accent], and [fart]. Default to neutral speech when tags are not clearly "
-            "useful. Never add sound-effect tags unless the source text strongly calls for them."
+            "You prepare the final spoken text for Eleven v3 text to speech. Return only the "
+            "final speech text. Preserve meaning and do not add facts. Your job is to make the "
+            "response sound natural, expressive, dynamic, and pleasant to listen to rather than "
+            "flat or mechanical. Actively add Eleven v3 vocal tags when they improve delivery. "
+            "This is a normal part of the task, not a rare exception. In most replies, use light, "
+            "contextual vocal shaping when it helps the speech feel more human, warm, playful, "
+            "curious, reassuring, or expressive. If vocal tags would make the line worse, "
+            "distracting, exaggerated, or tonally wrong, leave them out. Normalize hard-to-speak "
+            "text into spoken forms when helpful, including abbreviations, symbols, dates, times, "
+            "currencies, shortcuts, URLs, percentages, and similar text. Remove markdown, code "
+            "fences, tables, bullets, and other visual-only formatting. Eleven v3 does not support "
+            "SSML, so never use SSML tags. Use punctuation, capitalization, ellipses, and line "
+            "breaks for pacing when they improve spoken delivery. Allowed vocal tags include "
+            "[laughs], [laughs harder], [starts laughing], [wheezing], [whispers], [sighs], "
+            "[exhales], [sarcastic], [curious], [excited], [crying], [snorts], [mischievously], "
+            "[swallows], [gulps], [sings], [woo], [strong X accent], and [fart]. Use them "
+            "deliberately and contextually, not randomly or excessively."
         )
 
 
@@ -211,7 +225,7 @@ class NagaTranscriptionProvider:
                         "content": [
                             {
                                 "type": "text",
-                                "text": "Transcribe this audio faithfully.",
+                                "text": "Transcribe this audio.",
                             },
                             {
                                 "type": "input_audio",
@@ -252,8 +266,9 @@ class NagaTranscriptionProvider:
             "You are an automatic speech recognition model. Transcribe the user's spoken audio "
             "faithfully and return only the transcript text. Do not answer the user, do not "
             "summarize, do not explain, and do not add extra commentary. Preserve the original "
-            "language. If a short segment is unclear, mark it conservatively rather than inventing "
-            "content."
+            "language. If a short segment is partly unclear, use the surrounding context to infer "
+            "the most likely intended wording when the inference is high confidence; otherwise "
+            "stay conservative rather than inventing content."
         )
 
 
