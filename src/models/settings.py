@@ -6,24 +6,78 @@ from src.exceptions.app_exceptions import ValidationError
 from src.services.keybinds import keybinds_are_unique, normalize_keybind
 
 
+AUTO_TTS_VOICE_ID = "auto"
+
+
+@dataclass(frozen=True)
+class ElevenV3Voice:
+    id: str
+    name: str
+    title: str
+    prompt_summary: str
+
+
 ELEVEN_V3_VOICES = [
-    "Bella - Professional, Bright, Warm",
-    "Roger - Laid-Back, Casual, Resonant",
-    "Sarah - Mature, Reassuring, Confident",
-    "Laura - Enthusiast, Quirky Attitude",
-    "Charlie - Deep, Confident, Energetic",
-    "George - Warm, Captivating Storyteller",
-    "Callum - Husky Trickster",
-    "River - Relaxed, Neutral, Informative",
-    "Harry - Fierce Warrior",
-    "Liam - Energetic, Social Media Creator",
-    "Alice - Clear, Engaging Educator",
-    "Matilda - Knowledgable, Professional",
-    "Will - Relaxed Optimist",
-    "Jessica - Playful, Bright, Warm",
-    "Eric - Smooth, Trustworthy",
+    ElevenV3Voice(
+        id="BIvP0GN1cAtSRTxNHnWS",
+        name="Ellen",
+        title="Serious, Direct and Confident",
+        prompt_summary="serious, direct, confident, calm international female voice",
+    ),
+    ElevenV3Voice(
+        id="EkK5I93UQWFDigLMpZcX",
+        name="James",
+        title="Husky, Engaging and Bold",
+        prompt_summary="husky, engaging, bold, slightly husky male voice",
+    ),
+    ElevenV3Voice(
+        id="aMSt68OGf4xUZAnLpTU8",
+        name="Juniper",
+        title="Grounded and Professional",
+        prompt_summary="grounded, professional, steady female professional voice",
+    ),
+    ElevenV3Voice(
+        id="UgBBYS2sOqTuMpoF3BR0",
+        name="Mark",
+        title="Natural Conversations",
+        prompt_summary="natural, conversational, casual young-adult speaking style",
+    ),
+    ElevenV3Voice(
+        id="Z3R5wn05IrDiVCyEkUrK",
+        name="Arabella",
+        title="Mysterious and Emotive",
+        prompt_summary="mysterious, emotive, young mature female narrator",
+    ),
+    ElevenV3Voice(
+        id="RILOU7YmBhvwJGDGjNmP",
+        name="Jane",
+        title="Professional Audiobook Reader",
+        prompt_summary="professional audiobook reader, polished, composed delivery",
+    ),
+    ElevenV3Voice(
+        id="tnSpp4vdxKPjI9w0GnoV",
+        name="Hope",
+        title="Upbeat and Clear",
+        prompt_summary="upbeat, clear, bright and reassuring delivery",
+    ),
+    ElevenV3Voice(
+        id="NNl6r8mD7vthiJatiJt1",
+        name="Bradford",
+        title="Expressive and Articulate",
+        prompt_summary="expressive, articulate, adult British male storyteller",
+    ),
 ]
-DEFAULT_TTS_VOICE = ELEVEN_V3_VOICES[0]
+ELEVEN_V3_VOICE_BY_ID = {voice.id: voice for voice in ELEVEN_V3_VOICES}
+ELEVEN_V3_VOICE_NAME_TO_ID = {
+    voice.name.lower(): voice.id for voice in ELEVEN_V3_VOICES
+}
+ELEVEN_V3_VOICE_LABELS = {
+    AUTO_TTS_VOICE_ID: "Auto - Pick the best curated Eleven v3 voice for each reply",
+    **{voice.id: f"{voice.name} - {voice.title}" for voice in ELEVEN_V3_VOICES},
+}
+DEFAULT_FIXED_TTS_VOICE = "UgBBYS2sOqTuMpoF3BR0"
+DEFAULT_TTS_VOICE = AUTO_TTS_VOICE_ID
+TTS_VOICE_OPTIONS = [AUTO_TTS_VOICE_ID, *ELEVEN_V3_VOICE_BY_ID.keys()]
 
 
 @dataclass
@@ -187,10 +241,28 @@ def normalize_tts_voice_id(value: str) -> str:
         return DEFAULT_TTS_VOICE
 
     lowered_value = stripped_value.lower()
+    if lowered_value == AUTO_TTS_VOICE_ID:
+        return AUTO_TTS_VOICE_ID
     if lowered_value == "alloy":
         return DEFAULT_TTS_VOICE
 
-    for voice_name in ELEVEN_V3_VOICES:
-        if voice_name.lower() == lowered_value:
-            return voice_name
+    if stripped_value in ELEVEN_V3_VOICE_BY_ID:
+        return stripped_value
+    if lowered_value in ELEVEN_V3_VOICE_NAME_TO_ID:
+        return ELEVEN_V3_VOICE_NAME_TO_ID[lowered_value]
+
+    for voice_id, label in ELEVEN_V3_VOICE_LABELS.items():
+        if label.lower() == lowered_value:
+            return voice_id
     return DEFAULT_TTS_VOICE
+
+
+def get_tts_voice(voice_id: str) -> ElevenV3Voice | None:
+    return ELEVEN_V3_VOICE_BY_ID.get(normalize_tts_voice_id(voice_id))
+
+
+def get_tts_voice_label(voice_id: str) -> str:
+    normalized_voice_id = normalize_tts_voice_id(voice_id)
+    return ELEVEN_V3_VOICE_LABELS.get(
+        normalized_voice_id, ELEVEN_V3_VOICE_LABELS[AUTO_TTS_VOICE_ID]
+    )

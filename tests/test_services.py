@@ -11,6 +11,7 @@ from src.agents.transcription_agent import TranscriptionAgent
 from src.exceptions.app_exceptions import ValidationError
 from src.factories.strategy_factory import ModeStrategyFactory
 from src.services.clipboard import ClipboardService
+from src.services.providers import LiveSpeechReply
 from src.strategies.live_strategy import LiveStrategy
 from src.strategies.ocr_strategy import OCRStrategy
 from src.strategies.quick_strategy import QuickStrategy
@@ -20,8 +21,17 @@ class DummyProvider:
     def generate_reply(self, **kwargs):
         return "ok"
 
-    def prepare_speech_text(self, text: str) -> str:
-        return text
+    def prepare_speech_text(self, text: str) -> LiveSpeechReply:
+        return LiveSpeechReply(
+            voice_id="UgBBYS2sOqTuMpoF3BR0",
+            text=text,
+        )
+
+    def generate_live_speech_reply(self, *, transcript: str) -> LiveSpeechReply:
+        return LiveSpeechReply(
+            voice_id="UgBBYS2sOqTuMpoF3BR0",
+            text=transcript,
+        )
 
     def extract_text(self, image_path: str) -> str:
         return image_path
@@ -29,7 +39,9 @@ class DummyProvider:
     def transcribe(self, audio_path: str) -> str:
         return audio_path
 
-    def synthesize(self, text: str, output_path: Path) -> str:
+    def synthesize(
+        self, text: str, output_path: Path, *, voice_id: str | None = None
+    ) -> str:
         return str(output_path)
 
 

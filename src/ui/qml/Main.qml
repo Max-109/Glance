@@ -899,10 +899,12 @@ ApplicationWindow {
                     theme: window.appTheme
                     iconLibrary: window.iconLibrary
                     label: "Voice"
-                    helperText: "Voice used for spoken replies. Use the play button to preview the selected voice."
+                    helperText: "Auto picks the best curated Eleven v3 voice for each reply. Use the play button to preview a fixed voice."
                     value: settingsController.settings.tts_voice_id || settingsController.voiceOptions[0]
                     options: settingsController.voiceOptions
+                    optionLabels: settingsController.voiceOptionLabels
                     previewingVoice: settingsController.previewingVoice || ""
+                    previewEnabled: (settingsController.settings.tts_voice_id || settingsController.voiceOptions[0]) !== "auto"
                     Layout.fillWidth: true
                     onValueEdited: function(nextValue) { settingsController.setField("tts_voice_id", nextValue) }
                     onPreviewClicked: function(voiceName) { settingsController.previewVoice(voiceName) }

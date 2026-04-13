@@ -11,7 +11,14 @@ from uuid import uuid4
 from PySide6.QtCore import Property, QCoreApplication, QTimer, QObject, Signal, Slot
 
 from src.exceptions.app_exceptions import ValidationError
-from src.models.settings import AppSettings, ELEVEN_V3_VOICES
+from src.models.settings import (
+    AUTO_TTS_VOICE_ID,
+    AppSettings,
+    ELEVEN_V3_VOICES,
+    TTS_VOICE_OPTIONS,
+    get_tts_voice,
+    get_tts_voice_label,
+)
 from src.services.audio_devices import AudioDeviceOption, AudioDeviceService
 from src.services.audio_monitor import AudioMonitorService
 from src.services.audio_playback import QtAudioPlaybackService
@@ -223,7 +230,13 @@ class SettingsViewModel(QObject):
 
     @Property("QStringList", constant=True)
     def voiceOptions(self) -> list[str]:
-        return ELEVEN_V3_VOICES
+        return TTS_VOICE_OPTIONS
+
+    @Property("QVariantMap", constant=True)
+    def voiceOptionLabels(self) -> dict[str, str]:
+        return {
+            voice_id: get_tts_voice_label(voice_id) for voice_id in TTS_VOICE_OPTIONS
+        }
 
     @Property("QStringList", constant=True)
     def languageOptions(self) -> list[str]:
@@ -734,7 +747,10 @@ class SettingsViewModel(QObject):
         self._recompute_dirty()
 
     def _build_preview_settings(self, voice_name: str) -> AppSettings | None:
-        if voice_name not in ELEVEN_V3_VOICES:
+        if voice_name == AUTO_TTS_VOICE_ID:
+            self._set_status("Choose a fixed voice to preview.", "error")
+            return None
+        if get_tts_voice(voice_name) is None:
             self._set_status("Choose a valid voice to preview.", "error")
             return None
 
@@ -816,7 +832,10 @@ class SettingsViewModel(QObject):
 
     @staticmethod
     def _voice_preview_label(voice_name: str) -> str:
-        return voice_name.split(" - ", 1)[0].strip() or voice_name
+        voice = get_tts_voice(voice_name)
+        if voice is None:
+            return get_tts_voice_label(voice_name)
+        return voice.name
 
     @staticmethod
     def _build_audio_option_state(

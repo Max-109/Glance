@@ -7,6 +7,7 @@ from src.factories.strategy_factory import ModeStrategyFactory
 from src.models.settings import AppSettings
 from src.services.app_paths import AppPaths
 from src.services.history_manager import HistoryManager
+from src.services.providers import LiveSpeechReply
 from src.storage.json_storage import JsonHistoryRepository
 
 
@@ -44,10 +45,16 @@ class FakeLLMAgent:
         return f"quick:{user_prompt}:{len(image_paths or [])}"
 
     def prepare_speech_text(self, *, text):
-        return text
+        return LiveSpeechReply(
+            voice_id="UgBBYS2sOqTuMpoF3BR0",
+            text=text,
+        )
 
     def generate_live_speech_reply(self, *, transcript):
-        return f"live:{transcript}"
+        return LiveSpeechReply(
+            voice_id="UgBBYS2sOqTuMpoF3BR0",
+            text=f"live:{transcript}",
+        )
 
 
 class FakeOCRAgent:
@@ -56,7 +63,7 @@ class FakeOCRAgent:
 
 
 class FakeTTSAgent:
-    def run(self, *, text, output_path):
+    def run(self, *, text, output_path, voice_id=None):
         return output_path
 
 

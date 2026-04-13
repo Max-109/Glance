@@ -2,6 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from src.services.providers import LiveSpeechReply
 from src.strategies.live_strategy import LiveStrategy
 
 
@@ -14,9 +15,12 @@ class FakeLLMAgent:
     def __init__(self) -> None:
         self.calls: list[tuple[str, str]] = []
 
-    def generate_live_speech_reply(self, *, transcript: str) -> str:
+    def generate_live_speech_reply(self, *, transcript: str) -> LiveSpeechReply:
         self.calls.append(("live", transcript))
-        return "[curious] Hello there!"
+        return LiveSpeechReply(
+            voice_id="UgBBYS2sOqTuMpoF3BR0",
+            text="[curious] Hello there!",
+        )
 
     def prepare_speech_text(
         self, *, text: str
@@ -26,10 +30,10 @@ class FakeLLMAgent:
 
 class FakeTTSAgent:
     def __init__(self) -> None:
-        self.calls: list[tuple[str, str]] = []
+        self.calls: list[tuple[str, str, str | None]] = []
 
-    def run(self, *, text: str, output_path: str) -> str:
-        self.calls.append((text, output_path))
+    def run(self, *, text: str, output_path: str, voice_id: str | None = None) -> str:
+        self.calls.append((text, output_path, voice_id))
         return output_path
 
 
@@ -55,6 +59,7 @@ class LiveStrategyTests(unittest.TestCase):
             tts_agent.calls[0][0],
             "[curious] Hello there!",
         )
+        self.assertEqual(tts_agent.calls[0][2], "UgBBYS2sOqTuMpoF3BR0")
         self.assertEqual(interaction.response, "[curious] Hello there!")
 
 

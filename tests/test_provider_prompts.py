@@ -2,6 +2,7 @@ import unittest
 
 from src.models.settings import AppSettings
 from src.services.providers import (
+    LiveSpeechReply,
     OpenAICompatibleProvider,
     NagaTranscriptionProvider,
     _preview_text,
@@ -43,9 +44,15 @@ class ProviderPromptTests(unittest.TestCase):
     def test_tts_preparation_prompt_encourages_contextual_vocal_tags(self) -> None:
         prompt = self.provider._build_tts_preparation_prompt()
 
-        self.assertIn("Actively add Eleven v3 vocal tags", prompt)
-        self.assertIn("In most replies", prompt)
-        self.assertIn("not randomly or excessively", prompt)
+        self.assertIn("Actively apply Eleven v3 best practices", prompt)
+        self.assertIn(
+            "voice-related tags, non-verbal vocal sounds, accent tags, and sound effect tags",
+            prompt,
+        )
+        self.assertIn("include at least one suitable Eleven-style tag", prompt)
+        self.assertIn("Never use angle-bracket tags like <laugh>", prompt)
+        self.assertIn("never use emoji", prompt)
+        self.assertIn("Reply only with the final speech text", prompt)
 
     def test_transcription_prompt_allows_high_confidence_context_inference(
         self,
@@ -61,10 +68,55 @@ class ProviderPromptTests(unittest.TestCase):
 
         self.assertIn("final spoken text", prompt)
         self.assertIn("Do not change speaker identity or perspective", prompt)
-        self.assertIn("Actively use light, contextual Eleven v3 vocal tags", prompt)
+        self.assertIn("Actively follow Eleven v3 best practices", prompt)
         self.assertIn(
-            "keep greetings, thanks, acknowledgments, and casual check-ins short",
+            "Use only square-bracket Eleven-style tags",
             prompt,
+        )
+        self.assertIn("Never use angle-bracket tags like <laugh>", prompt)
+        self.assertIn("never use emoji", prompt)
+        self.assertIn("place the main tag at the start of the reply", prompt)
+        self.assertIn(
+            "Small conversational turns should usually be one short sentence", prompt
+        )
+        self.assertIn("ask at most one follow-up question", prompt)
+
+    def test_live_speech_prompt_lists_auto_voice_contract(self) -> None:
+        prompt = self.provider._build_live_speech_system_prompt()
+
+        self.assertIn("VOICE_ID: <id>", prompt)
+        self.assertIn("Allowed voice: BIvP0GN1cAtSRTxNHnWS - Ellen", prompt)
+        self.assertIn(
+            "prefer Mark unless another voice is clearly a better fit", prompt
+        )
+        self.assertIn("Choose the voice before composing the final reply", prompt)
+
+    def test_parse_live_speech_reply_uses_fixed_voice_when_not_auto(self) -> None:
+        self.provider._settings.tts_voice_id = "UgBBYS2sOqTuMpoF3BR0"
+
+        reply = self.provider._parse_live_speech_reply("[happy] Hello there!")
+
+        self.assertEqual(
+            reply,
+            LiveSpeechReply(
+                voice_id="UgBBYS2sOqTuMpoF3BR0",
+                text="[happy] Hello there!",
+            ),
+        )
+
+    def test_parse_live_speech_reply_extracts_auto_voice_header(self) -> None:
+        self.provider._settings.tts_voice_id = "auto"
+
+        reply = self.provider._parse_live_speech_reply(
+            "VOICE_ID: BIvP0GN1cAtSRTxNHnWS\n\n[happy] Hello there!"
+        )
+
+        self.assertEqual(
+            reply,
+            LiveSpeechReply(
+                voice_id="BIvP0GN1cAtSRTxNHnWS",
+                text="[happy] Hello there!",
+            ),
         )
 
     def test_preview_text_normalizes_whitespace_and_truncates(self) -> None:

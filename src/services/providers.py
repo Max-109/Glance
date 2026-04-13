@@ -3,11 +3,20 @@ from __future__ import annotations
 import base64
 import logging
 import mimetypes
+import re
+from dataclasses import dataclass
 from pathlib import Path
 from time import perf_counter
 
 from src.exceptions.app_exceptions import ProviderError
-from src.models.settings import AppSettings
+from src.models.settings import (
+    AUTO_TTS_VOICE_ID,
+    AppSettings,
+    DEFAULT_FIXED_TTS_VOICE,
+    ELEVEN_V3_VOICES,
+    get_tts_voice,
+    get_tts_voice_label,
+)
 
 try:
     from openai import OpenAI
@@ -16,6 +25,12 @@ except ImportError:  # pragma: no cover - exercised only without optional depend
 
 
 logger = logging.getLogger("glance.providers")
+
+
+@dataclass(frozen=True)
+class LiveSpeechReply:
+    voice_id: str
+    text: str
 
 
 class OpenAICompatibleProvider:
@@ -89,7 +104,7 @@ class OpenAICompatibleProvider:
         )
         return text.strip()
 
-    def generate_live_speech_reply(self, *, transcript: str) -> str:
+    def generate_live_speech_reply(self, *, transcript: str) -> LiveSpeechReply:
         started_at = perf_counter()
         try:
             response = self._client.chat.completions.create(
@@ -115,20 +130,22 @@ class OpenAICompatibleProvider:
         text = _extract_text_content(response.choices[0].message.content)
         if not text:
             raise ProviderError("Live reply response was empty.")
+        live_reply = self._parse_live_speech_reply(text)
         logger.info(
-            "LLM reply completed in %.1f ms [model=%s reasoning=%s output=%s]",
+            "LLM reply completed in %.1f ms [model=%s reasoning=%s voice=%s output=%s]",
             _elapsed_ms(started_at),
             self._settings.llm_model_name,
             self._settings.llm_reasoning,
-            _preview_text(text),
+            get_tts_voice_label(live_reply.voice_id),
+            _preview_text(live_reply.text),
         )
-        return text.strip()
+        return live_reply
 
     def extract_text(self, image_path: str) -> str:
         prompt = "Extract all visible text exactly as written. Preserve line breaks where useful."
         return self.generate_reply(user_prompt=prompt, image_paths=[image_path])
 
-    def prepare_speech_text(self, text: str) -> str:
+    def prepare_speech_text(self, text: str) -> LiveSpeechReply:
         started_at = perf_counter()
         try:
             response = self._client.chat.completions.create(
@@ -154,14 +171,16 @@ class OpenAICompatibleProvider:
         prepared_text = _extract_text_content(response.choices[0].message.content)
         if not prepared_text:
             raise ProviderError("Speech text preparation returned empty output.")
+        prepared_reply = self._parse_live_speech_reply(prepared_text)
         logger.info(
-            "Speech text preparation completed in %.1f ms [model=%s reasoning=%s output=%s]",
+            "Speech text preparation completed in %.1f ms [model=%s reasoning=%s voice=%s output=%s]",
             _elapsed_ms(started_at),
             self._settings.llm_model_name,
             self._settings.llm_reasoning,
-            _preview_text(prepared_text),
+            get_tts_voice_label(prepared_reply.voice_id),
+            _preview_text(prepared_reply.text),
         )
-        return prepared_text.strip()
+        return prepared_reply
 
     def _build_system_prompt(self, match_user_language: bool) -> str:
         prompt = (
@@ -195,29 +214,40 @@ class OpenAICompatibleProvider:
 
     def _build_live_speech_system_prompt(self) -> str:
         prompt = (
-            "You are Glance, a live desktop voice assistant. The user's message is a transcript of "
-            "what they just said aloud. Your job is to answer them directly and produce the final "
-            "spoken text that will be sent straight to Eleven v3. Respond like a warm, lively, "
-            "friendly person in a real back-and-forth conversation. Be genuinely helpful, clear, "
-            "accurate, and pleasant to listen to. Match the length to what the user actually said: "
-            "keep greetings, thanks, acknowledgments, and casual check-ins short and natural, and "
-            "only give longer answers when the user is clearly asking for more. Make the reply easy "
-            "to understand in one listen. Use natural spoken phrasing, not visual writing. Do not "
-            "use markdown, code fences, bullets, or visual formatting. Do not explain your process. "
-            "Do not rewrite, critique, or correct another assistant message. Do not change speaker "
+            "You are Glance, a live desktop voice assistant. The input is the user's spoken "
+            "transcript. Your job is to answer the user directly and produce the final spoken text "
+            "that will be sent straight to Eleven v3. Respond like a warm, lively, friendly person "
+            "in a real back-and-forth conversation. Be genuinely helpful, clear, accurate, happy, "
+            "and pleasant to listen to. Match the answer length to the user's request. Keep short "
+            "greetings, thanks, acknowledgments, and casual check-ins short and natural, and only "
+            "give longer answers when the user is clearly asking for more. Small conversational turns "
+            "should usually be one short sentence, or two short sentences at most. Avoid rambling, "
+            "avoid repeating the same feeling in multiple ways, and ask at most one follow-up "
+            "question unless the user clearly wants a deeper conversation. Make the reply easy to "
+            "understand in one listen. Use natural spoken phrasing, not visual writing. Do not use "
+            "markdown, code fences, bullets, or visual formatting. Do not explain your process. Do "
+            "not rewrite, critique, or correct another assistant message. Do not change speaker "
             "identity or perspective. Do not mention Claude, Anthropic, or being an AI unless the "
-            "user explicitly asks. Preserve meaning and do not add facts. This output is already "
-            "the final speech text, so shape it for spoken delivery in this same answer. Normalize "
-            "hard-to-speak text into spoken forms when helpful, including abbreviations, symbols, "
-            "dates, times, currencies, shortcuts, URLs, percentages, and similar text. Use "
-            "punctuation, capitalization, ellipses, and line breaks for pacing only when they help. "
-            "Actively use light, contextual Eleven v3 vocal tags when they improve warmth, "
-            "friendliness, liveliness, or emotional clarity. In most replies, use some expressive "
-            "shaping when it helps the speech feel more human and engaging, but do not overdo it or "
-            "sound theatrical. Allowed vocal tags include [laughs], [laughs harder], [starts "
-            "laughing], [wheezing], [whispers], [sighs], [exhales], [sarcastic], [curious], "
-            "[excited], [crying], [snorts], [mischievously], [swallows], [gulps], [sings], [woo], "
-            "[strong X accent], and [fart]."
+            "user explicitly asks. Preserve the intended meaning and do not add facts. This output "
+            "is already the final speech text, so shape it for spoken delivery in this same answer. "
+            "Actively follow Eleven v3 best practices: use contextually appropriate audio tags, "
+            "punctuation, capitalization, ellipses, and text structure to make the result more "
+            "expressive and engaging while preserving meaning. Use tags strategically. By default, "
+            "place the main tag at the start of the reply. For short replies, use at most one tag "
+            "unless a second tag is clearly necessary. Only place a tag mid-sentence when there is a "
+            "real emotional shift. Use voice-related tags, non-verbal vocal sounds, accent tags, and "
+            "sound-effect tags when they genuinely improve the spoken result. For warm, playful, "
+            "sympathetic, excited, reassuring, or emotional replies, include at least one suitable "
+            "Eleven-style tag when it improves delivery. For neutral factual replies, tags may stay "
+            "sparse. Use them freely when useful, but do not overdo them or make the result chaotic. "
+            "Use only square-bracket Eleven-style tags such as [excited], [laughs], [sighs], "
+            "[whispers], [curious], [mischievously], [swallows], [strong French accent], or "
+            "[applause]. Never use angle-bracket tags like <laugh>, never use emoji, never use "
+            "SSML, and never invent non-auditory stage directions. Normalize hard-to-speak text into "
+            "spoken forms when helpful, including numbers, dates, times, currencies, phone numbers, "
+            "symbols, abbreviations, shortcuts, URLs, percentages, and similar text. Example good "
+            "outputs: `[excited] Hey! I'm doing great, thanks for asking!` and `[sighs] I'm really "
+            "sorry you're going through that.`"
         )
         override = self._settings.system_prompt_override.strip()
         if override:
@@ -227,29 +257,111 @@ class OpenAICompatibleProvider:
             "asks you to use another language. If they ask for another language, answer in that "
             "language immediately in the same reply."
         )
+        if self._settings.tts_voice_id == AUTO_TTS_VOICE_ID:
+            prompt += (
+                " Auto voice selection is active. First choose the single best voice ID from the "
+                "allowed list below, based on the emotional shape and style of your answer. Output "
+                "the first line exactly as `VOICE_ID: <id>`, then leave one blank line, then output "
+                "only the final speech text. Never output any voice ID outside this list. Do not "
+                "default to the same upbeat voice for every positive or generic answer. For ordinary "
+                "everyday conversation and casual back-and-forth, prefer Mark unless another voice is "
+                "clearly a better fit. Choose the voice before composing the final reply."
+            )
+            for voice in ELEVEN_V3_VOICES:
+                prompt += (
+                    f" Allowed voice: {voice.id} - {voice.name} - {voice.title} - "
+                    f"{voice.prompt_summary}."
+                )
+        else:
+            voice = get_tts_voice(self._settings.tts_voice_id)
+            if voice is not None:
+                prompt += (
+                    f" The active voice is fixed to {voice.name} ({voice.title}). Shape the final "
+                    f"speech text so it suits this voice's strengths: {voice.prompt_summary}. Do "
+                    "not output a VOICE_ID header when a fixed voice is already selected."
+                )
         return prompt
 
-    @staticmethod
-    def _build_tts_preparation_prompt() -> str:
-        return (
-            "You prepare the final spoken text for Eleven v3 text to speech. Return only the "
-            "final speech text. Preserve meaning and do not add facts. Your job is to make the "
-            "response sound natural, expressive, dynamic, and pleasant to listen to rather than "
-            "flat or mechanical. Actively add Eleven v3 vocal tags when they improve delivery. "
-            "This is a normal part of the task, not a rare exception. In most replies, use light, "
-            "contextual vocal shaping when it helps the speech feel more human, warm, playful, "
-            "curious, reassuring, or expressive. If vocal tags would make the line worse, "
-            "distracting, exaggerated, or tonally wrong, leave them out. Normalize hard-to-speak "
-            "text into spoken forms when helpful, including abbreviations, symbols, dates, times, "
-            "currencies, shortcuts, URLs, percentages, and similar text. Remove markdown, code "
-            "fences, tables, bullets, and other visual-only formatting. Eleven v3 does not support "
-            "SSML, so never use SSML tags. Use punctuation, capitalization, ellipses, and line "
-            "breaks for pacing when they improve spoken delivery. Allowed vocal tags include "
-            "[laughs], [laughs harder], [starts laughing], [wheezing], [whispers], [sighs], "
-            "[exhales], [sarcastic], [curious], [excited], [crying], [snorts], [mischievously], "
-            "[swallows], [gulps], [sings], [woo], [strong X accent], and [fart]. Use them "
-            "deliberately and contextually, not randomly or excessively."
+    def _parse_live_speech_reply(self, text: str) -> LiveSpeechReply:
+        stripped_text = text.strip()
+        if self._settings.tts_voice_id != AUTO_TTS_VOICE_ID:
+            return LiveSpeechReply(
+                voice_id=self._settings.tts_voice_id,
+                text=stripped_text,
+            )
+
+        match = re.match(r"^VOICE_ID:\s*(\S+)\s*(?:\n+|$)", stripped_text)
+        if match is None:
+            logger.warning(
+                "Auto voice reply was missing a VOICE_ID header; falling back to %s.",
+                get_tts_voice_label(DEFAULT_FIXED_TTS_VOICE),
+            )
+            return LiveSpeechReply(DEFAULT_FIXED_TTS_VOICE, stripped_text)
+
+        parsed_voice_id = match.group(1).strip()
+        remaining_text = stripped_text[match.end() :].strip()
+        if parsed_voice_id not in {voice.id for voice in ELEVEN_V3_VOICES}:
+            logger.warning(
+                "Auto voice reply chose unknown voice id %s; falling back to %s.",
+                parsed_voice_id,
+                get_tts_voice_label(DEFAULT_FIXED_TTS_VOICE),
+            )
+            return LiveSpeechReply(
+                DEFAULT_FIXED_TTS_VOICE,
+                remaining_text or stripped_text,
+            )
+        if not remaining_text:
+            raise ProviderError(
+                "Live reply response did not include final speech text."
+            )
+        return LiveSpeechReply(parsed_voice_id, remaining_text)
+
+    def _build_tts_preparation_prompt(self) -> str:
+        prompt = (
+            "You are an AI assistant specializing in enhancing dialogue text for Eleven v3 speech "
+            "generation. Your primary goal is to prepare final spoken text that sounds expressive, "
+            "engaging, and natural while strictly preserving the original meaning and intent of the "
+            "reply. Actively apply Eleven v3 best practices. Integrate contextually appropriate "
+            "audio tags, punctuation, capitalization, ellipses, and text structure to improve "
+            "delivery. Use voice-related tags, non-verbal vocal sounds, accent tags, and sound "
+            "effect tags when they genuinely improve the spoken result. For warm, playful, "
+            "sympathetic, excited, reassuring, or emotional replies, include at least one suitable "
+            "Eleven-style tag when it improves delivery. For neutral factual replies, tags may stay "
+            "sparse. Use them strategically and freely when useful, but do not make the output "
+            "chaotic or theatrical. Use only square-bracket Eleven-style tags such as [excited], "
+            "[laughs], [sighs], [whispers], [curious], [mischievously], [swallows], [strong French "
+            "accent], or [applause]. Never use angle-bracket tags like <laugh>, never use emoji, "
+            "never use SSML, and never invent non-auditory stage directions. Do not add facts. Do "
+            "not answer the text as if it were a new conversation turn. Do not change speaker "
+            "identity or perspective. Do not mention Claude, Anthropic, or being an AI unless the "
+            "user explicitly asked for that. Normalize hard-to-speak text into spoken forms when "
+            "helpful, including numbers, dates, times, currencies, phone numbers, symbols, "
+            "abbreviations, shortcuts, URLs, percentages, and similar text. Remove markdown, code "
+            "fences, tables, bullets, and other visual-only formatting. Reply only with the final "
+            "speech text. Example good outputs: `[excited] Hey! I'm doing great, thanks for asking!` "
+            "and `[sighs] I'm really sorry you're going through that.`"
         )
+        if self._settings.tts_voice_id == AUTO_TTS_VOICE_ID:
+            prompt += (
+                " Auto voice selection is active. First choose the single best voice ID from the "
+                "allowed list below, based on the emotional shape and style of the reply. Output "
+                "the first line exactly as `VOICE_ID: <id>`, then leave one blank line, then output "
+                "only the final speech text. Never output any voice ID outside this list."
+            )
+            for voice in ELEVEN_V3_VOICES:
+                prompt += (
+                    f" Allowed voice: {voice.id} - {voice.name} - {voice.title} - "
+                    f"{voice.prompt_summary}."
+                )
+        else:
+            voice = get_tts_voice(self._settings.tts_voice_id)
+            if voice is not None:
+                prompt += (
+                    f" The active voice is fixed to {voice.name} ({voice.title}). Shape the final "
+                    f"speech text so it suits this voice's strengths: {voice.prompt_summary}. Do "
+                    "not output a VOICE_ID header when a fixed voice is already selected."
+                )
+        return prompt
 
 
 class NagaTranscriptionProvider:
@@ -381,12 +493,21 @@ class NagaSpeechProvider:
             default_headers={"Accept-Encoding": "identity"},
         )
 
-    def synthesize(self, text: str, output_path: Path) -> str:
+    def synthesize(
+        self,
+        text: str,
+        output_path: Path,
+        *,
+        voice_id: str | None = None,
+    ) -> str:
         started_at = perf_counter()
+        resolved_voice_id = voice_id or self._settings.tts_voice_id
+        if resolved_voice_id == AUTO_TTS_VOICE_ID:
+            resolved_voice_id = DEFAULT_FIXED_TTS_VOICE
         try:
             response = self._client.audio.speech.create(
                 model=self._settings.tts_model,
-                voice=self._settings.tts_voice_id,
+                voice=resolved_voice_id,
                 input=text,
             )
             response.stream_to_file(output_path)
@@ -395,14 +516,14 @@ class NagaSpeechProvider:
                 "TTS request failed after %.1f ms [model=%s voice=%s]",
                 _elapsed_ms(started_at),
                 self._settings.tts_model,
-                self._settings.tts_voice_id,
+                get_tts_voice_label(resolved_voice_id),
             )
             raise ProviderError(f"TTS request failed: {exc}") from exc
         logger.info(
             "Speech synthesis completed in %.1f ms [model=%s voice=%s input=%s]",
             _elapsed_ms(started_at),
             self._settings.tts_model,
-            self._settings.tts_voice_id,
+            get_tts_voice_label(resolved_voice_id),
             _preview_text(text),
         )
         return str(output_path)

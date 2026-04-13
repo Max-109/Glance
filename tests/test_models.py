@@ -96,6 +96,18 @@ class AppSettingsTests(unittest.TestCase):
 
         self.assertEqual(settings.tts_voice_id, DEFAULT_TTS_VOICE)
 
+    def test_from_mapping_normalizes_curated_voice_name_to_voice_id(self) -> None:
+        settings = AppSettings.from_mapping(
+            {
+                "llm_base_url": "https://api.example.com/v1",
+                "llm_model_name": "model-a",
+                "tts_base_url": "https://tts.example.com/v1",
+                "tts_voice_id": "Hope",
+            }
+        )
+
+        self.assertEqual(settings.tts_voice_id, "tnSpp4vdxKPjI9w0GnoV")
+
 
 class SessionRecordTests(unittest.TestCase):
     def test_session_rejects_mismatched_mode(self) -> None:

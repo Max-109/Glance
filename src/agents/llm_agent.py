@@ -23,8 +23,8 @@ class LLMAgent(BaseAgent):
             match_user_language=match_user_language,
         )
 
-    def prepare_speech_text(self, *, text: str) -> str:
+    def prepare_speech_text(self, *, text: str):
         return self._provider.prepare_speech_text(text)
 
-    def generate_live_speech_reply(self, *, transcript: str) -> str:
+    def generate_live_speech_reply(self, *, transcript: str):
         return self._provider.generate_live_speech_reply(transcript=transcript)

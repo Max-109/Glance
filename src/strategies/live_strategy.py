@@ -25,16 +25,17 @@ class LiveStrategy(ModeStrategy):
     def execute(self, context: dict) -> LiveInteraction:
         recording_path = str(context["recording_path"])
         transcript = self._transcription_agent.run(audio_path=recording_path)
-        response = self._llm_agent.generate_live_speech_reply(transcript=transcript)
+        live_reply = self._llm_agent.generate_live_speech_reply(transcript=transcript)
         speech_path = self._audio_dir / f"live-{Path(recording_path).stem}.mp3"
         generated_speech_path = self._tts_agent.run(
-            text=response,
+            text=live_reply.text,
             output_path=str(speech_path),
+            voice_id=live_reply.voice_id,
         )
         return LiveInteraction(
             mode="live",
             recording_path=recording_path,
             transcript=transcript,
-            response=response,
+            response=live_reply.text,
             speech_path=generated_speech_path,
         )

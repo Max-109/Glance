@@ -15,7 +15,9 @@ Item {
     property string iconName: "mic"
     property string value: ""
     property var options: []
+    property var optionLabels: ({})
     property string previewingVoice: ""
+    property bool previewEnabled: true
     readonly property real pixelRatio: Screen.devicePixelRatio > 0 ? Screen.devicePixelRatio : 1
 
     signal valueEdited(string value)
@@ -30,7 +32,14 @@ Item {
     }
 
     function currentValue() {
-        return voiceCombo.currentIndex >= 0 ? voiceCombo.currentText : "Select"
+        if (voiceCombo.currentIndex < 0) {
+            return "Select"
+        }
+        var currentOption = root.options[voiceCombo.currentIndex]
+        if (root.optionLabels && root.optionLabels[currentOption]) {
+            return root.optionLabels[currentOption]
+        }
+        return currentOption
     }
 
     Layout.fillWidth: true
@@ -62,7 +71,7 @@ Item {
                 hoverEnabled: true
                 Accessible.name: root.label
 
-                onActivated: root.valueEdited(voiceCombo.currentText)
+                onActivated: (index) => root.valueEdited(root.options[index])
 
                 background: Rectangle {
                     radius: 8
@@ -146,7 +155,9 @@ Item {
                     }
 
                     contentItem: Text {
-                        text: delegateRoot.modelData
+                        text: root.optionLabels && root.optionLabels[delegateRoot.modelData]
+                            ? root.optionLabels[delegateRoot.modelData]
+                            : delegateRoot.modelData
                         color: root.theme.textStrong
                         font.pixelSize: 14
                         elide: Text.ElideRight
@@ -203,16 +214,16 @@ Item {
             OcButton {
                 theme: root.theme
                 iconLibrary: root.iconLibrary
-                variant: root.previewingVoice === voiceCombo.currentText ? "secondary" : "ghost"
-                iconName: root.previewingVoice === voiceCombo.currentText ? "audio-lines" : "play"
+                variant: root.previewingVoice === root.value ? "secondary" : "ghost"
+                iconName: root.previewingVoice === root.value ? "audio-lines" : "play"
                 text: ""
                 Layout.preferredWidth: 32
                 Layout.preferredHeight: 32
-                enabled: voiceCombo.currentIndex >= 0
-                accessibleLabel: root.previewingVoice === voiceCombo.currentText
-                    ? "Previewing " + voiceCombo.currentText
-                    : "Preview " + voiceCombo.currentText
-                onClicked: root.previewClicked(voiceCombo.currentText)
+                enabled: root.previewEnabled && voiceCombo.currentIndex >= 0
+                accessibleLabel: root.previewingVoice === root.value
+                    ? "Previewing " + root.currentValue()
+                    : "Preview " + root.currentValue()
+                onClicked: root.previewClicked(root.options[voiceCombo.currentIndex])
             }
         }
 

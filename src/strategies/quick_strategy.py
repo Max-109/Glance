@@ -26,11 +26,12 @@ class QuickStrategy(ModeStrategy):
         image_path = self._screen_capture_agent.run(image_path=context["image_path"])
         question = context.get("question") or "What should I notice in this selection?"
         answer = self._llm_agent.run(user_prompt=question, image_paths=[image_path])
-        spoken_answer = self._llm_agent.prepare_speech_text(text=answer)
+        spoken_reply = self._llm_agent.prepare_speech_text(text=answer)
         speech_path = self._audio_dir / f"quick-{Path(image_path).stem}.mp3"
         generated_speech_path = self._tts_agent.run(
-            text=spoken_answer,
+            text=spoken_reply.text,
             output_path=str(speech_path),
+            voice_id=spoken_reply.voice_id,
         )
         return QuickInteraction(
             mode="quick",
