@@ -760,6 +760,30 @@ ApplicationWindow {
         ColumnLayout {
             spacing: 12
 
+            LabeledTextField {
+                theme: window.appTheme
+                iconLibrary: window.iconLibrary
+                iconName: "link-2"
+                label: "Base URL"
+                helperText: "Full URL for your transcription API endpoint."
+                errorText: settingsController.errors.transcription_base_url || ""
+                value: settingsController.settings.transcription_base_url || ""
+                Layout.fillWidth: true
+                onValueEdited: function(nextValue) { settingsController.setField("transcription_base_url", nextValue) }
+            }
+
+            LabeledTextField {
+                theme: window.appTheme
+                iconLibrary: window.iconLibrary
+                iconName: "key-round"
+                label: "Key for the API"
+                helperText: "Saved locally on this device."
+                value: settingsController.settings.transcription_api_key || ""
+                secret: true
+                Layout.fillWidth: true
+                onValueEdited: function(nextValue) { settingsController.setField("transcription_api_key", nextValue) }
+            }
+
             RowLayout {
                 Layout.fillWidth: true
                 spacing: 12
@@ -828,7 +852,7 @@ ApplicationWindow {
                     iconLibrary: window.iconLibrary
                     iconName: "key-round"
                     label: "Key for the API"
-                    helperText: "Used by speech synthesis and transcription."
+                    helperText: "Saved locally on this device."
                     value: settingsController.settings.tts_api_key || ""
                     secret: true
                     Layout.fillWidth: true

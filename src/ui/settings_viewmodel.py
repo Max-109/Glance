@@ -311,6 +311,7 @@ class SettingsViewModel(QObject):
         errors: dict[str, str] = {}
 
         self._validate_optional_url(payload, "llm_base_url", errors)
+        self._validate_optional_url(payload, "transcription_base_url", errors)
         self._require_text(payload, "llm_model_name", errors)
         self._validate_optional_url(payload, "tts_base_url", errors)
         self._require_text(payload, "tts_model", errors)

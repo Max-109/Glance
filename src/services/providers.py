@@ -169,8 +169,8 @@ class NagaTranscriptionProvider:
     def __init__(self, settings: AppSettings) -> None:
         self._settings = settings
         self._client = self._build_client(
-            base_url=settings.tts_base_url,
-            api_key=settings.tts_api_key,
+            base_url=settings.transcription_base_url,
+            api_key=settings.transcription_api_key,
         )
 
     @staticmethod

@@ -11,12 +11,29 @@ class AppSettingsTests(unittest.TestCase):
             {
                 "llm_base_url": "https://api.example.com/v1",
                 "llm_model_name": "model-a",
+                "transcription_base_url": "https://transcribe.example.com/v1",
                 "tts_base_url": "https://tts.example.com/v1",
             }
         )
 
         self.assertEqual(settings.llm_model_name, "model-a")
+        self.assertEqual(
+            settings.transcription_base_url,
+            "https://transcribe.example.com/v1",
+        )
         self.assertEqual(settings.history_length, 50)
+
+    def test_from_mapping_uses_transcription_defaults_when_values_missing(self) -> None:
+        settings = AppSettings.from_mapping(
+            {
+                "llm_base_url": "https://api.example.com/v1",
+                "llm_model_name": "model-a",
+                "tts_base_url": "https://tts.example.com/v1",
+            }
+        )
+
+        self.assertEqual(settings.transcription_base_url, "https://api.naga.ac/v1")
+        self.assertEqual(settings.transcription_api_key, "")
 
     def test_from_mapping_normalizes_keybinds_to_uppercase(self) -> None:
         settings = AppSettings.from_mapping(

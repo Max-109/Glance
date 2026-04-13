@@ -33,19 +33,42 @@ Item {
     }
 
     function popupParent() {
-        return Overlay.overlay ? Overlay.overlay : root
+        return popup.parent ? popup.parent : root
+    }
+
+    function mapTriggerPoint(offsetY) {
+        var target = popupParent()
+        var globalPoint = trigger.mapToGlobal(0, offsetY)
+        return target.mapFromGlobal(globalPoint.x, globalPoint.y)
     }
 
     function popupX() {
         var target = popupParent()
-        var point = trigger.mapToItem(target, 0, trigger.height + 6)
+        var point = root.mapTriggerPoint(0)
         return Math.max(12, Math.min(point.x, target.width - popup.width - 12))
+    }
+
+    function popupHeight() {
+        if (popup.implicitHeight > 0) {
+            return popup.implicitHeight
+        }
+        if (popup.contentItem) {
+            return popup.contentItem.implicitHeight + popup.topPadding + popup.bottomPadding
+        }
+        return 0
     }
 
     function popupY() {
         var target = popupParent()
-        var point = trigger.mapToItem(target, 0, trigger.height + 6)
-        return Math.max(12, point.y)
+        var popupHeight = root.popupHeight()
+        var belowY = root.mapTriggerPoint(trigger.height + 6).y
+        var maxY = Math.max(12, target.height - popupHeight - 12)
+        if (belowY <= maxY) {
+            return Math.max(12, belowY)
+        }
+
+        var aboveY = root.mapTriggerPoint(-popupHeight - 6).y
+        return Math.max(12, Math.min(aboveY, maxY))
     }
 
     Layout.fillWidth: true
@@ -138,7 +161,7 @@ Item {
 
         Popup {
             id: popup
-            parent: root.popupParent()
+            parent: Overlay.overlay ? Overlay.overlay : root
             x: root.popupX()
             y: root.popupY()
             width: trigger.width

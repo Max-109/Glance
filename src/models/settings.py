@@ -35,6 +35,8 @@ class AppSettings:
     llm_api_key: str = ""
     llm_model_name: str = "claude-opus-4.6"
     llm_reasoning: str = "low"
+    transcription_base_url: str = "https://api.naga.ac/v1"
+    transcription_api_key: str = ""
     transcription_model_name: str = "gemini-3.1-flash-lite-preview"
     transcription_reasoning: str = "medium"
     tts_base_url: str = "https://api.naga.ac/v1"
@@ -106,6 +108,12 @@ class AppSettings:
             llm_api_key=data.get("llm_api_key", cls.llm_api_key),
             llm_model_name=data.get("llm_model_name", cls.llm_model_name),
             llm_reasoning=data.get("llm_reasoning", cls.llm_reasoning),
+            transcription_base_url=data.get(
+                "transcription_base_url", cls.transcription_base_url
+            ),
+            transcription_api_key=data.get(
+                "transcription_api_key", cls.transcription_api_key
+            ),
             transcription_model_name=data.get(
                 "transcription_model_name", cls.transcription_model_name
             ),
