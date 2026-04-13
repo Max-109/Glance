@@ -1,7 +1,11 @@
 import unittest
 
 from src.models.settings import AppSettings
-from src.services.providers import OpenAICompatibleProvider, NagaTranscriptionProvider
+from src.services.providers import (
+    OpenAICompatibleProvider,
+    NagaTranscriptionProvider,
+    _preview_text,
+)
 
 
 class ProviderPromptTests(unittest.TestCase):
@@ -51,6 +55,13 @@ class ProviderPromptTests(unittest.TestCase):
         self.assertIn("use the surrounding context to infer", prompt)
         self.assertIn("high confidence", prompt)
         self.assertIn("stay conservative rather than inventing content", prompt)
+
+    def test_preview_text_normalizes_whitespace_and_truncates(self) -> None:
+        preview = _preview_text("Hello\n\nthere   general   kenobi" * 40, limit=40)
+
+        self.assertNotIn("\n", preview)
+        self.assertLessEqual(len(preview), 40)
+        self.assertTrue(preview.endswith("..."))
 
 
 if __name__ == "__main__":

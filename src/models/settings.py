@@ -37,7 +37,7 @@ class AppSettings:
     llm_reasoning: str = "low"
     transcription_base_url: str = "https://api.naga.ac/v1"
     transcription_api_key: str = ""
-    transcription_model_name: str = "gemini-3.1-flash-lite-preview"
+    transcription_model_name: str = "whisper-large-v3-turbo"
     transcription_reasoning: str = "medium"
     tts_base_url: str = "https://api.naga.ac/v1"
     tts_api_key: str = ""

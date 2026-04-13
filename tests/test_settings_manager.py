@@ -28,7 +28,7 @@ class SettingsManagerTests(unittest.TestCase):
         self.assertEqual(settings.llm_base_url, "https://persisted.example/v1")
         self.assertEqual(
             settings.transcription_model_name,
-            "gemini-3.1-flash-lite-preview",
+            "whisper-large-v3-turbo",
         )
 
     def test_load_migrates_legacy_transcription_provider_values(self) -> None:

@@ -81,10 +81,11 @@ class OpenAICompatibleProvider:
         if not text:
             raise ProviderError("LLM response was empty.")
         logger.info(
-            "LLM reply completed in %.1f ms [model=%s reasoning=%s]",
+            "LLM reply completed in %.1f ms [model=%s reasoning=%s output=%s]",
             _elapsed_ms(started_at),
             self._settings.llm_model_name,
             self._settings.llm_reasoning,
+            _preview_text(text),
         )
         return text.strip()
 
@@ -119,10 +120,11 @@ class OpenAICompatibleProvider:
         if not prepared_text:
             raise ProviderError("Speech text preparation returned empty output.")
         logger.info(
-            "Speech text preparation completed in %.1f ms [model=%s reasoning=%s]",
+            "Speech text preparation completed in %.1f ms [model=%s reasoning=%s output=%s]",
             _elapsed_ms(started_at),
             self._settings.llm_model_name,
             self._settings.llm_reasoning,
+            _preview_text(prepared_text),
         )
         return prepared_text.strip()
 
@@ -209,37 +211,46 @@ class NagaTranscriptionProvider:
         if not audio_bytes:
             raise ProviderError("Audio file was empty.")
 
-        audio_format = path.suffix.lower().lstrip(".") or "wav"
         started_at = perf_counter()
         try:
-            response = self._client.chat.completions.create(
-                model=self._settings.transcription_model_name,
-                reasoning_effort=self._settings.transcription_reasoning,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": self._build_transcription_prompt(),
-                    },
-                    {
-                        "role": "user",
-                        "content": [
-                            {
-                                "type": "text",
-                                "text": "Transcribe this audio.",
-                            },
-                            {
-                                "type": "input_audio",
-                                "input_audio": {
-                                    "data": base64.b64encode(audio_bytes).decode(
-                                        "ascii"
-                                    ),
-                                    "format": audio_format,
+            if self._uses_transcriptions_api():
+                with path.open("rb") as audio_file:
+                    response = self._client.audio.transcriptions.create(
+                        model=self._settings.transcription_model_name,
+                        file=audio_file,
+                        prompt=self._build_transcription_prompt(),
+                        language=None,
+                    )
+            else:
+                audio_format = path.suffix.lower().lstrip(".") or "wav"
+                response = self._client.chat.completions.create(
+                    model=self._settings.transcription_model_name,
+                    reasoning_effort=self._settings.transcription_reasoning,
+                    messages=[
+                        {
+                            "role": "system",
+                            "content": self._build_transcription_prompt(),
+                        },
+                        {
+                            "role": "user",
+                            "content": [
+                                {
+                                    "type": "text",
+                                    "text": "Transcribe this audio.",
                                 },
-                            },
-                        ],
-                    },
-                ],
-            )
+                                {
+                                    "type": "input_audio",
+                                    "input_audio": {
+                                        "data": base64.b64encode(audio_bytes).decode(
+                                            "ascii"
+                                        ),
+                                        "format": audio_format,
+                                    },
+                                },
+                            ],
+                        },
+                    ],
+                )
         except Exception as exc:  # pragma: no cover - depends on external service.
             logger.exception(
                 "Transcription request failed after %.1f ms [model=%s reasoning=%s]",
@@ -249,16 +260,23 @@ class NagaTranscriptionProvider:
             )
             raise ProviderError(f"Transcription request failed: {exc}") from exc
 
-        text = _extract_text_content(response.choices[0].message.content)
+        if self._uses_transcriptions_api():
+            text = getattr(response, "text", "")
+        else:
+            text = _extract_text_content(response.choices[0].message.content)
         if not text:
             raise ProviderError("Transcription response was empty.")
         logger.info(
-            "Transcription completed in %.1f ms [model=%s reasoning=%s]",
+            "Transcription completed in %.1f ms [model=%s reasoning=%s output=%s]",
             _elapsed_ms(started_at),
             self._settings.transcription_model_name,
             self._settings.transcription_reasoning,
+            _preview_text(text),
         )
         return text.strip()
+
+    def _uses_transcriptions_api(self) -> bool:
+        return self._settings.transcription_model_name.startswith("whisper")
 
     @staticmethod
     def _build_transcription_prompt() -> str:
@@ -310,10 +328,11 @@ class NagaSpeechProvider:
             )
             raise ProviderError(f"TTS request failed: {exc}") from exc
         logger.info(
-            "Speech synthesis completed in %.1f ms [model=%s voice=%s]",
+            "Speech synthesis completed in %.1f ms [model=%s voice=%s input=%s]",
             _elapsed_ms(started_at),
             self._settings.tts_model,
             self._settings.tts_voice_id,
+            _preview_text(text),
         )
         return str(output_path)
 
@@ -367,3 +386,12 @@ def _extract_part_text(part) -> str | None:
 
 def _elapsed_ms(started_at: float) -> float:
     return round((perf_counter() - started_at) * 1000, 1)
+
+
+def _preview_text(text: str, *, limit: int = 320) -> str:
+    normalized = " ".join(text.split())
+    if len(normalized) <= limit:
+        return normalized
+    if limit <= 3:
+        return "." * limit
+    return normalized[: limit - 3].rstrip() + "..."
