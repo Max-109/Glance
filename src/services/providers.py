@@ -70,14 +70,22 @@ class OpenAICompatibleProvider:
             )
         except Exception as exc:  # pragma: no cover - depends on external service.
             logger.exception(
-                "LLM request failed after %.1f ms", _elapsed_ms(started_at)
+                "LLM request failed after %.1f ms [model=%s reasoning=%s]",
+                _elapsed_ms(started_at),
+                self._settings.llm_model_name,
+                self._settings.llm_reasoning,
             )
             raise ProviderError(f"LLM request failed: {exc}") from exc
 
         text = _extract_text_content(response.choices[0].message.content)
         if not text:
             raise ProviderError("LLM response was empty.")
-        logger.info("LLM reply completed in %.1f ms", _elapsed_ms(started_at))
+        logger.info(
+            "LLM reply completed in %.1f ms [model=%s reasoning=%s]",
+            _elapsed_ms(started_at),
+            self._settings.llm_model_name,
+            self._settings.llm_reasoning,
+        )
         return text.strip()
 
     def extract_text(self, image_path: str) -> str:
@@ -100,8 +108,10 @@ class OpenAICompatibleProvider:
             )
         except Exception as exc:  # pragma: no cover - depends on external service.
             logger.exception(
-                "Speech text preparation failed after %.1f ms",
+                "Speech text preparation failed after %.1f ms [model=%s reasoning=%s]",
                 _elapsed_ms(started_at),
+                self._settings.llm_model_name,
+                self._settings.llm_reasoning,
             )
             raise ProviderError(f"Speech text preparation failed: {exc}") from exc
 
@@ -109,8 +119,10 @@ class OpenAICompatibleProvider:
         if not prepared_text:
             raise ProviderError("Speech text preparation returned empty output.")
         logger.info(
-            "Speech text preparation completed in %.1f ms",
+            "Speech text preparation completed in %.1f ms [model=%s reasoning=%s]",
             _elapsed_ms(started_at),
+            self._settings.llm_model_name,
+            self._settings.llm_reasoning,
         )
         return prepared_text.strip()
 
@@ -216,15 +228,22 @@ class NagaTranscriptionProvider:
             )
         except Exception as exc:  # pragma: no cover - depends on external service.
             logger.exception(
-                "Transcription request failed after %.1f ms",
+                "Transcription request failed after %.1f ms [model=%s reasoning=%s]",
                 _elapsed_ms(started_at),
+                self._settings.transcription_model_name,
+                self._settings.transcription_reasoning,
             )
             raise ProviderError(f"Transcription request failed: {exc}") from exc
 
         text = _extract_text_content(response.choices[0].message.content)
         if not text:
             raise ProviderError("Transcription response was empty.")
-        logger.info("Transcription completed in %.1f ms", _elapsed_ms(started_at))
+        logger.info(
+            "Transcription completed in %.1f ms [model=%s reasoning=%s]",
+            _elapsed_ms(started_at),
+            self._settings.transcription_model_name,
+            self._settings.transcription_reasoning,
+        )
         return text.strip()
 
     @staticmethod
@@ -269,10 +288,18 @@ class NagaSpeechProvider:
             response.stream_to_file(output_path)
         except Exception as exc:  # pragma: no cover - depends on external service.
             logger.exception(
-                "TTS request failed after %.1f ms", _elapsed_ms(started_at)
+                "TTS request failed after %.1f ms [model=%s voice=%s]",
+                _elapsed_ms(started_at),
+                self._settings.tts_model,
+                self._settings.tts_voice_id,
             )
             raise ProviderError(f"TTS request failed: {exc}") from exc
-        logger.info("Speech synthesis completed in %.1f ms", _elapsed_ms(started_at))
+        logger.info(
+            "Speech synthesis completed in %.1f ms [model=%s voice=%s]",
+            _elapsed_ms(started_at),
+            self._settings.tts_model,
+            self._settings.tts_voice_id,
+        )
         return str(output_path)
 
 
