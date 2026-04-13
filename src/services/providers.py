@@ -89,6 +89,41 @@ class OpenAICompatibleProvider:
         )
         return text.strip()
 
+    def generate_live_speech_reply(self, *, transcript: str) -> str:
+        started_at = perf_counter()
+        try:
+            response = self._client.chat.completions.create(
+                model=self._settings.llm_model_name,
+                reasoning_effort=self._settings.llm_reasoning,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": self._build_live_speech_system_prompt(),
+                    },
+                    {"role": "user", "content": transcript.strip()},
+                ],
+            )
+        except Exception as exc:  # pragma: no cover - depends on external service.
+            logger.exception(
+                "Live reply request failed after %.1f ms [model=%s reasoning=%s]",
+                _elapsed_ms(started_at),
+                self._settings.llm_model_name,
+                self._settings.llm_reasoning,
+            )
+            raise ProviderError(f"Live reply request failed: {exc}") from exc
+
+        text = _extract_text_content(response.choices[0].message.content)
+        if not text:
+            raise ProviderError("Live reply response was empty.")
+        logger.info(
+            "LLM reply completed in %.1f ms [model=%s reasoning=%s output=%s]",
+            _elapsed_ms(started_at),
+            self._settings.llm_model_name,
+            self._settings.llm_reasoning,
+            _preview_text(text),
+        )
+        return text.strip()
+
     def extract_text(self, image_path: str) -> str:
         prompt = "Extract all visible text exactly as written. Preserve line breaks where useful."
         return self.generate_reply(user_prompt=prompt, image_paths=[image_path])
@@ -155,6 +190,42 @@ class OpenAICompatibleProvider:
         prompt += (
             " Keep the delivery conversational and pleasant, without sounding forced, overly "
             "cheerful, or theatrical."
+        )
+        return prompt
+
+    def _build_live_speech_system_prompt(self) -> str:
+        prompt = (
+            "You are Glance, a live desktop voice assistant. The user's message is a transcript of "
+            "what they just said aloud. Your job is to answer them directly and produce the final "
+            "spoken text that will be sent straight to Eleven v3. Respond like a warm, lively, "
+            "friendly person in a real back-and-forth conversation. Be genuinely helpful, clear, "
+            "accurate, and pleasant to listen to. Match the length to what the user actually said: "
+            "keep greetings, thanks, acknowledgments, and casual check-ins short and natural, and "
+            "only give longer answers when the user is clearly asking for more. Make the reply easy "
+            "to understand in one listen. Use natural spoken phrasing, not visual writing. Do not "
+            "use markdown, code fences, bullets, or visual formatting. Do not explain your process. "
+            "Do not rewrite, critique, or correct another assistant message. Do not change speaker "
+            "identity or perspective. Do not mention Claude, Anthropic, or being an AI unless the "
+            "user explicitly asks. Preserve meaning and do not add facts. This output is already "
+            "the final speech text, so shape it for spoken delivery in this same answer. Normalize "
+            "hard-to-speak text into spoken forms when helpful, including abbreviations, symbols, "
+            "dates, times, currencies, shortcuts, URLs, percentages, and similar text. Use "
+            "punctuation, capitalization, ellipses, and line breaks for pacing only when they help. "
+            "Actively use light, contextual Eleven v3 vocal tags when they improve warmth, "
+            "friendliness, liveliness, or emotional clarity. In most replies, use some expressive "
+            "shaping when it helps the speech feel more human and engaging, but do not overdo it or "
+            "sound theatrical. Allowed vocal tags include [laughs], [laughs harder], [starts "
+            "laughing], [wheezing], [whispers], [sighs], [exhales], [sarcastic], [curious], "
+            "[excited], [crying], [snorts], [mischievously], [swallows], [gulps], [sings], [woo], "
+            "[strong X accent], and [fart]."
+        )
+        override = self._settings.system_prompt_override.strip()
+        if override:
+            prompt += f" Additional instructions: {override}"
+        prompt += (
+            " Reply in the same language as the user's spoken request, unless the user explicitly "
+            "asks you to use another language. If they ask for another language, answer in that "
+            "language immediately in the same reply."
         )
         return prompt
 

@@ -56,6 +56,17 @@ class ProviderPromptTests(unittest.TestCase):
         self.assertIn("high confidence", prompt)
         self.assertIn("stay conservative rather than inventing content", prompt)
 
+    def test_live_speech_prompt_merges_reply_and_delivery_rules(self) -> None:
+        prompt = self.provider._build_live_speech_system_prompt()
+
+        self.assertIn("final spoken text", prompt)
+        self.assertIn("Do not change speaker identity or perspective", prompt)
+        self.assertIn("Actively use light, contextual Eleven v3 vocal tags", prompt)
+        self.assertIn(
+            "keep greetings, thanks, acknowledgments, and casual check-ins short",
+            prompt,
+        )
+
     def test_preview_text_normalizes_whitespace_and_truncates(self) -> None:
         preview = _preview_text("Hello\n\nthere   general   kenobi" * 40, limit=40)
 

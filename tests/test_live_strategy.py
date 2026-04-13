@@ -1,0 +1,62 @@
+import tempfile
+import unittest
+from pathlib import Path
+
+from src.strategies.live_strategy import LiveStrategy
+
+
+class FakeTranscriptionAgent:
+    def run(self, *, audio_path: str) -> str:
+        return f"transcript for {audio_path}"
+
+
+class FakeLLMAgent:
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, str]] = []
+
+    def generate_live_speech_reply(self, *, transcript: str) -> str:
+        self.calls.append(("live", transcript))
+        return "[curious] Hello there!"
+
+    def prepare_speech_text(
+        self, *, text: str
+    ) -> str:  # pragma: no cover - regression guard.
+        raise AssertionError("live strategy should not call prepare_speech_text")
+
+
+class FakeTTSAgent:
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, str]] = []
+
+    def run(self, *, text: str, output_path: str) -> str:
+        self.calls.append((text, output_path))
+        return output_path
+
+
+class LiveStrategyTests(unittest.TestCase):
+    def test_execute_uses_single_llm_reply_for_tts(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            llm_agent = FakeLLMAgent()
+            tts_agent = FakeTTSAgent()
+            strategy = LiveStrategy(
+                transcription_agent=FakeTranscriptionAgent(),
+                llm_agent=llm_agent,
+                tts_agent=tts_agent,
+                audio_dir=Path(temp_dir),
+            )
+
+            interaction = strategy.execute({"recording_path": "input.wav"})
+
+        self.assertEqual(
+            llm_agent.calls,
+            [("live", "transcript for input.wav")],
+        )
+        self.assertEqual(
+            tts_agent.calls[0][0],
+            "[curious] Hello there!",
+        )
+        self.assertEqual(interaction.response, "[curious] Hello there!")
+
+
+if __name__ == "__main__":
+    unittest.main()

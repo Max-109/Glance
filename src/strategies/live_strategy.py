@@ -25,21 +25,10 @@ class LiveStrategy(ModeStrategy):
     def execute(self, context: dict) -> LiveInteraction:
         recording_path = str(context["recording_path"])
         transcript = self._transcription_agent.run(audio_path=recording_path)
-        prompt = (
-            "You are replying inside a live desktop voice conversation. Help the user with their "
-            "last spoken request in a natural back-and-forth way. Be clear, direct, and friendly. "
-            "Be brief by default, but include enough detail to actually help. Make the reply easy "
-            "to understand in one listen and easy to speak aloud."
-        )
-        response = self._llm_agent.run(
-            user_prompt=prompt,
-            transcript=transcript,
-            match_user_language=True,
-        )
-        spoken_response = self._llm_agent.prepare_speech_text(text=response)
+        response = self._llm_agent.generate_live_speech_reply(transcript=transcript)
         speech_path = self._audio_dir / f"live-{Path(recording_path).stem}.mp3"
         generated_speech_path = self._tts_agent.run(
-            text=spoken_response,
+            text=response,
             output_path=str(speech_path),
         )
         return LiveInteraction(

@@ -25,3 +25,6 @@ class LLMAgent(BaseAgent):
 
     def prepare_speech_text(self, *, text: str) -> str:
         return self._provider.prepare_speech_text(text)
+
+    def generate_live_speech_reply(self, *, transcript: str) -> str:
+        return self._provider.generate_live_speech_reply(transcript=transcript)

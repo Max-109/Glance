@@ -46,6 +46,9 @@ class FakeLLMAgent:
     def prepare_speech_text(self, *, text):
         return text
 
+    def generate_live_speech_reply(self, *, transcript):
+        return f"live:{transcript}"
+
 
 class FakeOCRAgent:
     def run(self, *, image_path):
@@ -122,7 +125,7 @@ class OrchestratorFlowTests(unittest.TestCase):
 
         self.assertEqual(interaction.recording_path, str(recording_path))
         self.assertEqual(interaction.transcript, "transcribed:turn.wav")
-        self.assertEqual(interaction.response, "live:transcribed:turn.wav:0")
+        self.assertEqual(interaction.response, "live:transcribed:turn.wav")
 
     def test_live_mode_reuses_same_session_when_provided(self) -> None:
         recording_path = Path(self.temp_dir.name) / "turn.wav"
