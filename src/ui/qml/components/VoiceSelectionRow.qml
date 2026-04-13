@@ -140,7 +140,7 @@ Item {
             y: root.popupY()
             width: trigger.width
             padding: 4
-            closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutsideParent
+            closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
 
             background: Rectangle {
                 radius: 10
