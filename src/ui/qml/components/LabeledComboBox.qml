@@ -1,3 +1,5 @@
+pragma ComponentBehavior: Bound
+
 import QtQuick 2.15
 import QtQuick.Controls 2.15
 import QtQuick.Layouts 1.15
@@ -13,16 +15,29 @@ Item {
     property string iconName: ""
     property string value: ""
     property var options: []
+    property var optionLabels: ({})
     property var optionIcons: ({})
     readonly property real pixelRatio: Screen.devicePixelRatio > 0 ? Screen.devicePixelRatio : 1
 
     signal valueEdited(string value)
 
-    function currentValue() {
-        if (root.value.length > 0) {
-            return root.value
+    function indexForValue() {
+        var index = root.options.indexOf(root.value)
+        if (index >= 0) {
+            return index
         }
-        return root.options.length > 0 ? root.options[0] : "Select"
+        return root.options.length > 0 ? 0 : -1
+    }
+
+    function currentValue() {
+        return combo.currentIndex >= 0 ? root.optionLabel(root.options[combo.currentIndex]) : "Select"
+    }
+
+    function optionLabel(optionValue) {
+        if (root.optionLabels && root.optionLabels[optionValue]) {
+            return root.optionLabels[optionValue]
+        }
+        return optionValue
     }
 
     function optionIcon(optionValue) {
@@ -30,45 +45,6 @@ Item {
             return root.optionIcons[optionValue]
         }
         return ""
-    }
-
-    function popupParent() {
-        return popup.parent ? popup.parent : root
-    }
-
-    function mapTriggerPoint(offsetY) {
-        var target = popupParent()
-        var globalPoint = trigger.mapToGlobal(0, offsetY)
-        return target.mapFromGlobal(globalPoint.x, globalPoint.y)
-    }
-
-    function popupX() {
-        var target = popupParent()
-        var point = root.mapTriggerPoint(0)
-        return Math.max(12, Math.min(point.x, target.width - popup.width - 12))
-    }
-
-    function popupHeight() {
-        if (popup.implicitHeight > 0) {
-            return popup.implicitHeight
-        }
-        if (popup.contentItem) {
-            return popup.contentItem.implicitHeight + popup.topPadding + popup.bottomPadding
-        }
-        return 0
-    }
-
-    function popupY() {
-        var target = popupParent()
-        var popupHeight = root.popupHeight()
-        var belowY = root.mapTriggerPoint(trigger.height + 6).y
-        var maxY = Math.max(12, target.height - popupHeight - 12)
-        if (belowY <= maxY) {
-            return Math.max(12, belowY)
-        }
-
-        var aboveY = root.mapTriggerPoint(-popupHeight - 6).y
-        return Math.max(12, Math.min(aboveY, maxY))
     }
 
     Layout.fillWidth: true
@@ -82,167 +58,178 @@ Item {
 
         Text {
             text: root.label
-            color: theme.textWeak
+            color: root.theme.textWeak
             font.pixelSize: 13
             font.weight: 500
         }
 
-        Rectangle {
-            id: trigger
+        ComboBox {
+            id: combo
             Layout.fillWidth: true
             implicitHeight: 32
-            clip: true
-            radius: 8
-            color: theme.controlSurface
-            border.width: 1
-            border.color: theme.controlOutline
+            model: root.options
+            currentIndex: root.indexForValue()
+            hoverEnabled: true
+            Accessible.name: root.label
 
-            Behavior on color { ColorAnimation { duration: 140 } }
-            Behavior on border.color { ColorAnimation { duration: 140 } }
-
-            RowLayout {
-                anchors.fill: parent
-                anchors.leftMargin: 12
-                anchors.rightMargin: 12
-                spacing: 10
-
-                Image {
-                    readonly property string displayIcon: {
-                        var optionIconName = root.optionIcon(root.currentValue())
-                        return optionIconName.length > 0 ? optionIconName : root.iconName
-                    }
-                    visible: displayIcon.length > 0
-                    source: root.iconLibrary ? root.iconLibrary.svgData(displayIcon, theme.iconBase) : ""
-                    sourceSize.width: Math.round(16 * root.pixelRatio)
-                    sourceSize.height: Math.round(16 * root.pixelRatio)
-                    fillMode: Image.PreserveAspectFit
-                    smooth: true
-                    Layout.preferredWidth: visible ? 16 : 0
-                    Layout.preferredHeight: visible ? 16 : 0
-                    Accessible.ignored: true
-                }
-
-                Text {
-                    Layout.fillWidth: true
-                    text: root.currentValue()
-                    font.pixelSize: 14
-                    color: theme.textStrong
-                    elide: Text.ElideRight
-                    verticalAlignment: Text.AlignVCenter
-                }
-
-                Image {
-                    source: root.iconLibrary ? root.iconLibrary.svgData("chevron-down", theme.iconBase) : ""
-                    sourceSize.width: Math.round(16 * root.pixelRatio)
-                    sourceSize.height: Math.round(16 * root.pixelRatio)
-                    fillMode: Image.PreserveAspectFit
-                    smooth: true
-                    Layout.preferredWidth: 16
-                    Layout.preferredHeight: 16
-                    Layout.alignment: Qt.AlignVCenter
-                    rotation: popup.opened ? 180 : 0
-
-                    Behavior on rotation {
-                        NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
-                    }
-                }
-            }
-
-            TapHandler {
-                onTapped: {
-                    if (popup.opened) {
-                        popup.close()
-                    } else {
-                        popup.open()
-                    }
-                }
-            }
-        }
-
-        Popup {
-            id: popup
-            parent: Overlay.overlay ? Overlay.overlay : root
-            x: root.popupX()
-            y: root.popupY()
-            width: trigger.width
-            padding: 4
-            closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+            onActivated: (index) => root.valueEdited(root.options[index])
 
             background: Rectangle {
-                radius: 10
-                color: theme.controlSurface
+                radius: 8
+                color: combo.pressed
+                    ? root.theme.surfaceBaseActive
+                    : (combo.hovered ? root.theme.surfaceBaseHover : root.theme.controlSurface)
                 border.width: 1
-                border.color: theme.controlOutline
+                border.color: combo.visualFocus || combo.popup.visible
+                    ? root.theme.borderSelected
+                    : root.theme.controlOutline
+
+                Behavior on color { ColorAnimation { duration: 140 } }
+                Behavior on border.color { ColorAnimation { duration: 140 } }
             }
 
-            enter: Transition {
-                ParallelAnimation {
-                    NumberAnimation { property: "opacity"; from: 0; to: 1; duration: 110 }
-                    NumberAnimation { property: "scale"; from: 0.98; to: 1.0; duration: 140; easing.type: Easing.OutCubic }
+            indicator: Image {
+                source: root.iconLibrary ? root.iconLibrary.svgData("chevron-down", root.theme.iconBase) : ""
+                width: 16
+                height: 16
+                sourceSize.width: Math.round(16 * root.pixelRatio)
+                sourceSize.height: Math.round(16 * root.pixelRatio)
+                fillMode: Image.PreserveAspectFit
+                smooth: true
+                x: Math.round(combo.width - width - 12)
+                y: Math.round((combo.height - height) / 2)
+                rotation: combo.popup.visible ? 180 : 0
+                Accessible.ignored: true
+
+                Behavior on rotation {
+                    NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
                 }
             }
 
-            exit: Transition {
-                ParallelAnimation {
-                    NumberAnimation { property: "opacity"; from: 1; to: 0; duration: 90 }
-                    NumberAnimation { property: "scale"; from: 1.0; to: 0.985; duration: 90; easing.type: Easing.OutCubic }
+            contentItem: Item {
+                implicitHeight: 32
+
+                RowLayout {
+                    anchors.fill: parent
+                    anchors.leftMargin: 12
+                    anchors.rightMargin: 34
+                    spacing: 10
+
+                    Image {
+                        readonly property string displayIcon: {
+                            var selectedValue = combo.currentIndex >= 0 ? root.options[combo.currentIndex] : ""
+                            var optionIconName = root.optionIcon(selectedValue)
+                            return optionIconName.length > 0 ? optionIconName : root.iconName
+                        }
+                        visible: displayIcon.length > 0
+                        source: root.iconLibrary ? root.iconLibrary.svgData(displayIcon, root.theme.iconBase) : ""
+                        sourceSize.width: Math.round(16 * root.pixelRatio)
+                        sourceSize.height: Math.round(16 * root.pixelRatio)
+                        fillMode: Image.PreserveAspectFit
+                        smooth: true
+                        Layout.preferredWidth: visible ? 16 : 0
+                        Layout.preferredHeight: visible ? 16 : 0
+                        Accessible.ignored: true
+                    }
+
+                    Text {
+                        Layout.fillWidth: true
+                        text: root.currentValue()
+                        color: root.theme.textStrong
+                        font.pixelSize: 14
+                        elide: Text.ElideRight
+                        verticalAlignment: Text.AlignVCenter
+                    }
                 }
             }
 
-            contentItem: ListView {
-                id: optionList
-                implicitHeight: Math.min(contentHeight, 220)
-                clip: true
-                spacing: 2
-                model: root.options
+            delegate: ItemDelegate {
+                id: delegateRoot
+                required property int index
+                required property string modelData
+                width: combo.width - 8
+                implicitHeight: 38
+                highlighted: combo.highlightedIndex === index
+                hoverEnabled: true
+                padding: 0
 
-                delegate: Rectangle {
-                    width: optionList.width
-                    height: 38
+                background: Rectangle {
                     radius: 6
-                    color: delegateArea.containsMouse || root.value === modelData
-                        ? theme.surfaceBaseActive
+                    color: delegateRoot.highlighted || combo.currentIndex === delegateRoot.index
+                        ? root.theme.surfaceBaseActive
                         : "transparent"
+                }
 
-                    RowLayout {
-                        anchors.fill: parent
-                        anchors.leftMargin: 12
-                        anchors.rightMargin: 12
-                        spacing: 10
+                contentItem: RowLayout {
+                    anchors.fill: parent
+                    anchors.leftMargin: 12
+                    anchors.rightMargin: 12
+                    spacing: 10
 
-                        Image {
-                            readonly property string optionIconName: root.optionIcon(modelData)
-                            visible: optionIconName.length > 0
-                            source: root.iconLibrary ? root.iconLibrary.svgData(optionIconName, theme.iconBase) : ""
-                            sourceSize.width: Math.round(16 * root.pixelRatio)
-                            sourceSize.height: Math.round(16 * root.pixelRatio)
-                            fillMode: Image.PreserveAspectFit
-                            smooth: true
-                            Layout.preferredWidth: visible ? 16 : 0
-                            Layout.preferredHeight: visible ? 16 : 0
-                            Accessible.ignored: true
-                        }
-
-                        Text {
-                            Layout.fillWidth: true
-                            text: modelData
-                            color: theme.textStrong
-                            font.pixelSize: 14
-                            elide: Text.ElideRight
-                            verticalAlignment: Text.AlignVCenter
-                        }
+                    Image {
+                        readonly property string optionIconName: root.optionIcon(delegateRoot.modelData)
+                        visible: optionIconName.length > 0
+                        source: root.iconLibrary ? root.iconLibrary.svgData(optionIconName, root.theme.iconBase) : ""
+                        sourceSize.width: Math.round(16 * root.pixelRatio)
+                        sourceSize.height: Math.round(16 * root.pixelRatio)
+                        fillMode: Image.PreserveAspectFit
+                        smooth: true
+                        Layout.preferredWidth: visible ? 16 : 0
+                        Layout.preferredHeight: visible ? 16 : 0
+                        Accessible.ignored: true
                     }
 
-                    MouseArea {
-                        id: delegateArea
-                        anchors.fill: parent
-                        hoverEnabled: true
-
-                        onClicked: {
-                            root.valueEdited(modelData)
-                            popup.close()
-                        }
+                    Text {
+                        Layout.fillWidth: true
+                        text: root.optionLabel(delegateRoot.modelData)
+                        color: root.theme.textStrong
+                        font.pixelSize: 14
+                        elide: Text.ElideRight
+                        verticalAlignment: Text.AlignVCenter
                     }
+                }
+            }
+
+            popup: Popup {
+                y: combo.height + 6
+                width: combo.width
+                margins: 12
+                padding: 4
+                modal: true
+                closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+
+                Overlay.modal: Rectangle {
+                    color: root.theme.surfaceBase
+                }
+
+                background: Rectangle {
+                    radius: 10
+                    color: root.theme.controlSurface
+                    border.width: 1
+                    border.color: root.theme.controlOutline
+                }
+
+                enter: Transition {
+                    ParallelAnimation {
+                        NumberAnimation { property: "opacity"; from: 0; to: 1; duration: 110 }
+                        NumberAnimation { property: "scale"; from: 0.98; to: 1.0; duration: 140; easing.type: Easing.OutCubic }
+                    }
+                }
+
+                exit: Transition {
+                    ParallelAnimation {
+                        NumberAnimation { property: "opacity"; from: 1; to: 0; duration: 90 }
+                        NumberAnimation { property: "scale"; from: 1.0; to: 0.985; duration: 90; easing.type: Easing.OutCubic }
+                    }
+                }
+
+                contentItem: ListView {
+                    clip: true
+                    implicitHeight: Math.min(contentHeight, 220)
+                    model: combo.popup.visible ? combo.delegateModel : null
+                    currentIndex: combo.highlightedIndex
+                    spacing: 2
+                    ScrollIndicator.vertical: ScrollIndicator {}
                 }
             }
         }
@@ -250,7 +237,7 @@ Item {
         Text {
             visible: root.helperText.length > 0
             text: root.helperText
-            color: theme.textWeak
+            color: root.theme.textWeak
             font.pixelSize: 13
             font.weight: 400
             wrapMode: Text.Wrap

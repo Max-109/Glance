@@ -30,7 +30,7 @@ Item {
 
         Text {
             text: root.label
-            color: root.errorText.length > 0 ? theme.textOnCriticalBase : theme.textWeak
+            color: root.errorText.length > 0 ? root.theme.textOnCriticalBase : root.theme.textWeak
             font.pixelSize: 13
             font.weight: 500
         }
@@ -40,23 +40,14 @@ Item {
             Layout.fillWidth: true
             implicitHeight: root.multiline ? 96 : 32
             radius: 8
-            color: root.errorText.length > 0 ? theme.surfaceCriticalWeak : theme.controlSurface
+            color: root.errorText.length > 0 ? root.theme.surfaceCriticalWeak : root.theme.controlSurface
             border.width: 1
             border.color: root.errorText.length > 0
-                ? theme.borderCriticalSelected
-                : theme.controlOutline
+                ? root.theme.borderCriticalSelected
+                : ((textField.activeFocus || textArea.activeFocus) ? root.theme.borderSelected : root.theme.controlOutline)
 
             Behavior on color { ColorAnimation { duration: 140 } }
             Behavior on border.color { ColorAnimation { duration: 140 } }
-
-            Rectangle {
-                anchors.fill: parent
-                anchors.margins: -3
-                radius: 9
-                color: "transparent"
-                border.width: (textField.activeFocus || textArea.activeFocus) ? 1 : 0
-                border.color: theme.controlOutline
-            }
 
             RowLayout {
                 anchors.fill: parent
@@ -68,7 +59,7 @@ Item {
 
                 Image {
                     visible: root.iconName.length > 0
-                    source: root.iconLibrary ? root.iconLibrary.svgData(root.iconName, theme.iconBase) : ""
+                    source: root.iconLibrary ? root.iconLibrary.svgData(root.iconName, root.theme.iconBase) : ""
                     sourceSize.width: Math.round(16 * root.pixelRatio)
                     sourceSize.height: Math.round(16 * root.pixelRatio)
                     fillMode: Image.PreserveAspectFit
@@ -86,13 +77,13 @@ Item {
                     Layout.fillWidth: true
                     clip: true
                     text: root.value
-                    color: theme.textStrong
-                    placeholderTextColor: theme.textWeak
+                    color: root.theme.textStrong
+                    placeholderTextColor: root.theme.textWeak
                     font.pixelSize: 14
                     font.weight: 400
                     selectByMouse: true
-                    selectionColor: theme.surfaceBaseActive
-                    selectedTextColor: theme.textStrong
+                    selectionColor: root.theme.surfaceBaseActive
+                    selectedTextColor: root.theme.textStrong
                     echoMode: root.secret && !revealToggle.checked ? TextInput.Password : TextInput.Normal
                     background: null
                     Accessible.name: root.label
@@ -106,14 +97,14 @@ Item {
                     Layout.fillHeight: true
                     clip: true
                     text: root.value
-                    color: theme.textStrong
-                    placeholderTextColor: theme.textWeak
+                    color: root.theme.textStrong
+                    placeholderTextColor: root.theme.textWeak
                     font.pixelSize: 14
                     font.weight: 400
                     wrapMode: Text.Wrap
                     selectByMouse: true
-                    selectionColor: theme.surfaceBaseActive
-                    selectedTextColor: theme.textStrong
+                    selectionColor: root.theme.surfaceBaseActive
+                    selectedTextColor: root.theme.textStrong
                     background: null
                     Accessible.name: root.label
                     onTextChanged: root.valueEdited(text)
@@ -129,7 +120,7 @@ Item {
                     Layout.alignment: Qt.AlignVCenter
                     Accessible.name: checked ? "Hide secret" : "Show secret"
                     contentItem: Image {
-                        source: root.iconLibrary ? root.iconLibrary.svgData("eye", revealToggle.hovered ? theme.iconHover : theme.iconBase) : ""
+                        source: root.iconLibrary ? root.iconLibrary.svgData("eye", revealToggle.hovered ? root.theme.iconHover : root.theme.iconBase) : ""
                         sourceSize.width: Math.round(16 * root.pixelRatio)
                         sourceSize.height: Math.round(16 * root.pixelRatio)
                         fillMode: Image.PreserveAspectFit
@@ -138,7 +129,7 @@ Item {
                     }
                     background: Rectangle {
                         radius: 4
-                        color: revealToggle.down ? theme.surfaceBaseActive : (revealToggle.hovered ? theme.surfaceBaseHover : "transparent")
+                        color: revealToggle.down ? root.theme.surfaceBaseActive : (revealToggle.hovered ? root.theme.surfaceBaseHover : "transparent")
 
                         Behavior on color { ColorAnimation { duration: 120 } }
                     }
@@ -149,7 +140,7 @@ Item {
         Text {
             visible: root.errorText.length > 0 || root.helperText.length > 0
             text: root.errorText.length > 0 ? root.errorText : root.helperText
-            color: root.errorText.length > 0 ? theme.textOnCriticalBase : theme.textWeak
+            color: root.errorText.length > 0 ? root.theme.textOnCriticalBase : root.theme.textWeak
             font.pixelSize: 13
             font.weight: root.errorText.length > 0 ? 500 : 400
             wrapMode: Text.Wrap

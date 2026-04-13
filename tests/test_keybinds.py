@@ -8,6 +8,7 @@ try:
     from src.services.settings_manager import SettingsManager
     from src.storage.json_storage import JsonHistoryRepository, JsonSettingsStore
     from src.ui.settings_viewmodel import SettingsViewModel
+    from src.services.audio_devices import AudioDeviceOption
 except ImportError:  # pragma: no cover - optional GUI dependency.
     Qt = None
     HistoryManager = None
@@ -15,6 +16,7 @@ except ImportError:  # pragma: no cover - optional GUI dependency.
     JsonHistoryRepository = None
     JsonSettingsStore = None
     SettingsViewModel = None
+    AudioDeviceOption = None
 
 from src.services.keybinds import (
     keybinds_are_unique,
@@ -164,6 +166,79 @@ class SettingsViewModelKeybindTests(unittest.TestCase):
             "Use a value between 0 and 1.",
         )
         self.assertTrue(self.viewmodel.dirty)
+
+    def test_audio_fields_autosave_without_manual_save(self) -> None:
+        self.viewmodel.setField("audio_activation_threshold", "0.08")
+
+        self.assertEqual(
+            self.settings_manager.reload().audio_activation_threshold, 0.08
+        )
+        self.assertFalse(self.viewmodel.dirty)
+
+    def test_reset_audio_defaults_uses_transient_status_for_noop(self) -> None:
+        self.viewmodel._set_status("Saved.", "success")
+
+        self.viewmodel.resetAudioDefaults()
+
+        revision = self.viewmodel._status_revision
+        self.assertEqual(self.viewmodel.statusMessage, "")
+        self.assertEqual(self.viewmodel.statusKind, "neutral")
+
+        self.viewmodel._apply_deferred_transient_status(
+            revision,
+            "Audio settings are already using the defaults.",
+            "neutral",
+            self.viewmodel._TRANSIENT_INFO_STATUS_DURATION_MS,
+        )
+
+        self.assertEqual(
+            self.viewmodel.statusMessage,
+            "Audio settings are already using the defaults.",
+        )
+        self.assertEqual(self.viewmodel.statusKind, "neutral")
+        self.assertTrue(self.viewmodel._status_timer.isActive())
+
+    def test_invalid_audio_preroll_shows_validation_error(self) -> None:
+        self.viewmodel.setField("audio_preroll_seconds", "-1")
+
+        self.assertEqual(
+            self.viewmodel.errors["audio_preroll_seconds"],
+            "Value cannot be negative.",
+        )
+
+    def test_audio_device_refresh_exposes_labels_and_preserves_missing_saved_value(
+        self,
+    ) -> None:
+        self.viewmodel.setField("audio_input_device", "input:99")
+        self.viewmodel._audio_device_service = type(
+            "FakeAudioService",
+            (),
+            {
+                "list_input_devices": staticmethod(
+                    lambda: [
+                        AudioDeviceOption("default", "System Default Input"),
+                        AudioDeviceOption("input:0", "Built-in Mic"),
+                    ]
+                ),
+                "list_output_devices": staticmethod(
+                    lambda: [
+                        AudioDeviceOption("default", "System Default Output"),
+                    ]
+                ),
+            },
+        )()
+
+        self.viewmodel.refreshAudioDevices()
+
+        self.assertIn("input:0", self.viewmodel.audioInputDeviceOptions)
+        self.assertEqual(
+            self.viewmodel.audioInputDeviceLabels["input:0"],
+            "Built-in Mic",
+        )
+        self.assertEqual(
+            self.viewmodel.audioInputDeviceLabels["input:99"],
+            "Saved input device unavailable",
+        )
 
 
 if __name__ == "__main__":

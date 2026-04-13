@@ -7,6 +7,7 @@ from threading import Event
 
 from src.exceptions.app_exceptions import PermissionDeniedError, ValidationError
 from src.models.settings import AppSettings
+from src.services.audio_devices import AudioDeviceService
 
 try:
     import numpy as np
@@ -24,24 +25,46 @@ class ThresholdAudioRecorder:
         self,
         settings: AppSettings,
         *,
+        device_service: AudioDeviceService | None = None,
         sample_rate: int = 16000,
         channels: int = 1,
         chunk_size: int = 1024,
-        activation_threshold: float = 0.02,
-        silence_seconds: float = 0.85,
-        max_wait_seconds: float = 15.0,
-        max_record_seconds: float = 30.0,
-        preroll_seconds: float = 0.25,
+        activation_threshold: float | None = None,
+        silence_seconds: float | None = None,
+        max_wait_seconds: float | None = None,
+        max_record_seconds: float | None = None,
+        preroll_seconds: float | None = None,
     ) -> None:
         self._settings = settings
+        self._device_service = device_service or AudioDeviceService()
         self._sample_rate = sample_rate
         self._channels = channels
         self._chunk_size = chunk_size
-        self._activation_threshold = activation_threshold
-        self._silence_seconds = silence_seconds
-        self._max_wait_seconds = max_wait_seconds
-        self._max_record_seconds = max_record_seconds
-        self._preroll_seconds = preroll_seconds
+        self._activation_threshold = (
+            settings.audio_activation_threshold
+            if activation_threshold is None
+            else activation_threshold
+        )
+        self._silence_seconds = (
+            settings.audio_silence_seconds
+            if silence_seconds is None
+            else silence_seconds
+        )
+        self._max_wait_seconds = (
+            settings.audio_max_wait_seconds
+            if max_wait_seconds is None
+            else max_wait_seconds
+        )
+        self._max_record_seconds = (
+            settings.audio_max_record_seconds
+            if max_record_seconds is None
+            else max_record_seconds
+        )
+        self._preroll_seconds = (
+            settings.audio_preroll_seconds
+            if preroll_seconds is None
+            else preroll_seconds
+        )
 
     def capture_turn(self, output_path: str, stop_event: Event | None = None) -> str:
         self._ensure_available()
@@ -69,10 +92,8 @@ class ThresholdAudioRecorder:
         total_chunks = 0
         started = False
 
-        device = (
-            None
-            if self._settings.audio_input_device == "default"
-            else self._settings.audio_input_device
+        device = self._device_service.resolve_input_device(
+            self._settings.audio_input_device
         )
 
         try:

@@ -115,6 +115,7 @@ def run_settings_app() -> int:
                 )
             )
             live_controller.set_recorder(ThresholdAudioRecorder(persisted_settings))
+            live_controller.set_output_device(persisted_settings.audio_output_device)
         except Exception as exc:
             live_controller.set_orchestrator(None)
             live_controller.set_recorder(None)
@@ -161,6 +162,9 @@ def run_settings_app() -> int:
     root_window.visibleChanged.connect(restore_hotkeys_if_pending)
     app.aboutToQuit.connect(hotkey_manager.stop)
     app.aboutToQuit.connect(live_controller.stop)
+    app.aboutToQuit.connect(controller.stopVoicePreview)
+    app.aboutToQuit.connect(controller.stopAudioInputTest)
+    app.aboutToQuit.connect(controller.stopSpeakerTest)
     refresh_runtime()
 
     return app.exec()
@@ -312,6 +316,8 @@ def _build_live_controller(
     return LiveSessionController(
         orchestrator=orchestrator,
         recorder=recorder,
-        playback_service=QtAudioPlaybackService(),
+        playback_service=QtAudioPlaybackService(
+            output_device_id=settings.audio_output_device,
+        ),
         audio_dir=paths.audio_dir,
     )

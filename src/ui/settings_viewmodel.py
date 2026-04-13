@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from copy import deepcopy
 from pathlib import Path
 from threading import Event, Thread
@@ -11,7 +12,10 @@ from PySide6.QtCore import Property, QCoreApplication, QTimer, QObject, Signal, 
 
 from src.exceptions.app_exceptions import ValidationError
 from src.models.settings import AppSettings, ELEVEN_V3_VOICES
+from src.services.audio_devices import AudioDeviceOption, AudioDeviceService
+from src.services.audio_monitor import AudioMonitorService
 from src.services.audio_playback import QtAudioPlaybackService
+from src.services.audio_signal import AudioTestSignalService
 from src.services.history_manager import HistoryManager
 from src.services.keybinds import (
     keybinds_are_unique,
@@ -24,6 +28,9 @@ from src.services.settings_manager import SettingsManager
 
 class SettingsViewModel(QObject):
     _AUTOSAVE_DELAY_MS = 350
+    _SUCCESS_STATUS_DURATION_MS = 2200
+    _TRANSIENT_INFO_STATUS_DURATION_MS = 2200
+    _STATUS_REPLACE_DELAY_MS = 180
     _IMMEDIATE_AUTOSAVE_FIELDS = {
         "llm_reasoning",
         "transcription_reasoning",
@@ -41,23 +48,44 @@ class SettingsViewModel(QObject):
     dirtyChanged = Signal()
     savingChanged = Signal()
     statusChanged = Signal()
+    audioDevicesChanged = Signal()
+    audioTestChanged = Signal()
     currentSectionChanged = Signal()
     bindingChanged = Signal()
     previewChanged = Signal()
     _previewStatusRequested = Signal(str, str)
     _previewStarted = Signal(str)
     _previewFinished = Signal(str)
+    _audioLevelRequested = Signal(float)
+    _audioInputTestFinished = Signal()
+    _speakerTestFinished = Signal()
 
     def __init__(
         self,
         settings_manager: SettingsManager,
         history_manager: HistoryManager,
         audio_dir: Path | None = None,
+        audio_device_service: AudioDeviceService | None = None,
+        audio_monitor_factory: Callable[[AppSettings], AudioMonitorService]
+        | None = None,
+        audio_signal_service: AudioTestSignalService | None = None,
+        playback_service_factory: Callable[[], QtAudioPlaybackService] | None = None,
     ) -> None:
         super().__init__()
         self._settings_manager = settings_manager
         self._history_manager = history_manager
         self._audio_dir = audio_dir
+        self._audio_device_service = audio_device_service or AudioDeviceService()
+        self._audio_monitor_factory = audio_monitor_factory or (
+            lambda settings: AudioMonitorService(
+                settings,
+                device_service=self._audio_device_service,
+            )
+        )
+        self._audio_signal_service = audio_signal_service or AudioTestSignalService()
+        self._playback_service_factory = playback_service_factory or (
+            lambda: QtAudioPlaybackService(device_service=self._audio_device_service)
+        )
         current_settings = settings_manager.load()
         self._baseline_map = current_settings.to_dict()
         self._settings_map = deepcopy(self._baseline_map)
@@ -66,18 +94,36 @@ class SettingsViewModel(QObject):
         self._saving = False
         self._status_message = ""
         self._status_kind = "neutral"
+        self._status_revision = 0
         self._current_section = "api"
         self._binding_field = ""
         self._previewing_voice = ""
         self._preview_thread: Thread | None = None
         self._preview_stop_event: Event | None = None
         self._preview_playback_service: QtAudioPlaybackService | None = None
+        self._audio_input_options = ["default"]
+        self._audio_output_options = ["default"]
+        self._audio_input_labels = {"default": "System Default Input"}
+        self._audio_output_labels = {"default": "System Default Output"}
+        self._audio_device_status = ""
+        self._audio_input_level = 0.0
+        self._audio_input_test_thread: Thread | None = None
+        self._audio_input_test_stop_event: Event | None = None
+        self._speaker_test_thread: Thread | None = None
+        self._speaker_test_stop_event: Event | None = None
         self._previewStatusRequested.connect(self._apply_status_update)
         self._previewStarted.connect(self._handle_preview_started)
         self._previewFinished.connect(self._handle_preview_finished)
+        self._audioLevelRequested.connect(self._apply_audio_level)
+        self._audioInputTestFinished.connect(self._handle_audio_input_test_finished)
+        self._speakerTestFinished.connect(self._handle_speaker_test_finished)
         self._autosave_timer = QTimer(self)
         self._autosave_timer.setSingleShot(True)
         self._autosave_timer.timeout.connect(self._apply_autosave)
+        self.refreshAudioDevices()
+        self._status_timer = QTimer(self)
+        self._status_timer.setSingleShot(True)
+        self._status_timer.timeout.connect(self._clear_status)
 
     @Property("QVariantMap", notify=settingsChanged)
     def settings(self) -> dict[str, Any]:
@@ -102,6 +148,42 @@ class SettingsViewModel(QObject):
     @Property(str, notify=statusChanged)
     def statusKind(self) -> str:
         return self._status_kind
+
+    @Property("QStringList", notify=audioDevicesChanged)
+    def audioDeviceOptions(self) -> list[str]:
+        return list(self._audio_input_options)
+
+    @Property("QStringList", notify=audioDevicesChanged)
+    def audioInputDeviceOptions(self) -> list[str]:
+        return list(self._audio_input_options)
+
+    @Property("QVariantMap", notify=audioDevicesChanged)
+    def audioInputDeviceLabels(self) -> dict[str, str]:
+        return dict(self._audio_input_labels)
+
+    @Property("QStringList", notify=audioDevicesChanged)
+    def audioOutputDeviceOptions(self) -> list[str]:
+        return list(self._audio_output_options)
+
+    @Property("QVariantMap", notify=audioDevicesChanged)
+    def audioOutputDeviceLabels(self) -> dict[str, str]:
+        return dict(self._audio_output_labels)
+
+    @Property(str, notify=audioDevicesChanged)
+    def audioDeviceStatusMessage(self) -> str:
+        return self._audio_device_status
+
+    @Property(float, notify=audioTestChanged)
+    def audioInputLevel(self) -> float:
+        return self._audio_input_level
+
+    @Property(bool, notify=audioTestChanged)
+    def audioInputTestActive(self) -> bool:
+        return self._audio_input_test_thread is not None
+
+    @Property(bool, notify=audioTestChanged)
+    def speakerTestActive(self) -> bool:
+        return self._speaker_test_thread is not None
 
     @Property(str, notify=currentSectionChanged)
     def currentSection(self) -> str:
@@ -147,16 +229,15 @@ class SettingsViewModel(QObject):
     def languageOptions(self) -> list[str]:
         return ["en", "lt", "fr", "de", "es"]
 
-    @Property("QStringList", constant=True)
-    def audioDeviceOptions(self) -> list[str]:
-        return ["default"]
-
     @Slot(str)
     def setCurrentSection(self, section: str) -> None:
         if section == self._current_section:
             return
         if section != "voice":
             self.stopVoicePreview()
+        if section != "audio":
+            self.stopAudioInputTest()
+            self.stopSpeakerTest()
         self._current_section = section
         self.currentSectionChanged.emit()
 
@@ -278,7 +359,8 @@ class SettingsViewModel(QObject):
             return
 
         try:
-            self._ensure_preview_playback_service()
+            self.stopSpeakerTest()
+            self._prepare_preview_playback_service(preview_settings.audio_output_device)
         except Exception as exc:
             self._set_status(f"Voice preview unavailable: {exc}", "error")
             return
@@ -304,6 +386,144 @@ class SettingsViewModel(QObject):
         if self._preview_playback_service is not None:
             self._preview_playback_service.stop()
 
+    @Slot()
+    def refreshAudioDevices(self) -> None:
+        try:
+            input_options = self._audio_device_service.list_input_devices()
+            output_options = self._audio_device_service.list_output_devices()
+        except Exception as exc:
+            self._audio_input_options = ["default"]
+            self._audio_output_options = ["default"]
+            self._audio_input_labels = {"default": "System Default Input"}
+            self._audio_output_labels = {"default": "System Default Output"}
+            self._audio_device_status = f"Device list unavailable: {exc}"
+            self.audioDevicesChanged.emit()
+            return
+
+        (
+            self._audio_input_options,
+            self._audio_input_labels,
+        ) = self._build_audio_option_state(
+            input_options,
+            str(self._settings_map.get("audio_input_device", "default")),
+            "Saved input device unavailable",
+        )
+        (
+            self._audio_output_options,
+            self._audio_output_labels,
+        ) = self._build_audio_option_state(
+            output_options,
+            str(self._settings_map.get("audio_output_device", "default")),
+            "Saved output device unavailable",
+        )
+
+        discovered_inputs = max(0, len(input_options) - 1)
+        discovered_outputs = max(0, len(output_options) - 1)
+        if discovered_inputs == 0 and discovered_outputs == 0:
+            self._audio_device_status = "Using system default audio devices."
+        else:
+            self._audio_device_status = f"{discovered_inputs} input device(s) and {discovered_outputs} output device(s) available."
+        self.audioDevicesChanged.emit()
+
+    @Slot()
+    def startAudioInputTest(self) -> None:
+        if self._audio_input_test_thread is not None:
+            return
+        settings = self._build_runtime_settings("Audio input test unavailable")
+        if settings is None:
+            return
+        self.stopVoicePreview()
+        self.stopSpeakerTest()
+        stop_event = Event()
+        self._audio_input_test_stop_event = stop_event
+        self._audio_input_level = 0.0
+        thread = Thread(
+            target=self._run_audio_input_test,
+            args=(settings, stop_event),
+            name="glance-audio-input-test",
+            daemon=True,
+        )
+        self._audio_input_test_thread = thread
+        self.audioTestChanged.emit()
+        self._set_status("Monitoring microphone input.", "neutral")
+        thread.start()
+
+    @Slot()
+    def stopAudioInputTest(self) -> None:
+        stop_event = self._audio_input_test_stop_event
+        if stop_event is not None:
+            stop_event.set()
+
+    @Slot()
+    def playSpeakerTest(self) -> None:
+        if self._speaker_test_thread is not None:
+            return
+        settings = self._build_runtime_settings("Speaker test unavailable")
+        if settings is None:
+            return
+        try:
+            self.stopAudioInputTest()
+            self.stopVoicePreview()
+            self._prepare_preview_playback_service(settings.audio_output_device)
+        except Exception as exc:
+            self._set_status(f"Speaker test unavailable: {exc}", "error")
+            return
+
+        stop_event = Event()
+        self._speaker_test_stop_event = stop_event
+        thread = Thread(
+            target=self._run_speaker_test,
+            args=(stop_event,),
+            name="glance-speaker-test",
+            daemon=True,
+        )
+        self._speaker_test_thread = thread
+        self.audioTestChanged.emit()
+        self._set_status("Playing speaker test.", "neutral")
+        thread.start()
+
+    @Slot()
+    def stopSpeakerTest(self) -> None:
+        stop_event = self._speaker_test_stop_event
+        if stop_event is not None:
+            stop_event.set()
+        if self._preview_playback_service is not None:
+            self._preview_playback_service.stop()
+
+    @Slot()
+    def resetAudioDefaults(self) -> None:
+        defaults = AppSettings()
+        audio_fields = (
+            "audio_input_device",
+            "audio_output_device",
+            "audio_activation_threshold",
+            "audio_silence_seconds",
+            "audio_max_wait_seconds",
+            "audio_max_record_seconds",
+            "audio_preroll_seconds",
+        )
+        updated = False
+        for field_name in audio_fields:
+            default_value = getattr(defaults, field_name)
+            if self._settings_map.get(field_name) == default_value:
+                continue
+            self._settings_map[field_name] = default_value
+            updated = True
+            self._errors.pop(field_name, None)
+        if not updated:
+            self._set_transient_status(
+                "Audio settings are already using the defaults.", "neutral"
+            )
+            return
+        self.stopAudioInputTest()
+        self.stopSpeakerTest()
+        self.refreshAudioDevices()
+        self._recompute_dirty()
+        self.settingsChanged.emit()
+        self.errorsChanged.emit()
+        self._schedule_autosave("audio_output_device")
+        self._set_status("Audio settings reset to the defaults.", "success")
+
     def _validate_current_settings(
         self, *, show_status: bool = True
     ) -> AppSettings | None:
@@ -325,6 +545,11 @@ class SettingsViewModel(QObject):
         self._coerce_positive_float(payload, "screenshot_interval", errors)
         self._coerce_positive_float(payload, "batch_window_duration", errors)
         self._coerce_ratio(payload, "screen_change_threshold", errors)
+        self._coerce_ratio(payload, "audio_activation_threshold", errors)
+        self._coerce_positive_float(payload, "audio_silence_seconds", errors)
+        self._coerce_positive_float(payload, "audio_max_wait_seconds", errors)
+        self._coerce_positive_float(payload, "audio_max_record_seconds", errors)
+        self._coerce_non_negative_float(payload, "audio_preroll_seconds", errors)
         self._coerce_theme(payload, "theme_preference", errors)
 
         for keybind_field in ("live_keybind", "quick_keybind", "ocr_keybind"):
@@ -374,8 +599,65 @@ class SettingsViewModel(QObject):
         self.dirtyChanged.emit()
 
     def _set_status(self, message: str, kind: str) -> None:
+        self._status_revision += 1
+        duration_ms = (
+            self._SUCCESS_STATUS_DURATION_MS if message and kind == "success" else None
+        )
+        self._apply_status(message, kind, duration_ms)
+
+    def _set_transient_status(self, message: str, kind: str = "neutral") -> None:
+        self._status_revision += 1
+        revision = self._status_revision
+        if self._status_message:
+            self._clear_status()
+            QTimer.singleShot(
+                self._STATUS_REPLACE_DELAY_MS,
+                lambda: self._apply_deferred_transient_status(
+                    revision,
+                    message,
+                    kind,
+                    self._TRANSIENT_INFO_STATUS_DURATION_MS,
+                ),
+            )
+            return
+        self._apply_deferred_transient_status(
+            revision,
+            message,
+            kind,
+            self._TRANSIENT_INFO_STATUS_DURATION_MS,
+        )
+
+    def _apply_deferred_transient_status(
+        self,
+        revision: int,
+        message: str,
+        kind: str,
+        duration_ms: int,
+    ) -> None:
+        if revision != self._status_revision:
+            return
+        self._apply_status(message, kind, duration_ms)
+
+    def _apply_status(
+        self,
+        message: str,
+        kind: str,
+        duration_ms: int | None,
+    ) -> None:
         self._status_message = message
-        self._status_kind = kind
+        self._status_kind = kind if message else "neutral"
+        if message and duration_ms is not None:
+            self._status_timer.start(duration_ms)
+        else:
+            self._status_timer.stop()
+        self.statusChanged.emit()
+
+    def _clear_status(self) -> None:
+        self._status_timer.stop()
+        if not self._status_message:
+            return
+        self._status_message = ""
+        self._status_kind = "neutral"
         self.statusChanged.emit()
 
     def _set_saving(self, value: bool) -> None:
@@ -390,6 +672,11 @@ class SettingsViewModel(QObject):
     @Slot(str, str)
     def _apply_status_update(self, message: str, kind: str) -> None:
         self._set_status(message, kind)
+
+    @Slot(float)
+    def _apply_audio_level(self, level: float) -> None:
+        self._audio_input_level = level
+        self.audioTestChanged.emit()
 
     @Slot(str)
     def _handle_preview_started(self, voice_name: str) -> None:
@@ -407,6 +694,19 @@ class SettingsViewModel(QObject):
         self._preview_stop_event = None
         self._preview_thread = None
         self.previewChanged.emit()
+
+    @Slot()
+    def _handle_audio_input_test_finished(self) -> None:
+        self._audio_input_test_stop_event = None
+        self._audio_input_test_thread = None
+        self._audio_input_level = 0.0
+        self.audioTestChanged.emit()
+
+    @Slot()
+    def _handle_speaker_test_finished(self) -> None:
+        self._speaker_test_stop_event = None
+        self._speaker_test_thread = None
+        self.audioTestChanged.emit()
 
     def _find_keybind_conflict(self, current_field: str, value: str) -> str | None:
         for field_name in ("live_keybind", "quick_keybind", "ocr_keybind"):
@@ -438,7 +738,11 @@ class SettingsViewModel(QObject):
             self._set_status("Choose a valid voice to preview.", "error")
             return None
 
-        payload = deepcopy(self._settings_map)
+        settings = self._build_runtime_settings("Voice preview failed")
+        if settings is None:
+            return None
+
+        payload = settings.to_dict()
         payload["tts_voice_id"] = voice_name
         missing_fields: list[str] = []
         for field_name, label in (
@@ -464,8 +768,17 @@ class SettingsViewModel(QObject):
         if self._audio_dir is None:
             raise ValidationError("audio output is not available in settings")
         if self._preview_playback_service is None:
-            self._preview_playback_service = QtAudioPlaybackService()
+            self._preview_playback_service = self._playback_service_factory()
         return self._preview_playback_service
+
+    def _prepare_preview_playback_service(
+        self, output_device_id: str
+    ) -> QtAudioPlaybackService:
+        playback_service = self._ensure_preview_playback_service()
+        set_output_device = getattr(playback_service, "set_output_device_id", None)
+        if callable(set_output_device):
+            set_output_device(output_device_id)
+        return playback_service
 
     def _run_voice_preview(
         self, settings: AppSettings, voice_name: str, stop_event: Event
@@ -482,9 +795,8 @@ class SettingsViewModel(QObject):
             )
             if stop_event.is_set():
                 return
-            self._preview_playback_service.play_blocking(
-                str(output_path), stop_event=stop_event
-            )
+            playback_service = self._ensure_preview_playback_service()
+            playback_service.play_blocking(str(output_path), stop_event=stop_event)
             if not stop_event.is_set():
                 self._previewStatusRequested.emit(
                     f"Previewed {self._voice_preview_label(voice_name)}.",
@@ -505,6 +817,68 @@ class SettingsViewModel(QObject):
     @staticmethod
     def _voice_preview_label(voice_name: str) -> str:
         return voice_name.split(" - ", 1)[0].strip() or voice_name
+
+    @staticmethod
+    def _build_audio_option_state(
+        options: list[AudioDeviceOption],
+        current_value: str,
+        missing_label: str,
+    ) -> tuple[list[str], dict[str, str]]:
+        values = [option.value for option in options]
+        labels = {option.value: option.label for option in options}
+        normalized_current_value = current_value or "default"
+        if normalized_current_value not in labels:
+            values.append(normalized_current_value)
+            labels[normalized_current_value] = missing_label
+        return values, labels
+
+    def _build_runtime_settings(self, error_prefix: str) -> AppSettings | None:
+        try:
+            return AppSettings.from_mapping(
+                deepcopy(self._settings_map), validate=False
+            )
+        except (ValidationError, ValueError) as exc:
+            self._set_status(f"{error_prefix}: {exc}", "error")
+            return None
+
+    def _run_audio_input_test(self, settings: AppSettings, stop_event: Event) -> None:
+        try:
+            monitor = self._audio_monitor_factory(settings)
+            monitor.monitor_levels(
+                lambda level: self._audioLevelRequested.emit(level),
+                stop_event=stop_event,
+            )
+        except Exception as exc:
+            if not stop_event.is_set():
+                self._previewStatusRequested.emit(
+                    f"Audio input test failed: {exc}",
+                    "error",
+                )
+        finally:
+            self._audioInputTestFinished.emit()
+
+    def _run_speaker_test(self, stop_event: Event) -> None:
+        output_path = self._audio_dir / f"speaker-test-{uuid4().hex}.wav"
+        try:
+            self._audio_signal_service.write_test_tone(output_path)
+            if stop_event.is_set():
+                return
+            playback_service = self._ensure_preview_playback_service()
+            playback_service.play_blocking(str(output_path), stop_event=stop_event)
+            if not stop_event.is_set():
+                self._previewStatusRequested.emit("Speaker test completed.", "success")
+        except Exception as exc:
+            if not stop_event.is_set():
+                self._previewStatusRequested.emit(
+                    f"Speaker test failed: {exc}",
+                    "error",
+                )
+        finally:
+            try:
+                output_path.unlink(missing_ok=True)
+            except OSError:
+                pass
+            self._speakerTestFinished.emit()
 
     def _schedule_autosave(self, field_name: str) -> None:
         if self._settings_map == self._baseline_map:
@@ -591,6 +965,21 @@ class SettingsViewModel(QObject):
             return
         if payload[field_name] <= 0:
             errors[field_name] = "Value must be greater than zero."
+
+    @staticmethod
+    def _coerce_non_negative_float(
+        payload: dict[str, Any],
+        field_name: str,
+        errors: dict[str, str],
+    ) -> None:
+        raw_value = payload.get(field_name, "")
+        try:
+            payload[field_name] = float(str(raw_value).strip())
+        except ValueError:
+            errors[field_name] = "Enter zero or a positive number."
+            return
+        if payload[field_name] < 0:
+            errors[field_name] = "Value cannot be negative."
 
     @staticmethod
     def _coerce_ratio(

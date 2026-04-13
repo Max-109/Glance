@@ -50,6 +50,11 @@ class AppSettings:
     batch_window_duration: float = 4.0
     audio_input_device: str = "default"
     audio_output_device: str = "default"
+    audio_activation_threshold: float = 0.02
+    audio_silence_seconds: float = 0.85
+    audio_max_wait_seconds: float = 15.0
+    audio_max_record_seconds: float = 30.0
+    audio_preroll_seconds: float = 0.25
     system_prompt_override: str = ""
     theme_preference: str = "dark"
 
@@ -90,6 +95,16 @@ class AppSettings:
             raise ValidationError("screen_change_threshold must be between 0 and 1.")
         if self.batch_window_duration <= 0:
             raise ValidationError("batch_window_duration must be positive.")
+        if not 0 < self.audio_activation_threshold <= 1:
+            raise ValidationError("audio_activation_threshold must be between 0 and 1.")
+        if self.audio_silence_seconds <= 0:
+            raise ValidationError("audio_silence_seconds must be positive.")
+        if self.audio_max_wait_seconds <= 0:
+            raise ValidationError("audio_max_wait_seconds must be positive.")
+        if self.audio_max_record_seconds <= 0:
+            raise ValidationError("audio_max_record_seconds must be positive.")
+        if self.audio_preroll_seconds < 0:
+            raise ValidationError("audio_preroll_seconds must be zero or positive.")
         if self.theme_preference not in {"dark", "light", "system"}:
             raise ValidationError("theme_preference must be dark, light, or system.")
 
@@ -140,6 +155,21 @@ class AppSettings:
             audio_input_device=data.get("audio_input_device", cls.audio_input_device),
             audio_output_device=data.get(
                 "audio_output_device", cls.audio_output_device
+            ),
+            audio_activation_threshold=float(
+                data.get("audio_activation_threshold", cls.audio_activation_threshold)
+            ),
+            audio_silence_seconds=float(
+                data.get("audio_silence_seconds", cls.audio_silence_seconds)
+            ),
+            audio_max_wait_seconds=float(
+                data.get("audio_max_wait_seconds", cls.audio_max_wait_seconds)
+            ),
+            audio_max_record_seconds=float(
+                data.get("audio_max_record_seconds", cls.audio_max_record_seconds)
+            ),
+            audio_preroll_seconds=float(
+                data.get("audio_preroll_seconds", cls.audio_preroll_seconds)
             ),
             system_prompt_override=data.get(
                 "system_prompt_override", cls.system_prompt_override

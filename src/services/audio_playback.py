@@ -4,6 +4,7 @@ from pathlib import Path
 from threading import Event, Lock
 
 from src.exceptions.app_exceptions import ProviderError
+from src.services.audio_devices import AudioDeviceService
 
 try:
     from PySide6.QtCore import QObject, QUrl, Signal, Slot
@@ -30,10 +31,17 @@ class QtAudioPlaybackService(QObject):
         _play_requested = Signal(str)
         _stop_requested = Signal()
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        *,
+        device_service: AudioDeviceService | None = None,
+        output_device_id: str = "default",
+    ) -> None:
         if QMediaPlayer is None or QAudioOutput is None or Signal is None:
             raise ProviderError("Qt multimedia playback is unavailable.")
         super().__init__()
+        self._device_service = device_service or AudioDeviceService()
+        self._output_device_id = output_device_id
         self._player = QMediaPlayer(self)
         self._output = QAudioOutput(self)
         self._player.setAudioOutput(self._output)
@@ -45,6 +53,14 @@ class QtAudioPlaybackService(QObject):
         self._stop_requested.connect(self._stop_on_main_thread)
         self._player.mediaStatusChanged.connect(self._on_media_status_changed)
         self._player.errorOccurred.connect(self._on_error)
+        self.set_output_device_id(output_device_id)
+
+    def set_output_device_id(self, output_device_id: str) -> None:
+        self._output_device_id = output_device_id or "default"
+        device = self._device_service.resolve_output_device(self._output_device_id)
+        set_device = getattr(self._output, "setDevice", None)
+        if callable(set_device) and device is not None:
+            set_device(device)
 
     def play_blocking(self, audio_path: str, stop_event: Event | None = None) -> str:
         if not Path(audio_path).exists():

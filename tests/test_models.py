@@ -62,6 +62,28 @@ class AppSettingsTests(unittest.TestCase):
                 }
             )
 
+    def test_validate_rejects_invalid_audio_activation_threshold(self) -> None:
+        with self.assertRaises(ValidationError):
+            AppSettings.from_mapping(
+                {
+                    "llm_base_url": "https://api.example.com/v1",
+                    "llm_model_name": "model-a",
+                    "tts_base_url": "https://tts.example.com/v1",
+                    "audio_activation_threshold": 0,
+                }
+            )
+
+    def test_validate_rejects_negative_audio_preroll(self) -> None:
+        with self.assertRaises(ValidationError):
+            AppSettings.from_mapping(
+                {
+                    "llm_base_url": "https://api.example.com/v1",
+                    "llm_model_name": "model-a",
+                    "tts_base_url": "https://tts.example.com/v1",
+                    "audio_preroll_seconds": -0.2,
+                }
+            )
+
     def test_from_mapping_replaces_invalid_alloy_voice(self) -> None:
         settings = AppSettings.from_mapping(
             {

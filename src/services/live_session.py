@@ -47,6 +47,16 @@ class LiveSessionController:
         with self._lock:
             self._recorder = recorder
 
+    def set_output_device(self, output_device_id: str) -> None:
+        with self._lock:
+            set_output_device = getattr(
+                self._playback_service,
+                "set_output_device_id",
+                None,
+            )
+            if callable(set_output_device):
+                set_output_device(output_device_id)
+
     def set_status_callback(self, callback: Callable[[str, str], None] | None) -> None:
         self._on_status = callback
 

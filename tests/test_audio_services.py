@@ -1,0 +1,105 @@
+import tempfile
+import unittest
+from pathlib import Path
+
+from src.models.settings import AppSettings
+from src.services.audio_devices import AudioDeviceService
+from src.services.audio_recording import ThresholdAudioRecorder
+from src.services.audio_signal import AudioTestSignalService
+
+
+class FakeOutputDevice:
+    def __init__(self, description: str, device_id: bytes) -> None:
+        self._description = description
+        self._device_id = device_id
+
+    def description(self) -> str:
+        return self._description
+
+    def id(self) -> bytes:
+        return self._device_id
+
+
+class AudioDeviceServiceTests(unittest.TestCase):
+    def test_list_input_devices_includes_default_and_named_inputs(self) -> None:
+        service = AudioDeviceService(
+            input_devices_provider=lambda: [
+                {"name": "Built-in Mic", "max_input_channels": 2, "hostapi": 0},
+                {"name": "Speakers", "max_input_channels": 0, "hostapi": 0},
+            ],
+            host_apis_provider=lambda: [{"name": "Core Audio"}],
+        )
+
+        options = service.list_input_devices()
+
+        self.assertEqual(options[0].value, "default")
+        self.assertEqual(options[1].value, "input:0")
+        self.assertEqual(options[1].label, "Built-in Mic (Core Audio)")
+
+    def test_list_output_devices_uses_friendly_labels(self) -> None:
+        service = AudioDeviceService(
+            output_devices_provider=lambda: [
+                FakeOutputDevice("Studio Display", b"display"),
+            ],
+            default_output_provider=lambda: FakeOutputDevice("Default", b"default"),
+        )
+
+        options = service.list_output_devices()
+
+        self.assertEqual(options[0].label, "System Default Output")
+        self.assertEqual(options[1].label, "Studio Display")
+        self.assertEqual(options[1].value, "output:646973706c6179")
+
+    def test_resolve_output_device_matches_saved_identifier(self) -> None:
+        built_in = FakeOutputDevice("Studio Display", b"display")
+        default = FakeOutputDevice("Default", b"default")
+        service = AudioDeviceService(
+            output_devices_provider=lambda: [built_in],
+            default_output_provider=lambda: default,
+        )
+
+        device = service.resolve_output_device("output:646973706c6179")
+
+        self.assertIs(device, built_in)
+        self.assertIs(service.resolve_output_device("default"), default)
+
+
+class ThresholdAudioRecorderTests(unittest.TestCase):
+    def test_recorder_uses_settings_backed_audio_thresholds(self) -> None:
+        settings = AppSettings.from_mapping(
+            {
+                "llm_base_url": "https://api.example.com/v1",
+                "llm_model_name": "model-a",
+                "tts_base_url": "https://tts.example.com/v1",
+                "audio_activation_threshold": 0.05,
+                "audio_silence_seconds": 1.25,
+                "audio_max_wait_seconds": 9.5,
+                "audio_max_record_seconds": 18.0,
+                "audio_preroll_seconds": 0.4,
+            }
+        )
+
+        recorder = ThresholdAudioRecorder(settings)
+
+        self.assertEqual(recorder._activation_threshold, 0.05)
+        self.assertEqual(recorder._silence_seconds, 1.25)
+        self.assertEqual(recorder._max_wait_seconds, 9.5)
+        self.assertEqual(recorder._max_record_seconds, 18.0)
+        self.assertEqual(recorder._preroll_seconds, 0.4)
+
+
+class AudioTestSignalServiceTests(unittest.TestCase):
+    def test_write_test_tone_creates_non_empty_wav(self) -> None:
+        service = AudioTestSignalService()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_path = Path(temp_dir) / "speaker-test.wav"
+
+            written_path = service.write_test_tone(output_path)
+
+            self.assertEqual(written_path, output_path)
+            self.assertTrue(output_path.exists())
+            self.assertGreater(output_path.stat().st_size, 44)
+
+
+if __name__ == "__main__":
+    unittest.main()

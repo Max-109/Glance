@@ -25,7 +25,7 @@ Item {
 
             Text {
                 text: root.label
-                color: theme.textStrong
+                color: root.theme.textStrong
                 font.pixelSize: 13
                 font.weight: 500
                 wrapMode: Text.Wrap
@@ -35,7 +35,7 @@ Item {
             Text {
                 visible: root.description.length > 0
                 text: root.description
-                color: theme.textBase
+                color: root.theme.textBase
                 font.pixelSize: 12
                 font.weight: 400
                 wrapMode: Text.Wrap
@@ -53,9 +53,11 @@ Item {
                 implicitWidth: 28
                 implicitHeight: 16
                 radius: 3
-                color: control.checked ? theme.iconStrongBase : theme.surfaceBase
+                color: control.checked ? root.theme.iconStrongBase : root.theme.surfaceBase
                 border.width: 1
-                border.color: control.checked ? theme.iconStrongBase : theme.borderWeakBase
+                border.color: control.visualFocus
+                    ? root.theme.borderSelected
+                    : (control.checked ? root.theme.iconStrongBase : root.theme.borderWeakBase)
 
                 Rectangle {
                     width: 14
@@ -63,9 +65,9 @@ Item {
                     radius: 2
                     y: 1
                     x: control.checked ? 13 : 1
-                    color: theme.iconInvertBase
+                    color: root.theme.iconInvertBase
                     border.width: control.checked ? 0 : 1
-                    border.color: theme.borderBase
+                    border.color: root.theme.borderBase
                 }
             }
 

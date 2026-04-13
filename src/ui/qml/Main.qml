@@ -71,17 +71,24 @@ ApplicationWindow {
         readonly property color textBase: lightTheme ? "#6a6763" : "#9effffff"
         readonly property color textWeak: lightTheme ? "#8c8984" : "#6cffffff"
         readonly property color borderBase: lightTheme ? "#20000000" : "#32ffffff"
+        readonly property color borderHover: lightTheme ? "#3c000000" : "#48ffffff"
         readonly property color borderWeakBase: lightTheme ? "#e3dfda" : "#282828"
         readonly property color borderSelected: lightTheme ? "#66635f" : "#9dbefe"
         readonly property color borderWeakSelected: lightTheme ? "#24000000" : "#9e034cff"
         readonly property color buttonPrimaryBase: lightTheme ? "#ece8e3" : "#ededed"
+        readonly property color buttonPrimaryHover: lightTheme ? "#151313" : "#f6f3f3"
+        readonly property color buttonPrimaryActive: lightTheme ? "#020202" : "#fcfcfc"
         readonly property color buttonSecondaryBase: lightTheme ? "#ffffff" : "#1c1c1c"
         readonly property color buttonSecondaryHover: lightTheme ? "#f4f1ed" : "#0affffff"
+        readonly property color buttonSecondaryDisabled: lightTheme ? "#ededed" : "#282828"
         readonly property color iconBase: lightTheme ? "#83807c" : "#7e7e7e"
         readonly property color iconHover: lightTheme ? "#5f5c58" : "#a0a0a0"
+        readonly property color iconActive: lightTheme ? "#171717" : "#ededed"
+        readonly property color iconDisabled: lightTheme ? "#c7c7c7" : "#3e3e3e"
         readonly property color iconStrongBase: lightTheme ? "#171311" : "#ededed"
         readonly property color iconStrongHover: lightTheme ? "#050505" : "#f6f3f3"
         readonly property color iconStrongActive: lightTheme ? "#000000" : "#ffffff"
+        readonly property color iconStrongDisabled: lightTheme ? "#c7c7c7" : "#3e3e3e"
         readonly property color iconInvertBase: lightTheme ? "#ffffff" : "#161616"
         readonly property color surfaceCriticalWeak: lightTheme ? "#fff7f4" : "#24130f"
         readonly property color borderCriticalSelected: "#fc533a"
@@ -419,9 +426,7 @@ ApplicationWindow {
                         iconLibrary: window.iconLibrary
                         kind: settingsController.statusKind
                         message: settingsController.statusMessage
-                        visible: settingsController.statusMessage.length > 0
                         Layout.fillWidth: true
-                        implicitHeight: visible ? 42 : 0
                     }
 
                     ScrollView {
@@ -894,7 +899,7 @@ ApplicationWindow {
                     theme: window.appTheme
                     iconLibrary: window.iconLibrary
                     label: "Voice"
-                    helperText: "Voice used for spoken replies. Use the play icon inside the menu to preview a voice."
+                    helperText: "Voice used for spoken replies. Use the play button to preview the selected voice."
                     value: settingsController.settings.tts_voice_id || settingsController.voiceOptions[0]
                     options: settingsController.voiceOptions
                     previewingVoice: settingsController.previewingVoice || ""
@@ -982,8 +987,8 @@ ApplicationWindow {
 
             FieldCard {
                 theme: window.appTheme
-                title: "Audio"
-                description: "Choose the default devices for listening and playback."
+                title: "Devices"
+                description: "Choose the hardware Glance should use for listening and playback."
                 Layout.fillWidth: true
 
                 ColumnLayout {
@@ -995,9 +1000,10 @@ ApplicationWindow {
                         iconLibrary: window.iconLibrary
                         iconName: "mic"
                         label: "Input device"
-                        helperText: "Microphone or system input used for capture."
+                        helperText: "Microphone used for live mode and the local mic test."
                         value: settingsController.settings.audio_input_device || "default"
-                        options: settingsController.audioDeviceOptions
+                        options: settingsController.audioInputDeviceOptions
+                        optionLabels: settingsController.audioInputDeviceLabels
                         Layout.fillWidth: true
                         onValueEdited: function(nextValue) { settingsController.setField("audio_input_device", nextValue) }
                     }
@@ -1007,11 +1013,173 @@ ApplicationWindow {
                         iconLibrary: window.iconLibrary
                         iconName: "headphones"
                         label: "Output device"
-                        helperText: "Speaker or headphones used for playback."
+                        helperText: "Speaker or headphones used for live replies, voice preview, and the speaker test."
                         value: settingsController.settings.audio_output_device || "default"
-                        options: settingsController.audioDeviceOptions
+                        options: settingsController.audioOutputDeviceOptions
+                        optionLabels: settingsController.audioOutputDeviceLabels
                         Layout.fillWidth: true
                         onValueEdited: function(nextValue) { settingsController.setField("audio_output_device", nextValue) }
+                    }
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 10
+
+                        Text {
+                            Layout.fillWidth: true
+                            text: settingsController.audioDeviceStatusMessage
+                            color: theme.textWeak
+                            font.pixelSize: 13
+                            font.weight: 400
+                            wrapMode: Text.Wrap
+                        }
+
+                        OcButton {
+                            theme: window.appTheme
+                            iconLibrary: window.iconLibrary
+                            variant: "secondary"
+                            iconName: "rotate-ccw"
+                            text: "Refresh devices"
+                            onClicked: settingsController.refreshAudioDevices()
+                        }
+                    }
+                }
+            }
+
+            FieldCard {
+                theme: window.appTheme
+                title: "Live Input"
+                description: "Tune how live mode decides when speech starts and when a turn should end."
+                Layout.fillWidth: true
+
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    spacing: 12
+
+                    LabeledTextField {
+                        theme: window.appTheme
+                        iconLibrary: window.iconLibrary
+                        iconName: "gauge"
+                        label: "Mic sensitivity"
+                        helperText: "Lower values catch quieter speech. Higher values ignore more background noise."
+                        errorText: settingsController.errors.audio_activation_threshold || ""
+                        value: String(settingsController.settings.audio_activation_threshold || "")
+                        Layout.fillWidth: true
+                        onValueEdited: function(nextValue) { settingsController.setField("audio_activation_threshold", nextValue) }
+                    }
+
+                    LabeledTextField {
+                        theme: window.appTheme
+                        iconLibrary: window.iconLibrary
+                        iconName: "history"
+                        label: "Silence timeout"
+                        helperText: "How long silence must last before Glance finishes the current spoken turn, in seconds."
+                        errorText: settingsController.errors.audio_silence_seconds || ""
+                        value: String(settingsController.settings.audio_silence_seconds || "")
+                        Layout.fillWidth: true
+                        onValueEdited: function(nextValue) { settingsController.setField("audio_silence_seconds", nextValue) }
+                    }
+
+                    LabeledTextField {
+                        theme: window.appTheme
+                        iconLibrary: window.iconLibrary
+                        iconName: "clock-3"
+                        label: "Wait for speech"
+                        helperText: "Maximum time to wait for speech before live mode returns to listening, in seconds."
+                        errorText: settingsController.errors.audio_max_wait_seconds || ""
+                        value: String(settingsController.settings.audio_max_wait_seconds || "")
+                        Layout.fillWidth: true
+                        onValueEdited: function(nextValue) { settingsController.setField("audio_max_wait_seconds", nextValue) }
+                    }
+
+                    LabeledTextField {
+                        theme: window.appTheme
+                        iconLibrary: window.iconLibrary
+                        iconName: "audio-lines"
+                        label: "Max turn length"
+                        helperText: "Hard limit for one captured spoken turn, in seconds."
+                        errorText: settingsController.errors.audio_max_record_seconds || ""
+                        value: String(settingsController.settings.audio_max_record_seconds || "")
+                        Layout.fillWidth: true
+                        onValueEdited: function(nextValue) { settingsController.setField("audio_max_record_seconds", nextValue) }
+                    }
+
+                    LabeledTextField {
+                        theme: window.appTheme
+                        iconLibrary: window.iconLibrary
+                        iconName: "mic"
+                        label: "Pre-roll"
+                        helperText: "Extra audio kept just before speech starts, in seconds."
+                        errorText: settingsController.errors.audio_preroll_seconds || ""
+                        value: String(settingsController.settings.audio_preroll_seconds || "")
+                        Layout.fillWidth: true
+                        onValueEdited: function(nextValue) { settingsController.setField("audio_preroll_seconds", nextValue) }
+                    }
+                }
+            }
+
+            FieldCard {
+                theme: window.appTheme
+                title: "Testing"
+                description: "Check microphone and speaker behavior locally before starting a live session."
+                Layout.fillWidth: true
+
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    spacing: 14
+
+                    AudioLevelMeter {
+                        theme: window.appTheme
+                        level: settingsController.audioInputLevel
+                        threshold: Number(settingsController.settings.audio_activation_threshold || 0.02)
+                        active: settingsController.audioInputTestActive
+                        Layout.fillWidth: true
+                    }
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 10
+
+                        OcButton {
+                            theme: window.appTheme
+                            iconLibrary: window.iconLibrary
+                            variant: "secondary"
+                            iconName: settingsController.audioInputTestActive ? "audio-lines" : "mic"
+                            text: settingsController.audioInputTestActive ? "Stop mic test" : "Start mic test"
+                            onClicked: {
+                                if (settingsController.audioInputTestActive) {
+                                    settingsController.stopAudioInputTest()
+                                } else {
+                                    settingsController.startAudioInputTest()
+                                }
+                            }
+                        }
+
+                        OcButton {
+                            theme: window.appTheme
+                            iconLibrary: window.iconLibrary
+                            variant: "secondary"
+                            iconName: settingsController.speakerTestActive ? "audio-lines" : "play"
+                            text: settingsController.speakerTestActive ? "Stop speaker test" : "Play speaker test"
+                            onClicked: {
+                                if (settingsController.speakerTestActive) {
+                                    settingsController.stopSpeakerTest()
+                                } else {
+                                    settingsController.playSpeakerTest()
+                                }
+                            }
+                        }
+
+                        Item { Layout.fillWidth: true }
+
+                        OcButton {
+                            theme: window.appTheme
+                            iconLibrary: window.iconLibrary
+                            variant: "ghost"
+                            iconName: "rotate-ccw"
+                            text: "Reset audio defaults"
+                            onClicked: settingsController.resetAudioDefaults()
+                        }
                     }
                 }
             }
@@ -1119,7 +1287,7 @@ ApplicationWindow {
         if (section === "api") return "Switch between compact provider panels for the response, transcription, and speech stack."
         if (section === "voice") return "Choose the speaking voice, preview it from the dropdown, and set the fallback language."
         if (section === "capture") return "Control screen sampling and response batching."
-        if (section === "audio") return "Choose the default input and output devices."
+        if (section === "audio") return "Choose devices, tune live listening thresholds, and run local audio tests."
         if (section === "history") return "Manage locally saved sessions."
         return "Adjust the theme and optional prompt override."
     }

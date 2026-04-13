@@ -1,3 +1,5 @@
+pragma ComponentBehavior: Bound
+
 import QtQuick 2.15
 import QtQuick.Controls 2.15
 import QtQuick.Layouts 1.15
@@ -19,50 +21,16 @@ Item {
     signal valueEdited(string value)
     signal previewClicked(string voiceName)
 
+    function indexForValue() {
+        var index = root.options.indexOf(root.value)
+        if (index >= 0) {
+            return index
+        }
+        return root.options.length > 0 ? 0 : -1
+    }
+
     function currentValue() {
-        if (root.value.length > 0) {
-            return root.value
-        }
-        return root.options.length > 0 ? root.options[0] : "Select"
-    }
-
-    function popupParent() {
-        return popup.parent ? popup.parent : root
-    }
-
-    function mapTriggerPoint(offsetY) {
-        var target = popupParent()
-        var globalPoint = trigger.mapToGlobal(0, offsetY)
-        return target.mapFromGlobal(globalPoint.x, globalPoint.y)
-    }
-
-    function popupX() {
-        var target = popupParent()
-        var point = root.mapTriggerPoint(0)
-        return Math.max(12, Math.min(point.x, target.width - popup.width - 12))
-    }
-
-    function popupHeight() {
-        if (popup.implicitHeight > 0) {
-            return popup.implicitHeight
-        }
-        if (popup.contentItem) {
-            return popup.contentItem.implicitHeight + popup.topPadding + popup.bottomPadding
-        }
-        return 0
-    }
-
-    function popupY() {
-        var target = popupParent()
-        var popupHeight = root.popupHeight()
-        var belowY = root.mapTriggerPoint(trigger.height + 6).y
-        var maxY = Math.max(12, target.height - popupHeight - 12)
-        if (belowY <= maxY) {
-            return Math.max(12, belowY)
-        }
-
-        var aboveY = root.mapTriggerPoint(-popupHeight - 6).y
-        return Math.max(12, Math.min(aboveY, maxY))
+        return voiceCombo.currentIndex >= 0 ? voiceCombo.currentText : "Select"
     }
 
     Layout.fillWidth: true
@@ -76,186 +44,182 @@ Item {
 
         Text {
             text: root.label
-            color: theme.textWeak
+            color: root.theme.textWeak
             font.pixelSize: 13
             font.weight: 500
         }
 
         RowLayout {
             Layout.fillWidth: true
-            spacing: 0
+            spacing: 8
 
-            Button {
-                id: trigger
+            ComboBox {
+                id: voiceCombo
                 Layout.fillWidth: true
                 implicitHeight: 32
+                model: root.options
+                currentIndex: root.indexForValue()
                 hoverEnabled: true
                 Accessible.name: root.label
 
-                contentItem: RowLayout {
-                    anchors.fill: parent
-                    anchors.leftMargin: 12
-                    anchors.rightMargin: 12
-                    spacing: 10
-
-                    Image {
-                        visible: root.iconName.length > 0
-                        source: root.iconLibrary ? root.iconLibrary.svgData(root.iconName, theme.iconBase) : ""
-                        sourceSize.width: Math.round(16 * root.pixelRatio)
-                        sourceSize.height: Math.round(16 * root.pixelRatio)
-                        fillMode: Image.PreserveAspectFit
-                        smooth: true
-                        Layout.preferredWidth: visible ? 16 : 0
-                        Layout.preferredHeight: visible ? 16 : 0
-                        Accessible.ignored: true
-                    }
-
-                    Text {
-                        Layout.fillWidth: true
-                        text: root.currentValue()
-                        font.pixelSize: 14
-                        color: theme.textStrong
-                        elide: Text.ElideRight
-                        verticalAlignment: Text.AlignVCenter
-                    }
-
-                    Image {
-                        source: root.iconLibrary ? root.iconLibrary.svgData("chevron-down", theme.iconBase) : ""
-                        sourceSize.width: Math.round(16 * root.pixelRatio)
-                        sourceSize.height: Math.round(16 * root.pixelRatio)
-                        fillMode: Image.PreserveAspectFit
-                        smooth: true
-                        Layout.preferredWidth: 16
-                        Layout.preferredHeight: 16
-                        Layout.alignment: Qt.AlignVCenter
-                        rotation: popup.opened ? 180 : 0
-
-                        Behavior on rotation {
-                            NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
-                        }
-                    }
-                }
+                onActivated: root.valueEdited(voiceCombo.currentText)
 
                 background: Rectangle {
                     radius: 8
-                    color: trigger.down ? theme.surfaceBaseActive : (trigger.hovered ? theme.surfaceBaseHover : theme.controlSurface)
+                    color: voiceCombo.pressed
+                        ? root.theme.surfaceBaseActive
+                        : (voiceCombo.hovered ? root.theme.surfaceBaseHover : root.theme.controlSurface)
                     border.width: 1
-                    border.color: theme.controlOutline
+                    border.color: voiceCombo.visualFocus || voiceCombo.popup.visible
+                        ? root.theme.borderSelected
+                        : root.theme.controlOutline
 
                     Behavior on color { ColorAnimation { duration: 140 } }
                     Behavior on border.color { ColorAnimation { duration: 140 } }
                 }
 
-                onClicked: {
-                    if (popup.opened) {
-                        popup.close()
-                    } else {
-                        popup.open()
+                indicator: Image {
+                    source: root.iconLibrary ? root.iconLibrary.svgData("chevron-down", root.theme.iconBase) : ""
+                    width: 16
+                    height: 16
+                    sourceSize.width: Math.round(16 * root.pixelRatio)
+                    sourceSize.height: Math.round(16 * root.pixelRatio)
+                    fillMode: Image.PreserveAspectFit
+                    smooth: true
+                    x: Math.round(voiceCombo.width - width - 12)
+                    y: Math.round((voiceCombo.height - height) / 2)
+                    rotation: voiceCombo.popup.visible ? 180 : 0
+                    Accessible.ignored: true
+
+                    Behavior on rotation {
+                        NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
                     }
                 }
-            }
-        }
 
-        Popup {
-            id: popup
-            parent: Overlay.overlay ? Overlay.overlay : root
-            x: root.popupX()
-            y: root.popupY()
-            width: trigger.width
-            padding: 4
-            closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
-
-            background: Rectangle {
-                radius: 10
-                color: theme.controlSurface
-                border.width: 1
-                border.color: theme.controlOutline
-            }
-
-            enter: Transition {
-                ParallelAnimation {
-                    NumberAnimation { property: "opacity"; from: 0; to: 1; duration: 110 }
-                    NumberAnimation { property: "scale"; from: 0.98; to: 1.0; duration: 140; easing.type: Easing.OutCubic }
-                }
-            }
-
-            exit: Transition {
-                ParallelAnimation {
-                    NumberAnimation { property: "opacity"; from: 1; to: 0; duration: 90 }
-                    NumberAnimation { property: "scale"; from: 1.0; to: 0.985; duration: 90; easing.type: Easing.OutCubic }
-                }
-            }
-
-            contentItem: ListView {
-                id: optionList
-                implicitHeight: Math.min(contentHeight, 220)
-                clip: true
-                spacing: 2
-                model: root.options
-
-                delegate: Rectangle {
-                    width: optionList.width
-                    height: 38
-                    radius: 6
-                    color: delegateArea.containsMouse || selectionArea.containsMouse || root.value === modelData
-                        ? theme.surfaceBaseActive
-                        : "transparent"
+                contentItem: Item {
+                    implicitHeight: 32
 
                     RowLayout {
                         anchors.fill: parent
                         anchors.leftMargin: 12
-                        anchors.rightMargin: 12
+                        anchors.rightMargin: 34
                         spacing: 10
 
-                        Item {
-                            id: selectionArea
-                            Layout.fillWidth: true
-                            Layout.fillHeight: true
-
-                            Text {
-                                anchors.fill: parent
-                                text: modelData
-                                color: theme.textStrong
-                                font.pixelSize: 14
-                                elide: Text.ElideRight
-                                verticalAlignment: Text.AlignVCenter
-                            }
-
-                            MouseArea {
-                                id: delegateArea
-                                anchors.fill: parent
-                                hoverEnabled: true
-
-                                onClicked: {
-                                    root.valueEdited(modelData)
-                                    popup.close()
-                                }
-                            }
+                        Image {
+                            visible: root.iconName.length > 0
+                            source: root.iconLibrary ? root.iconLibrary.svgData(root.iconName, root.theme.iconBase) : ""
+                            sourceSize.width: Math.round(16 * root.pixelRatio)
+                            sourceSize.height: Math.round(16 * root.pixelRatio)
+                            fillMode: Image.PreserveAspectFit
+                            smooth: true
+                            Layout.preferredWidth: visible ? 16 : 0
+                            Layout.preferredHeight: visible ? 16 : 0
+                            Accessible.ignored: true
                         }
 
-                        OcButton {
-                            id: previewButton
-                            theme: root.theme
-                            iconLibrary: root.iconLibrary
-                            variant: root.previewingVoice === modelData ? "secondary" : "ghost"
-                            iconName: root.previewingVoice === modelData ? "audio-lines" : "play"
-                            text: ""
-                            Layout.preferredWidth: 32
-                            Layout.preferredHeight: 32
-                            accessibleLabel: root.previewingVoice === modelData
-                                ? "Previewing " + modelData
-                                : "Preview " + modelData
-                            onClicked: root.previewClicked(modelData)
+                        Text {
+                            Layout.fillWidth: true
+                            text: root.currentValue()
+                            color: root.theme.textStrong
+                            font.pixelSize: 14
+                            elide: Text.ElideRight
+                            verticalAlignment: Text.AlignVCenter
                         }
                     }
                 }
+
+                delegate: ItemDelegate {
+                    id: delegateRoot
+                    required property int index
+                    required property string modelData
+                    width: voiceCombo.width - 8
+                    implicitHeight: 38
+                    highlighted: voiceCombo.highlightedIndex === index
+                    hoverEnabled: true
+                    padding: 0
+
+                    background: Rectangle {
+                        radius: 6
+                        color: delegateRoot.highlighted || voiceCombo.currentIndex === delegateRoot.index
+                            ? root.theme.surfaceBaseActive
+                            : "transparent"
+                    }
+
+                    contentItem: Text {
+                        text: delegateRoot.modelData
+                        color: root.theme.textStrong
+                        font.pixelSize: 14
+                        elide: Text.ElideRight
+                        verticalAlignment: Text.AlignVCenter
+                        leftPadding: 12
+                        rightPadding: 12
+                    }
+                }
+
+                popup: Popup {
+                    y: voiceCombo.height + 6
+                    width: voiceCombo.width
+                    margins: 12
+                    padding: 4
+                    modal: true
+                    closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+
+                    Overlay.modal: Rectangle {
+                        color: root.theme.surfaceBase
+                    }
+
+                    background: Rectangle {
+                        radius: 10
+                        color: root.theme.controlSurface
+                        border.width: 1
+                        border.color: root.theme.controlOutline
+                    }
+
+                    enter: Transition {
+                        ParallelAnimation {
+                            NumberAnimation { property: "opacity"; from: 0; to: 1; duration: 110 }
+                            NumberAnimation { property: "scale"; from: 0.98; to: 1.0; duration: 140; easing.type: Easing.OutCubic }
+                        }
+                    }
+
+                    exit: Transition {
+                        ParallelAnimation {
+                            NumberAnimation { property: "opacity"; from: 1; to: 0; duration: 90 }
+                            NumberAnimation { property: "scale"; from: 1.0; to: 0.985; duration: 90; easing.type: Easing.OutCubic }
+                        }
+                    }
+
+                    contentItem: ListView {
+                        clip: true
+                        implicitHeight: Math.min(contentHeight, 220)
+                        model: voiceCombo.popup.visible ? voiceCombo.delegateModel : null
+                        currentIndex: voiceCombo.highlightedIndex
+                        spacing: 2
+                        ScrollIndicator.vertical: ScrollIndicator {}
+                    }
+                }
+            }
+
+            OcButton {
+                theme: root.theme
+                iconLibrary: root.iconLibrary
+                variant: root.previewingVoice === voiceCombo.currentText ? "secondary" : "ghost"
+                iconName: root.previewingVoice === voiceCombo.currentText ? "audio-lines" : "play"
+                text: ""
+                Layout.preferredWidth: 32
+                Layout.preferredHeight: 32
+                enabled: voiceCombo.currentIndex >= 0
+                accessibleLabel: root.previewingVoice === voiceCombo.currentText
+                    ? "Previewing " + voiceCombo.currentText
+                    : "Preview " + voiceCombo.currentText
+                onClicked: root.previewClicked(voiceCombo.currentText)
             }
         }
 
         Text {
             visible: root.helperText.length > 0
             text: root.helperText
-            color: theme.textWeak
+            color: root.theme.textWeak
             font.pixelSize: 13
             font.weight: 400
             wrapMode: Text.Wrap

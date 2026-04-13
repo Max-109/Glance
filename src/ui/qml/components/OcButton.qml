@@ -1,6 +1,5 @@
 import QtQuick 2.15
 import QtQuick.Controls 2.15
-import QtQuick.Layouts 1.15
 import QtQuick.Window 2.15
 
 Button {
@@ -12,86 +11,158 @@ Button {
     property var iconLibrary
     property string accessibleLabel: ""
     readonly property real pixelRatio: Screen.devicePixelRatio > 0 ? Screen.devicePixelRatio : 1
+    readonly property bool iconOnly: root.text.length === 0
+    readonly property bool activePress: root.down || root.checked
 
-    implicitHeight: 34
-    implicitWidth: root.text.length > 0
-        ? Math.max(96, contentItem.implicitWidth + 24)
-        : 32
+    implicitHeight: iconOnly ? 32 : 34
+    implicitWidth: iconOnly
+        ? 32
+        : Math.max(96, contentRow.implicitWidth + leftPadding + rightPadding)
+
+    padding: 0
+    leftPadding: iconOnly ? 8 : 12
+    rightPadding: iconOnly ? 8 : 12
+    topPadding: 0
+    bottomPadding: 0
     hoverEnabled: true
+    focusPolicy: Qt.StrongFocus
     Accessible.name: root.accessibleLabel.length > 0 ? root.accessibleLabel : (root.text.length > 0 ? root.text : root.iconName)
 
-    contentItem: RowLayout {
-        spacing: 8
-        anchors.centerIn: parent
+    contentItem: Item {
+        anchors.fill: parent
+        implicitWidth: contentRow.implicitWidth
+        implicitHeight: contentRow.implicitHeight
+        y: root.activePress ? 1 : 0
 
-        Image {
-            visible: root.iconName.length > 0
-            source: root.iconLibrary ? root.iconLibrary.svgData(root.iconName, root._foregroundColor()) : ""
-            sourceSize.width: Math.round(16 * root.pixelRatio)
-            sourceSize.height: Math.round(16 * root.pixelRatio)
-            fillMode: Image.PreserveAspectFit
-            Layout.preferredWidth: visible ? 16 : 0
-            Layout.preferredHeight: visible ? 16 : 0
-            smooth: true
-            Accessible.ignored: true
+        Behavior on y {
+            NumberAnimation { duration: 70; easing.type: Easing.OutCubic }
         }
 
-        Text {
-            visible: root.text.length > 0
-            text: root.text
-            color: root._foregroundColor()
-            font.pixelSize: 13
-            font.weight: 500
-            renderType: Text.QtRendering
-            elide: Text.ElideRight
+        Row {
+            id: contentRow
+            anchors.centerIn: parent
+            spacing: icon.visible && label.visible ? 8 : 0
+
+            Image {
+                id: icon
+                visible: root.iconName.length > 0
+                width: visible ? 16 : 0
+                height: visible ? 16 : 0
+                anchors.verticalCenter: parent.verticalCenter
+                source: root.iconLibrary ? root.iconLibrary.svgData(root.iconName, root._foregroundColor()) : ""
+                sourceSize.width: Math.round(16 * root.pixelRatio)
+                sourceSize.height: Math.round(16 * root.pixelRatio)
+                fillMode: Image.PreserveAspectFit
+                smooth: true
+                Accessible.ignored: true
+            }
+
+            Text {
+                id: label
+                visible: root.text.length > 0
+                anchors.verticalCenter: parent.verticalCenter
+                text: root.text
+                color: root._foregroundColor()
+                font.pixelSize: 13
+                font.weight: 500
+                renderType: Text.QtRendering
+                horizontalAlignment: Text.AlignHCenter
+                verticalAlignment: Text.AlignVCenter
+            }
         }
     }
 
     background: Rectangle {
-        radius: 6
-        border.width: root.variant === "ghost" ? (root.hovered ? 1 : 0) : 1
-        border.color: root._borderColor()
+        radius: iconOnly ? 4 : 6
         color: root._backgroundColor()
+        border.width: root._borderWidth()
+        border.color: root._borderColor()
 
-        Behavior on color { ColorAnimation { duration: 140 } }
-        Behavior on border.color { ColorAnimation { duration: 140 } }
+        Behavior on color {
+            ColorAnimation { duration: 110; easing.type: Easing.OutCubic }
+        }
+
+        Behavior on border.color {
+            ColorAnimation { duration: 110; easing.type: Easing.OutCubic }
+        }
     }
 
     function _backgroundColor() {
+        if (!enabled) {
+            if (variant === "primary") {
+                return theme.buttonSecondaryDisabled
+            }
+            if (variant === "secondary") {
+                return theme.buttonSecondaryDisabled
+            }
+            if (variant === "danger") {
+                return theme.surfaceCriticalWeak
+            }
+            return "transparent"
+        }
         if (variant === "primary") {
-            return down ? theme.surfaceRaisedBaseActive : (hovered ? theme.surfaceBaseHover : theme.buttonPrimaryBase)
+            return activePress
+                ? theme.buttonPrimaryActive
+                : (hovered ? theme.buttonPrimaryHover : theme.buttonPrimaryBase)
         }
         if (variant === "danger") {
-            return hovered ? theme.surfaceBaseHover : theme.surfaceCriticalWeak
+            return activePress
+                ? theme.surfaceBaseActive
+                : (hovered ? theme.surfaceBaseHover : theme.surfaceCriticalWeak)
         }
         if (variant === "ghost") {
-            return down ? theme.surfaceBaseActive : (hovered ? theme.surfaceBaseHover : "transparent")
+            return activePress
+                ? theme.surfaceBaseActive
+                : (hovered ? theme.surfaceBaseHover : "transparent")
         }
-        return hovered ? theme.buttonSecondaryHover : theme.buttonSecondaryBase
+        return activePress
+            ? theme.surfaceRaisedBaseActive
+            : (hovered ? theme.buttonSecondaryHover : theme.buttonSecondaryBase)
     }
 
     function _borderColor() {
-        if (variant === "primary") {
-            return theme.borderWeakBase
+        if (variant === "ghost") {
+            if (activePress || visualFocus) {
+                return theme.borderSelected
+            }
+            return hovered ? theme.borderHover : "transparent"
         }
         if (variant === "danger") {
             return theme.borderCriticalSelected
         }
-        if (variant === "ghost") {
-            return "transparent"
+        if (activePress || visualFocus) {
+            return theme.borderSelected
         }
-        return theme.borderWeakBase
+        return hovered ? theme.borderHover : theme.borderWeakBase
+    }
+
+    function _borderWidth() {
+        if (variant === "ghost") {
+            return hovered || activePress || visualFocus ? 1 : 0
+        }
+        return 1
     }
 
     function _foregroundColor() {
-        if (variant === "ghost" && root.text.length === 0) {
-            return hovered ? theme.iconStrongBase : theme.iconHover
+        if (!enabled) {
+            if (variant === "primary") {
+                return theme.iconStrongDisabled
+            }
+            if (variant === "ghost" && iconOnly) {
+                return theme.iconDisabled
+            }
+            return theme.textWeak
         }
         if (variant === "primary") {
-            return theme.textStrong
+            return theme.iconInvertBase
         }
         if (variant === "danger") {
             return theme.textOnCriticalBase
+        }
+        if (variant === "ghost" && iconOnly) {
+            return activePress
+                ? theme.iconActive
+                : (hovered ? theme.iconHover : theme.iconBase)
         }
         return theme.textStrong
     }
