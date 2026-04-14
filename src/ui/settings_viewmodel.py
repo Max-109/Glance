@@ -218,7 +218,7 @@ class SettingsViewModel(QObject):
 
     @Property("QStringList", constant=True)
     def reasoningOptions(self) -> list[str]:
-        return ["low", "medium", "high"]
+        return ["minimal", "low", "medium", "high"]
 
     @Property("QStringList", constant=True)
     def transcriptionReasoningOptions(self) -> list[str]:

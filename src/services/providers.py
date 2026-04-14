@@ -73,13 +73,11 @@ class OpenAICompatibleProvider:
             content.append({"type": "text", "text": f"User transcript: {transcript}"})
 
         system_prompt = self._build_system_prompt(match_user_language)
-        max_tokens = self._llm_max_tokens()
         started_at = perf_counter()
         try:
             response = self._client.chat.completions.create(
                 model=self._settings.llm_model_name,
                 reasoning_effort=self._settings.llm_reasoning,
-                max_tokens=max_tokens,
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": content},
@@ -87,11 +85,10 @@ class OpenAICompatibleProvider:
             )
         except Exception as exc:  # pragma: no cover - depends on external service.
             logger.exception(
-                "LLM request failed after %.1f ms [model=%s reasoning=%s max_tokens=%s]",
+                "LLM request failed after %.1f ms [model=%s reasoning=%s]",
                 _elapsed_ms(started_at),
                 self._settings.llm_model_name,
                 self._settings.llm_reasoning,
-                max_tokens,
             )
             raise ProviderError(f"LLM request failed: {exc}") from exc
 
@@ -99,24 +96,21 @@ class OpenAICompatibleProvider:
         if not text:
             raise ProviderError("LLM response was empty.")
         logger.info(
-            "LLM reply completed in %.1f ms [model=%s reasoning=%s max_tokens=%s usage=%s output=%s]",
+            "LLM reply completed in %.1f ms [model=%s reasoning=%s usage=%s output=%s]",
             _elapsed_ms(started_at),
             self._settings.llm_model_name,
             self._settings.llm_reasoning,
-            max_tokens,
             _format_usage(response),
             _preview_text(text),
         )
         return text.strip()
 
     def generate_live_speech_reply(self, *, transcript: str) -> LiveSpeechReply:
-        max_tokens = self._llm_max_tokens()
         started_at = perf_counter()
         try:
             response = self._client.chat.completions.create(
                 model=self._settings.llm_model_name,
                 reasoning_effort=self._settings.llm_reasoning,
-                max_tokens=max_tokens,
                 messages=[
                     {
                         "role": "system",
@@ -127,11 +121,10 @@ class OpenAICompatibleProvider:
             )
         except Exception as exc:  # pragma: no cover - depends on external service.
             logger.exception(
-                "Live reply request failed after %.1f ms [model=%s reasoning=%s max_tokens=%s]",
+                "Live reply request failed after %.1f ms [model=%s reasoning=%s]",
                 _elapsed_ms(started_at),
                 self._settings.llm_model_name,
                 self._settings.llm_reasoning,
-                max_tokens,
             )
             raise ProviderError(f"Live reply request failed: {exc}") from exc
 
@@ -140,11 +133,10 @@ class OpenAICompatibleProvider:
             raise ProviderError("Live reply response was empty.")
         live_reply = self._parse_live_speech_reply(text)
         logger.info(
-            "LLM reply completed in %.1f ms [model=%s reasoning=%s max_tokens=%s usage=%s voice=%s output=%s]",
+            "LLM reply completed in %.1f ms [model=%s reasoning=%s usage=%s voice=%s output=%s]",
             _elapsed_ms(started_at),
             self._settings.llm_model_name,
             self._settings.llm_reasoning,
-            max_tokens,
             _format_usage(response),
             get_tts_voice_label(live_reply.voice_id),
             _preview_text(live_reply.text),
@@ -156,13 +148,11 @@ class OpenAICompatibleProvider:
         return self.generate_reply(user_prompt=prompt, image_paths=[image_path])
 
     def prepare_speech_text(self, text: str) -> LiveSpeechReply:
-        max_tokens = self._llm_max_tokens()
         started_at = perf_counter()
         try:
             response = self._client.chat.completions.create(
                 model=self._settings.llm_model_name,
                 reasoning_effort=self._settings.llm_reasoning,
-                max_tokens=max_tokens,
                 messages=[
                     {
                         "role": "system",
@@ -173,11 +163,10 @@ class OpenAICompatibleProvider:
             )
         except Exception as exc:  # pragma: no cover - depends on external service.
             logger.exception(
-                "Speech text preparation failed after %.1f ms [model=%s reasoning=%s max_tokens=%s]",
+                "Speech text preparation failed after %.1f ms [model=%s reasoning=%s]",
                 _elapsed_ms(started_at),
                 self._settings.llm_model_name,
                 self._settings.llm_reasoning,
-                max_tokens,
             )
             raise ProviderError(f"Speech text preparation failed: {exc}") from exc
 
@@ -186,24 +175,15 @@ class OpenAICompatibleProvider:
             raise ProviderError("Speech text preparation returned empty output.")
         prepared_reply = self._parse_live_speech_reply(prepared_text)
         logger.info(
-            "Speech text preparation completed in %.1f ms [model=%s reasoning=%s max_tokens=%s usage=%s voice=%s output=%s]",
+            "Speech text preparation completed in %.1f ms [model=%s reasoning=%s usage=%s voice=%s output=%s]",
             _elapsed_ms(started_at),
             self._settings.llm_model_name,
             self._settings.llm_reasoning,
-            max_tokens,
             _format_usage(response),
             get_tts_voice_label(prepared_reply.voice_id),
             _preview_text(prepared_reply.text),
         )
         return prepared_reply
-
-    def _llm_max_tokens(self) -> int:
-        mapping = {
-            "low": 1024,
-            "medium": 4096,
-            "high": 16000,
-        }
-        return mapping.get(self._settings.llm_reasoning, 4096)
 
     def _build_system_prompt(self, match_user_language: bool) -> str:
         prompt = (

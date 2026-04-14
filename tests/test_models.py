@@ -108,6 +108,18 @@ class AppSettingsTests(unittest.TestCase):
 
         self.assertEqual(settings.tts_voice_id, "tnSpp4vdxKPjI9w0GnoV")
 
+    def test_from_mapping_normalizes_legacy_instant_reasoning_to_minimal(self) -> None:
+        settings = AppSettings.from_mapping(
+            {
+                "llm_base_url": "https://api.example.com/v1",
+                "llm_model_name": "model-a",
+                "tts_base_url": "https://tts.example.com/v1",
+                "llm_reasoning": "instant",
+            }
+        )
+
+        self.assertEqual(settings.llm_reasoning, "minimal")
+
 
 class SessionRecordTests(unittest.TestCase):
     def test_session_rejects_mismatched_mode(self) -> None:

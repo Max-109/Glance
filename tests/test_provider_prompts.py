@@ -143,16 +143,6 @@ class ProviderPromptTests(unittest.TestCase):
             "prompt_tokens=10,completion_tokens=20,total_tokens=30",
         )
 
-    def test_llm_max_tokens_uses_hybrid_mapping(self) -> None:
-        self.provider._settings.llm_reasoning = "low"
-        self.assertEqual(self.provider._llm_max_tokens(), 1024)
-
-        self.provider._settings.llm_reasoning = "medium"
-        self.assertEqual(self.provider._llm_max_tokens(), 4096)
-
-        self.provider._settings.llm_reasoning = "high"
-        self.assertEqual(self.provider._llm_max_tokens(), 16000)
-
 
 if __name__ == "__main__":
     unittest.main()

@@ -746,6 +746,7 @@ ApplicationWindow {
                     value: settingsController.settings.llm_reasoning || "medium"
                     options: settingsController.reasoningOptions
                     optionIcons: ({
+                        "minimal": "clock-3",
                         "low": "zap",
                         "medium": "brain",
                         "high": "brain-circuit"

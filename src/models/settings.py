@@ -133,8 +133,10 @@ class AppSettings:
             raise ValidationError("tts_model cannot be empty.")
         if not self.tts_voice_id.strip():
             raise ValidationError("tts_voice_id cannot be empty.")
-        if self.llm_reasoning not in {"low", "medium", "high"}:
-            raise ValidationError("llm_reasoning must be low, medium, or high.")
+        if self.llm_reasoning not in {"minimal", "low", "medium", "high"}:
+            raise ValidationError(
+                "llm_reasoning must be minimal, low, medium, or high."
+            )
         if self.transcription_reasoning not in {"minimal", "low", "medium", "high"}:
             raise ValidationError(
                 "transcription_reasoning must be minimal, low, medium, or high."
@@ -176,7 +178,9 @@ class AppSettings:
             llm_base_url=data.get("llm_base_url", cls.llm_base_url),
             llm_api_key=data.get("llm_api_key", cls.llm_api_key),
             llm_model_name=data.get("llm_model_name", cls.llm_model_name),
-            llm_reasoning=data.get("llm_reasoning", cls.llm_reasoning),
+            llm_reasoning=normalize_llm_reasoning(
+                data.get("llm_reasoning", cls.llm_reasoning)
+            ),
             transcription_base_url=data.get(
                 "transcription_base_url", cls.transcription_base_url
             ),
@@ -255,6 +259,15 @@ def normalize_tts_voice_id(value: str) -> str:
         if label.lower() == lowered_value:
             return voice_id
     return DEFAULT_TTS_VOICE
+
+
+def normalize_llm_reasoning(value: str) -> str:
+    lowered_value = str(value).strip().lower()
+    if lowered_value == "instant":
+        return "minimal"
+    if lowered_value in {"minimal", "low", "medium", "high"}:
+        return lowered_value
+    return lowered_value
 
 
 def get_tts_voice(voice_id: str) -> ElevenV3Voice | None:

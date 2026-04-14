@@ -7,10 +7,11 @@ from src.exceptions.app_exceptions import ProviderError
 from src.services.audio_devices import AudioDeviceService
 
 try:
-    from PySide6.QtCore import QObject, QUrl, Signal, Slot
+    from PySide6.QtCore import QObject, QTimer, QUrl, Signal, Slot
     from PySide6.QtMultimedia import QAudioOutput, QMediaPlayer
 except ImportError:  # pragma: no cover - optional in test environments.
     QObject = object
+    QTimer = None
     QUrl = None
     Signal = None
     Slot = None
@@ -27,6 +28,8 @@ if Slot is None:  # pragma: no cover - used only without Qt.
 
 
 class QtAudioPlaybackService(QObject):
+    _PLAYBACK_COMPLETION_GRACE_MS = 200
+
     if Signal is not None:
         _play_requested = Signal(str)
         _stop_requested = Signal()
@@ -98,7 +101,7 @@ class QtAudioPlaybackService(QObject):
     @Slot(object)
     def _on_media_status_changed(self, status) -> None:
         if status == QMediaPlayer.EndOfMedia:
-            self._finish_playback()
+            self._schedule_finish_playback()
         elif status == QMediaPlayer.InvalidMedia:
             self._error_message = (
                 "Audio playback failed because the media file was invalid."
@@ -117,3 +120,9 @@ class QtAudioPlaybackService(QObject):
             self._completion_event = None
         if completion_event is not None:
             completion_event.set()
+
+    def _schedule_finish_playback(self) -> None:
+        if QTimer is None:
+            self._finish_playback()
+            return
+        QTimer.singleShot(self._PLAYBACK_COMPLETION_GRACE_MS, self._finish_playback)
