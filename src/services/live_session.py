@@ -96,6 +96,7 @@ class LiveSessionController:
         thread = self._thread
         if thread and thread.is_alive() and thread is not current_thread():
             thread.join(timeout=1.5)
+        self._session = None
         self._set_status("idle", "Live session stopped.")
 
     def _run_loop(self) -> None:
@@ -175,6 +176,7 @@ class LiveSessionController:
         finally:
             self._stop_event.set()
             self._thread = None
+            self._session = None
             if self._state != "idle":
                 self._set_status("idle", "Live session idle.")
 

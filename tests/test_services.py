@@ -35,7 +35,12 @@ class DummyProvider:
             text=text,
         )
 
-    def generate_live_speech_reply(self, *, transcript: str) -> LiveSpeechReply:
+    def generate_live_speech_reply(
+        self,
+        *,
+        transcript: str,
+        conversation_history=None,
+    ) -> LiveSpeechReply:
         return LiveSpeechReply(
             voice_id="UgBBYS2sOqTuMpoF3BR0",
             text=transcript,

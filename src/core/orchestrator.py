@@ -79,7 +79,9 @@ class Orchestrator:
             audio_dir=self._audio_dir,
         )
         active_session = session or self._history_manager.start_session(mode)
-        interaction = strategy.execute(context)
+        execution_context = dict(context)
+        execution_context["session"] = active_session
+        interaction = strategy.execute(execution_context)
         self._history_manager.save_interaction(active_session, interaction)
         return interaction
 

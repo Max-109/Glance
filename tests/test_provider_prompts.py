@@ -1,4 +1,6 @@
 import unittest
+from types import SimpleNamespace
+from unittest.mock import Mock
 
 from src.models.settings import AppSettings
 from src.services.providers import (
@@ -141,6 +143,55 @@ class ProviderPromptTests(unittest.TestCase):
         self.assertEqual(
             usage,
             "prompt_tokens=10,completion_tokens=20,total_tokens=30",
+        )
+
+    def test_format_usage_flattens_nested_cache_details(self) -> None:
+        usage = _format_usage(
+            {
+                "usage": {
+                    "prompt_tokens": 120,
+                    "completion_tokens": 25,
+                    "total_tokens": 145,
+                    "prompt_tokens_details": {"cached_tokens": 96},
+                }
+            }
+        )
+
+        self.assertEqual(
+            usage,
+            "prompt_tokens=120,completion_tokens=25,total_tokens=145,prompt_tokens_details.cached_tokens=96",
+        )
+
+    def test_live_reply_request_includes_prior_conversation_history(self) -> None:
+        self.provider._settings.tts_voice_id = "UgBBYS2sOqTuMpoF3BR0"
+        messages_create = Mock(
+            return_value=SimpleNamespace(
+                choices=[
+                    SimpleNamespace(
+                        message=SimpleNamespace(content="[curious] Got it.")
+                    )
+                ],
+                usage={"prompt_tokens": 10},
+            )
+        )
+        self.provider._client = SimpleNamespace(
+            chat=SimpleNamespace(completions=SimpleNamespace(create=messages_create))
+        )
+
+        reply = self.provider.generate_live_speech_reply(
+            transcript="What was I just asking?",
+            conversation_history=[
+                {"role": "user", "content": "Remember this detail."},
+                {"role": "assistant", "content": "I will remember it."},
+            ],
+        )
+
+        self.assertEqual(reply.text, "[curious] Got it.")
+        request_messages = messages_create.call_args.kwargs["messages"]
+        self.assertEqual(request_messages[1]["content"], "Remember this detail.")
+        self.assertEqual(request_messages[2]["content"], "I will remember it.")
+        self.assertEqual(
+            request_messages[3], {"role": "user", "content": "What was I just asking?"}
         )
 
 

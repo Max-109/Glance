@@ -3,9 +3,9 @@ from __future__ import annotations
 from pathlib import Path
 
 from src.agents.llm_agent import LLMAgent
+from src.models.interactions import LiveInteraction, SessionRecord
 from src.agents.tts_agent import TTSAgent
 from src.agents.transcription_agent import TranscriptionAgent
-from src.models.interactions import LiveInteraction
 from src.strategies.mode_strategy import ModeStrategy, force_pause_at_end_for_tts
 
 
@@ -25,7 +25,12 @@ class LiveStrategy(ModeStrategy):
     def execute(self, context: dict) -> LiveInteraction:
         recording_path = str(context["recording_path"])
         transcript = self._transcription_agent.run(audio_path=recording_path)
-        live_reply = self._llm_agent.generate_live_speech_reply(transcript=transcript)
+        live_reply = self._llm_agent.generate_live_speech_reply(
+            transcript=transcript,
+            conversation_history=self._build_conversation_history(
+                context.get("session")
+            ),
+        )
         speech_path = self._audio_dir / f"live-{Path(recording_path).stem}.wav"
         generated_speech_path = self._tts_agent.run(
             text=force_pause_at_end_for_tts(live_reply.text),
@@ -39,3 +44,18 @@ class LiveStrategy(ModeStrategy):
             response=live_reply.text,
             speech_path=generated_speech_path,
         )
+
+    @staticmethod
+    def _build_conversation_history(
+        session: SessionRecord | None,
+    ) -> list[dict[str, str]]:
+        if session is None:
+            return []
+
+        history: list[dict[str, str]] = []
+        for interaction in session.interactions:
+            if not isinstance(interaction, LiveInteraction):
+                continue
+            history.append({"role": "user", "content": interaction.transcript})
+            history.append({"role": "assistant", "content": interaction.response})
+        return history

@@ -50,10 +50,10 @@ class FakeLLMAgent:
             text=text,
         )
 
-    def generate_live_speech_reply(self, *, transcript):
+    def generate_live_speech_reply(self, *, transcript, conversation_history=None):
         return LiveSpeechReply(
             voice_id="UgBBYS2sOqTuMpoF3BR0",
-            text=f"live:{transcript}",
+            text=f"live:{transcript}:history={len(conversation_history or [])}",
         )
 
 
@@ -139,9 +139,12 @@ class OrchestratorFlowTests(unittest.TestCase):
 
         self.assertEqual(interaction.recording_path, str(recording_path))
         self.assertEqual(interaction.transcript, "transcribed:turn.wav")
-        self.assertEqual(interaction.response, "live:transcribed:turn.wav")
+        self.assertEqual(interaction.response, "live:transcribed:turn.wav:history=0")
         self.assertTrue(interaction.speech_path.endswith(".wav"))
-        self.assertEqual(self.tts_agent.calls[0][0], "live:transcribed:turn.wav...")
+        self.assertEqual(
+            self.tts_agent.calls[0][0],
+            "live:transcribed:turn.wav:history=0...",
+        )
 
     def test_live_mode_reuses_same_session_when_provided(self) -> None:
         recording_path = Path(self.temp_dir.name) / "turn.wav"
@@ -151,13 +154,33 @@ class OrchestratorFlowTests(unittest.TestCase):
         self.orchestrator.run_mode(
             "live", session=session, recording_path=str(recording_path)
         )
-        self.orchestrator.run_mode(
+        second_interaction = self.orchestrator.run_mode(
             "live", session=session, recording_path=str(recording_path)
         )
 
         history = self.orchestrator.list_history()
         self.assertEqual(len(history), 1)
         self.assertEqual(len(history[0].interactions), 2)
+        self.assertEqual(
+            second_interaction.response,
+            "live:transcribed:turn.wav:history=2",
+        )
+
+    def test_live_mode_does_not_reuse_context_across_sessions(self) -> None:
+        recording_path = Path(self.temp_dir.name) / "turn.wav"
+        recording_path.write_bytes(b"audio")
+
+        first_session = self.orchestrator.open_session("live")
+        self.orchestrator.run_mode(
+            "live", session=first_session, recording_path=str(recording_path)
+        )
+
+        second_session = self.orchestrator.open_session("live")
+        interaction = self.orchestrator.run_mode(
+            "live", session=second_session, recording_path=str(recording_path)
+        )
+
+        self.assertEqual(interaction.response, "live:transcribed:turn.wav:history=0")
 
 
 if __name__ == "__main__":

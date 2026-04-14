@@ -112,19 +112,21 @@ class OpenAICompatibleProvider:
         )
         return text.strip()
 
-    def generate_live_speech_reply(self, *, transcript: str) -> LiveSpeechReply:
+    def generate_live_speech_reply(
+        self,
+        *,
+        transcript: str,
+        conversation_history: list[dict[str, str]] | None = None,
+    ) -> LiveSpeechReply:
         started_at = perf_counter()
         try:
             response = self._client.chat.completions.create(
                 model=self._settings.llm_model_name,
                 reasoning_effort=self._settings.llm_reasoning,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": self._build_live_speech_system_prompt(),
-                    },
-                    {"role": "user", "content": transcript.strip()},
-                ],
+                messages=self._build_live_speech_messages(
+                    transcript=transcript,
+                    conversation_history=conversation_history,
+                ),
             )
         except Exception as exc:  # pragma: no cover - depends on external service.
             logger.exception(
@@ -149,6 +151,22 @@ class OpenAICompatibleProvider:
             _preview_text(live_reply.text),
         )
         return live_reply
+
+    def _build_live_speech_messages(
+        self,
+        *,
+        transcript: str,
+        conversation_history: list[dict[str, str]] | None = None,
+    ) -> list[dict[str, str]]:
+        messages = [
+            {
+                "role": "system",
+                "content": self._build_live_speech_system_prompt(),
+            }
+        ]
+        messages.extend(_normalize_chat_messages(conversation_history))
+        messages.append({"role": "user", "content": transcript.strip()})
+        return messages
 
     def extract_text(self, image_path: str) -> str:
         prompt = "Extract all visible text exactly as written. Preserve line breaks where useful."
@@ -747,37 +765,84 @@ def _format_usage(response) -> str:
     if usage is None:
         return "n/a"
 
-    if not isinstance(usage, dict):
-        usage = {
-            key: value
-            for key, value in vars(usage).items()
-            if not key.startswith("_") and value is not None
-        }
-
+    usage = _normalize_usage_payload(usage)
     if not usage:
         return "n/a"
 
+    flattened_usage = dict(_flatten_mapping(usage))
     details: list[str] = []
     for key in (
         "prompt_tokens",
         "completion_tokens",
         "total_tokens",
+        "input_tokens",
+        "output_tokens",
         "reasoning_tokens",
         "cached_tokens",
+        "prompt_tokens_details.cached_tokens",
+        "input_tokens_details.cached_tokens",
+        "output_tokens_details.reasoning_tokens",
     ):
-        value = usage.get(key)
+        value = flattened_usage.pop(key, None)
         if value is not None:
             details.append(f"{key}={value}")
 
-    for key, value in usage.items():
-        if key in {
-            "prompt_tokens",
-            "completion_tokens",
-            "total_tokens",
-            "reasoning_tokens",
-            "cached_tokens",
-        }:
-            continue
+    for key, value in flattened_usage.items():
         details.append(f"{key}={value}")
 
     return ",".join(details) if details else "n/a"
+
+
+def _normalize_chat_messages(
+    messages: list[dict[str, str]] | None,
+) -> list[dict[str, str]]:
+    normalized_messages: list[dict[str, str]] = []
+    for message in messages or []:
+        role = str(message.get("role", "")).strip().lower()
+        content = message.get("content", "")
+        if role not in {"user", "assistant"}:
+            continue
+        if not isinstance(content, str):
+            content = _extract_text_content(content)
+        stripped_content = content.strip()
+        if not stripped_content:
+            continue
+        normalized_messages.append({"role": role, "content": stripped_content})
+    return normalized_messages
+
+
+def _normalize_usage_payload(value):
+    if isinstance(value, dict):
+        return {
+            key: _normalize_usage_payload(item)
+            for key, item in value.items()
+            if item is not None
+        }
+    model_dump = getattr(value, "model_dump", None)
+    if callable(model_dump):
+        return _normalize_usage_payload(model_dump(exclude_none=True))
+    to_dict = getattr(value, "to_dict", None)
+    if callable(to_dict):
+        return _normalize_usage_payload(to_dict())
+    try:
+        public_attributes = {
+            key: item
+            for key, item in vars(value).items()
+            if not key.startswith("_") and item is not None
+        }
+    except TypeError:
+        return value
+    if not public_attributes:
+        return value
+    return {
+        key: _normalize_usage_payload(item) for key, item in public_attributes.items()
+    }
+
+
+def _flatten_mapping(mapping: dict, prefix: str = ""):
+    for key, value in mapping.items():
+        composed_key = f"{prefix}.{key}" if prefix else key
+        if isinstance(value, dict) and value:
+            yield from _flatten_mapping(value, composed_key)
+            continue
+        yield composed_key, value
