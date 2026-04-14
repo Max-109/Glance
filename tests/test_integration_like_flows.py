@@ -63,7 +63,11 @@ class FakeOCRAgent:
 
 
 class FakeTTSAgent:
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, str, str | None]] = []
+
     def run(self, *, text, output_path, voice_id=None):
+        self.calls.append((text, output_path, voice_id))
         return output_path
 
 
@@ -89,6 +93,7 @@ class OrchestratorFlowTests(unittest.TestCase):
             }
         )
         self.clipboard = FakeClipboardService()
+        self.tts_agent = FakeTTSAgent()
         self.orchestrator = Orchestrator(
             settings=settings,
             history_manager=history_manager,
@@ -99,7 +104,7 @@ class OrchestratorFlowTests(unittest.TestCase):
             transcription_agent=FakeTranscriptionAgent(),
             llm_agent=FakeLLMAgent(),
             ocr_agent=FakeOCRAgent(),
-            tts_agent=FakeTTSAgent(),
+            tts_agent=self.tts_agent,
             clipboard_service=self.clipboard,
             audio_dir=temp_path,
         )
@@ -115,6 +120,8 @@ class OrchestratorFlowTests(unittest.TestCase):
         )
 
         self.assertEqual(interaction.answer, "quick:Explain this:1")
+        self.assertTrue(interaction.speech_path.endswith(".wav"))
+        self.assertEqual(self.tts_agent.calls[0][0], "quick:Explain this:1...")
         self.assertEqual(len(self.orchestrator.list_history()), 1)
 
     def test_ocr_mode_copies_text(self) -> None:
@@ -133,6 +140,8 @@ class OrchestratorFlowTests(unittest.TestCase):
         self.assertEqual(interaction.recording_path, str(recording_path))
         self.assertEqual(interaction.transcript, "transcribed:turn.wav")
         self.assertEqual(interaction.response, "live:transcribed:turn.wav")
+        self.assertTrue(interaction.speech_path.endswith(".wav"))
+        self.assertEqual(self.tts_agent.calls[0][0], "live:transcribed:turn.wav...")
 
     def test_live_mode_reuses_same_session_when_provided(self) -> None:
         recording_path = Path(self.temp_dir.name) / "turn.wav"

@@ -57,10 +57,12 @@ class LiveStrategyTests(unittest.TestCase):
         )
         self.assertEqual(
             tts_agent.calls[0][0],
-            "[curious] Hello there!",
+            "[curious] Hello there!...",
         )
+        self.assertTrue(tts_agent.calls[0][1].endswith(".wav"))
         self.assertEqual(tts_agent.calls[0][2], "UgBBYS2sOqTuMpoF3BR0")
         self.assertEqual(interaction.response, "[curious] Hello there!")
+        self.assertTrue(interaction.speech_path.endswith(".wav"))
 
 
 if __name__ == "__main__":

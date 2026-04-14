@@ -799,7 +799,7 @@ class SettingsViewModel(QObject):
     def _run_voice_preview(
         self, settings: AppSettings, voice_name: str, stop_event: Event
     ) -> None:
-        output_path = self._audio_dir / f"voice-preview-{uuid4().hex}.mp3"
+        output_path = self._audio_dir / f"voice-preview-{uuid4().hex}.wav"
         try:
             provider = NagaSpeechProvider(settings)
             provider.synthesize(
@@ -824,10 +824,6 @@ class SettingsViewModel(QObject):
                     f"Voice preview failed: {exc}", "error"
                 )
         finally:
-            try:
-                output_path.unlink(missing_ok=True)
-            except OSError:
-                pass
             self._previewFinished.emit(voice_name)
 
     @staticmethod

@@ -6,7 +6,7 @@ from src.agents.llm_agent import LLMAgent
 from src.agents.screen_capture_agent import ScreenCaptureAgent
 from src.agents.tts_agent import TTSAgent
 from src.models.interactions import QuickInteraction
-from src.strategies.mode_strategy import ModeStrategy
+from src.strategies.mode_strategy import ModeStrategy, force_pause_at_end_for_tts
 
 
 class QuickStrategy(ModeStrategy):
@@ -27,9 +27,9 @@ class QuickStrategy(ModeStrategy):
         question = context.get("question") or "What should I notice in this selection?"
         answer = self._llm_agent.run(user_prompt=question, image_paths=[image_path])
         spoken_reply = self._llm_agent.prepare_speech_text(text=answer)
-        speech_path = self._audio_dir / f"quick-{Path(image_path).stem}.mp3"
+        speech_path = self._audio_dir / f"quick-{Path(image_path).stem}.wav"
         generated_speech_path = self._tts_agent.run(
-            text=spoken_reply.text,
+            text=force_pause_at_end_for_tts(spoken_reply.text),
             output_path=str(speech_path),
             voice_id=spoken_reply.voice_id,
         )

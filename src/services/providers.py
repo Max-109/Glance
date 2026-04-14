@@ -4,9 +4,12 @@ import base64
 import logging
 import mimetypes
 import re
+import shutil
+import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 from time import perf_counter
+import wave
 
 from src.exceptions.app_exceptions import ProviderError
 from src.models.settings import (
@@ -25,6 +28,10 @@ except ImportError:  # pragma: no cover - exercised only without optional depend
 
 
 logger = logging.getLogger("glance.providers")
+
+_PCM_SAMPLE_RATE = 24000
+_PCM_CHANNELS = 1
+_PCM_SAMPLE_WIDTH_BYTES = 2
 
 
 @dataclass(frozen=True)
@@ -509,12 +516,20 @@ class NagaSpeechProvider:
         if resolved_voice_id == AUTO_TTS_VOICE_ID:
             resolved_voice_id = DEFAULT_FIXED_TTS_VOICE
         try:
-            response = self._client.audio.speech.create(
+            requested_format = _speech_response_format(output_path)
+            with self._client.audio.speech.with_streaming_response.create(
                 model=self._settings.tts_model,
                 voice=resolved_voice_id,
                 input=text,
+                response_format=requested_format,
+            ) as response:
+                response.stream_to_file(output_path)
+                content_type = response.headers.get("content-type", "")
+            output_path = _normalize_synthesized_audio(
+                output_path,
+                requested_format,
+                content_type=content_type,
             )
-            response.stream_to_file(output_path)
         except Exception as exc:  # pragma: no cover - depends on external service.
             logger.exception(
                 "TTS request failed after %.1f ms [model=%s voice=%s]",
@@ -531,6 +546,138 @@ class NagaSpeechProvider:
             _preview_text(text),
         )
         return str(output_path)
+
+
+def _speech_response_format(output_path: Path) -> str:
+    suffix = output_path.suffix.lower().lstrip(".")
+    if suffix:
+        return suffix
+    return "mp3"
+
+
+def _normalize_synthesized_audio(
+    output_path: Path,
+    requested_format: str,
+    *,
+    content_type: str = "",
+) -> Path:
+    actual_format = _detect_audio_format(output_path)
+    if actual_format is None or actual_format == requested_format:
+        if requested_format == "wav" and _should_wrap_pcm_as_wav(
+            output_path, actual_format=actual_format, content_type=content_type
+        ):
+            return _wrap_pcm_file_as_wav(output_path)
+        return output_path
+
+    logger.warning(
+        "TTS provider returned %s while %s was requested for %s",
+        actual_format,
+        requested_format,
+        output_path.name,
+    )
+
+    if requested_format == "wav":
+        converted_path = _convert_audio_to_wav(output_path)
+        if converted_path is not None:
+            return converted_path
+
+    normalized_path = output_path.with_suffix(f".{actual_format}")
+    if normalized_path == output_path:
+        return output_path
+    output_path.replace(normalized_path)
+    return normalized_path
+
+
+def _should_wrap_pcm_as_wav(
+    output_path: Path,
+    *,
+    actual_format: str | None,
+    content_type: str,
+) -> bool:
+    if actual_format is not None:
+        return False
+    if not output_path.exists() or output_path.stat().st_size == 0:
+        return False
+    normalized_content_type = content_type.lower()
+    return normalized_content_type in {
+        "audio/wav",
+        "audio/wave",
+        "audio/x-wav",
+        "audio/pcm",
+    }
+
+
+def _wrap_pcm_file_as_wav(output_path: Path) -> Path:
+    pcm_bytes = output_path.read_bytes()
+    temp_path = output_path.with_name(f"{output_path.stem}-pcm-wrap.wav")
+    with wave.open(str(temp_path), "wb") as wav_file:
+        wav_file.setnchannels(_PCM_CHANNELS)
+        wav_file.setsampwidth(_PCM_SAMPLE_WIDTH_BYTES)
+        wav_file.setframerate(_PCM_SAMPLE_RATE)
+        wav_file.writeframes(pcm_bytes)
+    output_path.unlink(missing_ok=True)
+    temp_path.replace(output_path)
+    logger.warning(
+        "Wrapped headerless PCM stream as WAV for %s using %d Hz mono s16le.",
+        output_path.name,
+        _PCM_SAMPLE_RATE,
+    )
+    return output_path
+
+
+def _detect_audio_format(output_path: Path) -> str | None:
+    try:
+        header = output_path.read_bytes()[:16]
+    except OSError:
+        return None
+    if len(header) >= 12 and header[:4] == b"RIFF" and header[8:12] == b"WAVE":
+        return "wav"
+    if header.startswith(b"ID3"):
+        return "mp3"
+    if len(header) >= 2 and header[0] == 0xFF and (header[1] & 0xE0) == 0xE0:
+        return "mp3"
+    return None
+
+
+def _convert_audio_to_wav(output_path: Path) -> Path | None:
+    ffmpeg_path = shutil.which("ffmpeg")
+    if ffmpeg_path is None:
+        logger.warning(
+            "ffmpeg is unavailable, keeping synthesized audio in its original format."
+        )
+        return None
+
+    converted_path = output_path.with_name(f"{output_path.stem}-converted.wav")
+    try:
+        subprocess.run(
+            [
+                ffmpeg_path,
+                "-y",
+                "-hide_banner",
+                "-loglevel",
+                "error",
+                "-i",
+                str(output_path),
+                "-vn",
+                "-acodec",
+                "pcm_s16le",
+                str(converted_path),
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except (OSError, subprocess.CalledProcessError) as exc:
+        logger.warning("ffmpeg WAV conversion failed for %s: %s", output_path.name, exc)
+        try:
+            converted_path.unlink(missing_ok=True)
+        except OSError:
+            pass
+        return None
+
+    output_path.unlink(missing_ok=True)
+    converted_path.replace(output_path)
+    return output_path
 
 
 def _file_to_data_url(file_path: Path) -> str:
