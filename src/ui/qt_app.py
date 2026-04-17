@@ -7,10 +7,11 @@ from pathlib import Path
 
 os.environ.setdefault("QT_QUICK_CONTROLS_STYLE", "Basic")
 
-from PySide6.QtCore import QCoreApplication, QObject, Qt, QTimer, QUrl, Signal
+from PySide6.QtCore import QByteArray, QCoreApplication, QObject, Qt, QTimer, QUrl, Signal
 from PySide6.QtGui import QAction, QColor, QCursor, QFont, QIcon, QPainter, QPixmap
 from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtQuickControls2 import QQuickStyle
+from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import QApplication, QMenu, QSystemTrayIcon
 
 from src.core.orchestrator import build_orchestrator_with_dependencies
@@ -39,12 +40,98 @@ class LiveStatusBridge(QObject):
     statusChanged = Signal(str, str)
 
 
+class TrayIconController(QObject):
+    _ANIMATION_INTERVAL_MS = {
+        "listening": 420,
+        "processing": 560,
+        "speaking": 420,
+    }
+    _ERROR_FLASH_MS = 1400
+
+    def __init__(self, tray: QSystemTrayIcon, app: QApplication) -> None:
+        super().__init__(tray)
+        self._tray = tray
+        self._base_state = "idle"
+        self._override_state: str | None = None
+        self._frame = 0
+        self._color_scheme = app.styleHints().colorScheme()
+
+        self._animation_timer = QTimer(self)
+        self._animation_timer.timeout.connect(self._advance_frame)
+
+        self._error_timer = QTimer(self)
+        self._error_timer.setSingleShot(True)
+        self._error_timer.timeout.connect(self._clear_override)
+
+        app.styleHints().colorSchemeChanged.connect(self._handle_color_scheme_changed)
+        self._refresh_animation()
+        self._apply_icon()
+
+    def set_state(self, state: str) -> None:
+        normalized_state = _normalize_tray_state(state)
+        if normalized_state == self._base_state and self._override_state is None:
+            return
+        self._base_state = normalized_state
+        if self._override_state is None:
+            self._frame = 0
+            self._refresh_animation()
+            self._apply_icon()
+
+    def flash_error(self) -> None:
+        self._override_state = "error"
+        self._frame = 0
+        self._animation_timer.stop()
+        self._apply_icon()
+        self._error_timer.start(self._ERROR_FLASH_MS)
+
+    def _advance_frame(self) -> None:
+        self._frame = 1 - self._frame
+        self._apply_icon()
+
+    def _clear_override(self) -> None:
+        self._override_state = None
+        self._frame = 0
+        self._refresh_animation()
+        self._apply_icon()
+
+    def _handle_color_scheme_changed(self, color_scheme) -> None:
+        self._color_scheme = color_scheme
+        self._apply_icon()
+
+    def _refresh_animation(self) -> None:
+        interval = self._ANIMATION_INTERVAL_MS.get(self._effective_state())
+        if interval is None:
+            self._animation_timer.stop()
+            self._frame = 0
+            return
+        if self._animation_timer.interval() != interval:
+            self._animation_timer.setInterval(interval)
+        if not self._animation_timer.isActive():
+            self._animation_timer.start()
+
+    def _effective_state(self) -> str:
+        return self._override_state or self._base_state
+
+    def _apply_icon(self) -> None:
+        self._tray.setIcon(
+            _create_tray_icon(
+                color_scheme=self._color_scheme,
+                state=self._effective_state(),
+                frame=self._frame,
+            )
+        )
+
+
 def run_settings_app() -> int:
     QCoreApplication.setAttribute(Qt.AA_MacDontSwapCtrlAndMeta, True)
     app = QApplication(sys.argv)
     app.setApplicationName("Glance")
     app.setOrganizationName("Glance")
     app.setQuitOnLastWindowClosed(False)
+
+    app_icon = _load_app_icon()
+    if not app_icon.isNull():
+        app.setWindowIcon(app_icon)
 
     paths = build_app_paths()
     log_file = configure_app_logging(paths.root_dir)
@@ -83,6 +170,8 @@ def run_settings_app() -> int:
         raise RuntimeError("Could not load the QML settings interface.")
 
     root_window = engine.rootObjects()[0]
+    if not app_icon.isNull():
+        root_window.setIcon(app_icon)
     tray = _build_tray_icon(app, root_window, controller, live_controller, log_file)
     tray.show()
     hotkey_manager = GlobalHotkeyManager(
@@ -177,8 +266,12 @@ def _build_tray_icon(
     live_controller: LiveSessionController,
     log_file: Path,
 ) -> QSystemTrayIcon:
-    tray = QSystemTrayIcon(_create_tray_icon(), app)
+    tray = QSystemTrayIcon(
+        _create_tray_icon(app.styleHints().colorScheme(), state="idle"),
+        app,
+    )
     tray.setToolTip("Glance")
+    tray_icon_controller = TrayIconController(tray, app)
 
     menu = QMenu()
     menu.setFont(QFont("SF Pro Text", 13))
@@ -217,11 +310,13 @@ def _build_tray_icon(
     controller.settingsChanged.connect(update_keybind_actions)
 
     def update_live_status(state: str, message: str) -> None:
+        tray_icon_controller.set_state(state)
         live_state_action.setText(f"Live status: {state}")
         tray.setToolTip(f"Glance\n{message}")
         if any(
             token in message.lower() for token in {"failed", "unavailable", "error"}
         ):
+            tray_icon_controller.flash_error()
             tray.showMessage("Glance", f"{message}\nSee log: {log_file}")
 
     status_bridge = LiveStatusBridge(tray)
@@ -260,23 +355,153 @@ def _toggle_window(root_window, force_show: bool = False) -> None:
     root_window.requestActivate()
 
 
-def _create_tray_icon() -> QIcon:
-    pixmap = QPixmap(64, 64)
-    pixmap.fill(QColor(0, 0, 0, 0))
+def _create_tray_icon(
+    color_scheme: Qt.ColorScheme | None = None,
+    *,
+    state: str = "idle",
+    frame: int = 0,
+) -> QIcon:
+    icon = QIcon()
+    color = QColor(_tray_icon_color(color_scheme))
+    for size in (18, 36, 72):
+        pixmap = QPixmap(size, size)
+        pixmap.fill(Qt.transparent)
+        painter = QPainter(pixmap)
+        painter.setRenderHint(QPainter.Antialiasing)
+        _paint_square_frame_symbol(
+            painter,
+            size,
+            foreground=color,
+            segment_opacities=_tray_segment_opacities(state, frame),
+        )
+        painter.end()
+        icon.addPixmap(pixmap)
+    return icon
+
+
+def _load_app_icon() -> QIcon:
+    icon = _load_svg_icon(
+        _asset_path("glance_app_icon.svg"),
+        sizes=(64, 128, 256, 512, 1024),
+    )
+    if icon.isNull():
+        return _create_fallback_app_icon()
+    return icon
+
+
+def _asset_path(filename: str) -> Path:
+    return Path(__file__).resolve().with_name(filename)
+
+
+def _load_svg_icon(
+    asset_path: Path,
+    *,
+    sizes: tuple[int, ...],
+) -> QIcon:
+    try:
+        svg_markup = asset_path.read_text(encoding="utf-8")
+    except OSError:
+        return QIcon()
+
+    renderer = QSvgRenderer(QByteArray(svg_markup.encode("utf-8")))
+    if not renderer.isValid():
+        return QIcon()
+
+    icon = QIcon()
+    for size in sizes:
+        pixmap = QPixmap(size, size)
+        pixmap.fill(Qt.transparent)
+        painter = QPainter(pixmap)
+        painter.setRenderHint(QPainter.Antialiasing)
+        renderer.render(painter)
+        painter.end()
+        icon.addPixmap(pixmap)
+    return icon
+
+
+def _tray_icon_color(color_scheme: Qt.ColorScheme | None) -> str:
+    if color_scheme == Qt.ColorScheme.Light:
+        return "#111111"
+    return "#FFFFFF"
+
+
+def _normalize_tray_state(state: str) -> str:
+    if state in {"listening", "processing", "speaking"}:
+        return state
+    if state == "error":
+        return state
+    return "idle"
+
+
+def _tray_segment_opacities(state: str, frame: int) -> tuple[float, float, float, float]:
+    pulse_alpha = 1.0 if frame else 0.38
+    completed_alpha = 0.9
+    idle_alpha = 0.56
+    inactive_alpha = 0.24
+
+    if state == "listening":
+        return pulse_alpha, inactive_alpha, inactive_alpha, inactive_alpha
+    if state == "processing":
+        return completed_alpha, pulse_alpha, inactive_alpha, inactive_alpha
+    if state == "speaking":
+        return completed_alpha, completed_alpha, pulse_alpha, inactive_alpha
+    if state == "error":
+        return 1.0, 1.0, 1.0, 1.0
+    return idle_alpha, idle_alpha, idle_alpha, idle_alpha
+
+
+def _paint_square_frame_symbol(
+    painter: QPainter,
+    size: int,
+    *,
+    foreground: QColor,
+    segment_opacities: tuple[float, float, float, float],
+) -> None:
+    painter.setPen(Qt.NoPen)
+
+    outer = max(8, round(size * 0.78))
+    thickness = max(2, round(size * 0.14))
+    gap = max(1, round(size * 0.06))
+    left = (size - outer) // 2
+    top = (size - outer) // 2
+    span = max(1, outer - (2 * (thickness + gap)))
+
+    segment_specs = (
+        (left, top + thickness + gap, thickness, span),
+        (left + thickness + gap, top, span, thickness),
+        (left + outer - thickness, top + thickness + gap, thickness, span),
+        (left + thickness + gap, top + outer - thickness, span, thickness),
+    )
+
+    for alpha, (x, y, width, height) in zip(segment_opacities, segment_specs):
+        color = QColor(foreground)
+        color.setAlphaF(alpha)
+        painter.setBrush(color)
+        painter.drawRect(x, y, width, height)
+
+
+def _create_fallback_app_icon() -> QIcon:
+    pixmap = QPixmap(256, 256)
+    pixmap.fill(Qt.transparent)
 
     painter = QPainter(pixmap)
     painter.setRenderHint(QPainter.Antialiasing)
-    painter.setBrush(QColor("#1a1a1f"))
-    painter.setPen(QColor("#c9c3bf"))
-    painter.drawRoundedRect(8, 8, 48, 48, 14, 14)
-    painter.setPen(QColor("#f0ebe7"))
-    font = QFont("SF Pro Display", 28)
-    font.setWeight(QFont.DemiBold)
-    painter.setFont(font)
-    painter.drawText(pixmap.rect(), 0x0084, "G")
+    painter.setPen(QColor("#4B4646"))
+    painter.setBrush(QColor("#211E1E"))
+    painter.drawRoundedRect(16, 16, 224, 224, 62, 62)
+    _paint_square_frame_symbol(
+        painter,
+        256,
+        foreground=QColor("#F2EFEB"),
+        segment_opacities=(1.0, 1.0, 1.0, 1.0),
+    )
     painter.end()
 
     return QIcon(pixmap)
+
+
+def _create_fallback_tray_icon() -> QIcon:
+    return _create_tray_icon(Qt.ColorScheme.Dark, state="idle")
 
 
 def _build_runtime_orchestrator(
