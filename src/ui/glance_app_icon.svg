@@ -1,10 +1,40 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" fill="none">
-  <rect x="64" y="64" width="896" height="896" rx="248" fill="#211E1E"/>
-  <rect x="64" y="64" width="896" height="896" rx="248" stroke="#4B4646" stroke-width="12"/>
-  <g fill="#F1ECEC">
-    <rect x="240" y="376" width="96" height="272"/>
-    <rect x="376" y="240" width="272" height="96"/>
-    <rect x="688" y="376" width="96" height="272"/>
-    <rect x="376" y="688" width="272" height="96"/>
+  <defs>
+    <linearGradient id="tileFill" x1="512" y1="72" x2="512" y2="952" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#5D585A"/>
+      <stop offset="0.38" stop-color="#433E40"/>
+      <stop offset="1" stop-color="#2B2628"/>
+    </linearGradient>
+    <linearGradient id="tileHighlight" x1="512" y1="96" x2="512" y2="300" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF" stop-opacity="0.24"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="wellFill" x1="512" y1="390" x2="512" y2="648" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#4C4644"/>
+      <stop offset="0.34" stop-color="#312C2B"/>
+      <stop offset="1" stop-color="#171516"/>
+    </linearGradient>
+    <linearGradient id="markFill" x1="512" y1="260" x2="512" y2="764" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FAF6F6"/>
+      <stop offset="1" stop-color="#D7D0D0"/>
+    </linearGradient>
+  </defs>
+  <rect x="72" y="72" width="880" height="880" rx="232" fill="url(#tileFill)"/>
+  <rect x="72" y="72" width="880" height="880" rx="232" stroke="#6F696A" stroke-width="8"/>
+  <path d="M156 112H868C895.614 112 918 134.386 918 162V212C918 239.614 895.614 262 868 262H156C128.386 262 106 239.614 106 212V162C106 134.386 128.386 112 156 112Z" fill="url(#tileHighlight)"/>
+  <path d="M158 786H866C897.48 786 923 811.52 923 843V878C923 909.48 897.48 935 866 935H158C126.52 935 101 909.48 101 878V843C101 811.52 126.52 786 158 786Z" fill="#181516" fill-opacity="0.28"/>
+  <g opacity="0.24" fill="#3A3435">
+    <rect x="260" y="402" width="92" height="260"/>
+    <rect x="402" y="260" width="260" height="92"/>
+    <rect x="672" y="402" width="92" height="260"/>
+    <rect x="402" y="672" width="260" height="92"/>
+  </g>
+  <rect x="390" y="390" width="244" height="244" fill="url(#wellFill)"/>
+  <rect x="390" y="390" width="244" height="244" stroke="#6A6263" stroke-opacity="0.38" stroke-width="6"/>
+  <g fill="url(#markFill)">
+    <rect x="240" y="376" width="92" height="260"/>
+    <rect x="376" y="240" width="260" height="92"/>
+    <rect x="692" y="376" width="92" height="260"/>
+    <rect x="376" y="692" width="260" height="92"/>
   </g>
 </svg>

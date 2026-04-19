@@ -616,12 +616,17 @@ def _should_wrap_pcm_as_wav(
         return False
     if not output_path.exists() or output_path.stat().st_size == 0:
         return False
-    normalized_content_type = content_type.lower()
+    normalized_content_type = content_type.lower().split(";", 1)[0].strip()
+    if not normalized_content_type:
+        return True
     return normalized_content_type in {
         "audio/wav",
         "audio/wave",
         "audio/x-wav",
         "audio/pcm",
+        "audio/mp3",
+        "audio/mpeg",
+        "application/octet-stream",
     }
 
 
@@ -652,9 +657,31 @@ def _detect_audio_format(output_path: Path) -> str | None:
         return "wav"
     if header.startswith(b"ID3"):
         return "mp3"
-    if len(header) >= 2 and header[0] == 0xFF and (header[1] & 0xE0) == 0xE0:
+    if _looks_like_mp3_frame_header(header):
         return "mp3"
     return None
+
+
+def _looks_like_mp3_frame_header(header: bytes) -> bool:
+    if len(header) < 4:
+        return False
+    if header[0] != 0xFF or (header[1] & 0xE0) != 0xE0:
+        return False
+
+    version_bits = (header[1] >> 3) & 0x03
+    layer_bits = (header[1] >> 1) & 0x03
+    bitrate_index = (header[2] >> 4) & 0x0F
+    sample_rate_index = (header[2] >> 2) & 0x03
+
+    if version_bits == 0x01:
+        return False
+    if layer_bits == 0x00:
+        return False
+    if bitrate_index in {0x00, 0x0F}:
+        return False
+    if sample_rate_index == 0x03:
+        return False
+    return True
 
 
 def _convert_audio_to_wav(output_path: Path) -> Path | None:

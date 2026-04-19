@@ -107,6 +107,15 @@ class SpeechProviderFormatTests(unittest.TestCase):
             self.assertEqual(_detect_audio_format(wav_path), "wav")
             self.assertEqual(_detect_audio_format(mp3_path), "mp3")
 
+    def test_detect_audio_format_does_not_misclassify_pcm_as_mp3(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            pcm_path = Path(temp_dir) / "reply.wav"
+            pcm_path.write_bytes(
+                b"\xff\xff\xf1\xff\xed\xff\xee\xff" + ((b"\x00\x00\x01\x00") * 64)
+            )
+
+            self.assertIsNone(_detect_audio_format(pcm_path))
+
     def test_normalize_synthesized_audio_renames_mismatched_mp3_when_wav_conversion_unavailable(
         self,
     ) -> None:
@@ -135,6 +144,20 @@ class SpeechProviderFormatTests(unittest.TestCase):
                 "wav",
                 content_type="audio/wav",
             )
+
+            self.assertEqual(normalized_path, output_path)
+            self.assertEqual(_detect_audio_format(normalized_path), "wav")
+
+    def test_normalize_synthesized_audio_wraps_unknown_pcm_when_wav_requested(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_path = Path(temp_dir) / "reply.wav"
+            output_path.write_bytes(
+                b"\xff\xff\xf1\xff\xed\xff\xee\xff" + ((b"\x00\x00\x01\x00") * 64)
+            )
+
+            normalized_path = _normalize_synthesized_audio(output_path, "wav")
 
             self.assertEqual(normalized_path, output_path)
             self.assertEqual(_detect_audio_format(normalized_path), "wav")

@@ -45,8 +45,10 @@ class TrayIconController(QObject):
         "listening": 420,
         "processing": 560,
         "speaking": 420,
+        "ready": 420,
     }
     _ERROR_FLASH_MS = 1400
+    _READY_FLASH_MS = 520
 
     def __init__(self, tray: QSystemTrayIcon, app: QApplication) -> None:
         super().__init__(tray)
@@ -58,6 +60,10 @@ class TrayIconController(QObject):
 
         self._animation_timer = QTimer(self)
         self._animation_timer.timeout.connect(self._advance_frame)
+
+        self._ready_timer = QTimer(self)
+        self._ready_timer.setSingleShot(True)
+        self._ready_timer.timeout.connect(self._clear_ready_override)
 
         self._error_timer = QTimer(self)
         self._error_timer.setSingleShot(True)
@@ -71,24 +77,52 @@ class TrayIconController(QObject):
         normalized_state = _normalize_tray_state(state)
         if normalized_state == self._base_state and self._override_state is None:
             return
+        previous_state = self._base_state
         self._base_state = normalized_state
+
+        if self._override_state == "ready" and normalized_state != "listening":
+            self._clear_ready_override()
+
+        if previous_state == "speaking" and normalized_state == "listening":
+            self._start_ready_override()
+            return
+
         if self._override_state is None:
             self._frame = 0
             self._refresh_animation()
             self._apply_icon()
 
     def flash_error(self) -> None:
+        self._ready_timer.stop()
         self._override_state = "error"
         self._frame = 0
         self._animation_timer.stop()
         self._apply_icon()
         self._error_timer.start(self._ERROR_FLASH_MS)
 
+    def _start_ready_override(self) -> None:
+        self._override_state = "ready"
+        self._frame = 0
+        self._refresh_animation()
+        self._apply_icon()
+        self._ready_timer.start(self._READY_FLASH_MS)
+
+    def _clear_ready_override(self) -> None:
+        if self._override_state != "ready":
+            self._ready_timer.stop()
+            return
+        self._ready_timer.stop()
+        self._override_state = None
+        self._frame = 0
+        self._refresh_animation()
+        self._apply_icon()
+
     def _advance_frame(self) -> None:
         self._frame = 1 - self._frame
         self._apply_icon()
 
     def _clear_override(self) -> None:
+        self._ready_timer.stop()
         self._override_state = None
         self._frame = 0
         self._refresh_animation()
@@ -426,7 +460,7 @@ def _tray_icon_color(color_scheme: Qt.ColorScheme | None) -> str:
 
 
 def _normalize_tray_state(state: str) -> str:
-    if state in {"listening", "processing", "speaking"}:
+    if state in {"listening", "processing", "speaking", "ready"}:
         return state
     if state == "error":
         return state
@@ -445,6 +479,8 @@ def _tray_segment_opacities(state: str, frame: int) -> tuple[float, float, float
         return completed_alpha, pulse_alpha, inactive_alpha, inactive_alpha
     if state == "speaking":
         return completed_alpha, completed_alpha, pulse_alpha, inactive_alpha
+    if state == "ready":
+        return completed_alpha, completed_alpha, completed_alpha, pulse_alpha
     if state == "error":
         return 1.0, 1.0, 1.0, 1.0
     return idle_alpha, idle_alpha, idle_alpha, idle_alpha
@@ -486,13 +522,13 @@ def _create_fallback_app_icon() -> QIcon:
 
     painter = QPainter(pixmap)
     painter.setRenderHint(QPainter.Antialiasing)
-    painter.setPen(QColor("#4B4646"))
-    painter.setBrush(QColor("#211E1E"))
+    painter.setPen(QColor("#6F696A"))
+    painter.setBrush(QColor("#433E40"))
     painter.drawRoundedRect(16, 16, 224, 224, 62, 62)
     _paint_square_frame_symbol(
         painter,
         256,
-        foreground=QColor("#F2EFEB"),
+        foreground=QColor("#F1ECEC"),
         segment_opacities=(1.0, 1.0, 1.0, 1.0),
     )
     painter.end()
