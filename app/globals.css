@@ -890,8 +890,8 @@ textarea.control::-webkit-scrollbar-thumb {
 }
 
 .stepper-button svg {
-  width: 9px;
-  height: 9px;
+  width: 12.5px;
+  height: 12.5px;
 }
 
 .stepper-button:hover {
