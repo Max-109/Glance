@@ -1,14 +1,19 @@
 :root {
   color-scheme: dark;
   font-family:
-    ui-rounded,
-    "SF Pro Rounded",
+    ui-sans-serif,
+    system-ui,
     -apple-system,
     BlinkMacSystemFont,
-    "SF Pro Text",
     "Segoe UI",
     sans-serif;
-  --font-mono: "IBM Plex Mono", "SF Mono", Menlo, Consolas, monospace;
+  --font-mono:
+    ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    Monaco,
+    Consolas,
+    monospace;
 }
 
 * {
@@ -31,11 +36,10 @@ body {
   -webkit-user-select: none;
   user-select: none;
   --font-body:
-    ui-rounded,
-    "SF Pro Rounded",
+    ui-sans-serif,
+    system-ui,
     -apple-system,
     BlinkMacSystemFont,
-    "SF Pro Text",
     "Segoe UI",
     sans-serif;
   font-family: var(--font-body);
@@ -983,12 +987,12 @@ textarea.control::-webkit-scrollbar-thumb {
 
 .accent-picker__detail {
   display: grid;
-  grid-template-columns: minmax(180px, 220px) minmax(320px, 560px);
+  grid-template-columns: 148px;
   justify-content: start;
-  gap: 12px;
+  gap: 0;
+  max-width: 100%;
 }
 
-.accent-preview,
 .accent-hex input,
 .accent-plane,
 .accent-hue {
@@ -999,51 +1003,16 @@ textarea.control::-webkit-scrollbar-thumb {
   color: var(--text-strong);
 }
 
-.accent-preview {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: center;
-  gap: 12px;
-  padding: 14px;
-}
-
-.accent-preview__chip {
-  width: 34px;
-  height: 34px;
-  border-radius: 13px;
-  box-shadow:
-    inset 0 0 0 1px rgba(255, 255, 255, 0.3),
-    0 0 28px color-mix(in srgb, var(--accent) 32%, transparent);
-}
-
-.accent-preview__copy {
-  display: grid;
-  gap: 4px;
-}
-
-.accent-preview__label {
-  font-size: 0.8rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.accent-preview__value {
-  color: var(--text-muted);
-  font-family: var(--font-mono);
-  font-size: 0.76rem;
-  letter-spacing: 0.04em;
-}
-
 .accent-tuner {
   display: grid;
-  gap: 10px;
-  width: min(100%, 560px);
+  gap: 8px;
+  justify-self: start;
+  width: 148px;
 }
 
 .accent-plane {
   position: relative;
-  min-height: 104px;
+  min-height: 118px;
   overflow: hidden;
   border-color: var(--accent-border);
   background:
@@ -1061,8 +1030,8 @@ textarea.control::-webkit-scrollbar-thumb {
 }
 
 .accent-plane__handle {
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
   border: 2px solid rgba(255, 255, 255, 0.96);
   box-shadow:
     0 0 0 3px rgba(0, 0, 0, 0.24),
@@ -1092,8 +1061,8 @@ textarea.control::-webkit-scrollbar-thumb {
 
 .accent-hue__handle {
   top: 50%;
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
   border: 2px solid rgba(255, 255, 255, 0.96);
   background: rgba(10, 10, 11, 0.75);
   box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.22);
@@ -1103,15 +1072,14 @@ textarea.control::-webkit-scrollbar-thumb {
 .accent-hex input {
   width: 100%;
   height: 100%;
-  padding: 0 14px;
+  padding: 0 12px;
   font-family: var(--font-mono);
-  font-size: 0.82rem;
+  font-size: 0.78rem;
   font-weight: 600;
 }
 
 .accent-hex {
-  grid-column: 1 / -1;
-  width: min(220px, 100%);
+  width: 100%;
 }
 
 .shortcut-list {

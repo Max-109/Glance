@@ -274,7 +274,6 @@ export function SettingsShell() {
   const [bridgeError, setBridgeError] = useState("");
   const [thresholdDraft, setThresholdDraft] = useState<number | null>(null);
   const thresholdCommitRef = useRef(0);
-  const skipLinkRef = useRef<HTMLAnchorElement | null>(null);
   const workspaceRef = useRef<HTMLElement | null>(null);
   const scrollViewportRef = useRef<HTMLDivElement | null>(null);
 
@@ -330,40 +329,6 @@ export function SettingsShell() {
   useEffect(() => {
     void refreshState();
   }, [refreshState]);
-
-  const focusWorkspaceViewport = useEffectEvent(() => {
-    const viewport = scrollViewportRef.current;
-    if (!viewport) {
-      return;
-    }
-
-    const activeElement = document.activeElement;
-    const shouldMoveFocus =
-      activeElement === null ||
-      activeElement === document.body ||
-      activeElement === document.documentElement ||
-      activeElement === skipLinkRef.current;
-
-    if (!shouldMoveFocus) {
-      return;
-    }
-
-    viewport.focus({ preventScroll: true });
-  });
-
-  useEffect(() => {
-    const syncFocus = () => {
-      window.requestAnimationFrame(() => {
-        focusWorkspaceViewport();
-      });
-    };
-
-    syncFocus();
-    window.addEventListener("focus", syncFocus);
-    return () => {
-      window.removeEventListener("focus", syncFocus);
-    };
-  }, [focusWorkspaceViewport]);
 
   useEffect(() => {
     if (!liveState.dirty) {
@@ -770,11 +735,7 @@ export function SettingsShell() {
 
   return (
     <main className="desktop-shell" data-theme={resolvedTheme} style={themeStyle}>
-      <a
-        ref={skipLinkRef}
-        className="skip-link"
-        href="#workspace-content"
-      >
+      <a className="skip-link" href="#workspace-content">
         Skip to Content
       </a>
 

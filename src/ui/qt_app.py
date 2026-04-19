@@ -5,12 +5,8 @@ import sys
 import logging
 from pathlib import Path
 
-os.environ.setdefault("QT_QUICK_CONTROLS_STYLE", "Basic")
-
-from PySide6.QtCore import QByteArray, QCoreApplication, QObject, Qt, QTimer, QUrl, Signal
+from PySide6.QtCore import QByteArray, QCoreApplication, QObject, Qt, QTimer, Signal
 from PySide6.QtGui import QAction, QColor, QCursor, QFont, QIcon, QPainter, QPixmap
-from PySide6.QtQml import QQmlApplicationEngine
-from PySide6.QtQuickControls2 import QQuickStyle
 from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import QApplication, QMenu, QSystemTrayIcon
 
@@ -30,12 +26,8 @@ from src.services.providers import (
 from src.services.settings_manager import SettingsManager
 from src.storage.json_storage import JsonHistoryRepository, JsonSettingsStore
 from src.ui.electron_bridge import SettingsBridgeServer
-from src.ui.electron_window import ElectronShellController, ElectronUnavailableError
-from src.ui.qt_icons import IconLibrary
+from src.ui.electron_window import ElectronShellController
 from src.ui.settings_viewmodel import SettingsViewModel
-
-
-QQuickStyle.setStyle("Basic")
 
 
 class LiveStatusBridge(QObject):
@@ -185,18 +177,13 @@ def run_settings_app() -> int:
         history_manager,
         audio_dir=paths.audio_dir,
     )
-    icon_library = IconLibrary()
     settings_bridge = SettingsBridgeServer(controller)
     live_controller = _build_live_controller(
         settings_manager=settings_manager,
         history_manager=history_manager,
         paths=paths,
     )
-    settings_window, qml_engine = _build_settings_window(
-        app=app,
-        controller=controller,
-        icon_library=icon_library,
-        app_icon=app_icon,
+    settings_window = _build_settings_window(
         bridge_url=settings_bridge.url,
         logger=logger,
     )
@@ -268,7 +255,7 @@ def run_settings_app() -> int:
 
     def restore_hotkeys_if_pending() -> None:
         nonlocal pending_hotkey_refresh
-        if not pending_hotkey_refresh or root_window.isVisible():
+        if not pending_hotkey_refresh or settings_window.isVisible():
             return
         pending_hotkey_refresh = False
         logger.info("Settings window hidden; scheduling hotkey refresh")
@@ -307,59 +294,21 @@ def _env_flag_enabled(name: str) -> bool:
 
 def _build_settings_window(
     *,
-    app: QApplication,
-    controller: SettingsViewModel,
-    icon_library: IconLibrary,
-    app_icon: QIcon,
     bridge_url: str,
     logger: logging.Logger,
 ):
-    del app
-    try:
-        window = ElectronShellController(
-            project_root=Path(__file__).resolve().parents[2],
-            bridge_url=bridge_url,
-            logger=logger,
-        )
-        logger.info("Using Electron settings shell.")
-        return window, None
-    except ElectronUnavailableError as exc:
-        logger.warning("Electron shell unavailable, falling back to QML: %s", exc)
-        return _build_qml_settings_window(
-            controller=controller,
-            icon_library=icon_library,
-            app_icon=app_icon,
-        )
-
-
-def _build_qml_settings_window(
-    *,
-    controller: SettingsViewModel,
-    icon_library: IconLibrary,
-    app_icon: QIcon,
-):
-    qml_dir = Path(__file__).resolve().parent / "qml"
-    engine = QQmlApplicationEngine()
-    engine.setInitialProperties(
-        {
-            "settingsController": controller,
-            "iconLibrary": icon_library,
-        }
+    window = ElectronShellController(
+        project_root=Path(__file__).resolve().parents[2],
+        bridge_url=bridge_url,
+        logger=logger,
     )
-    engine.load(QUrl.fromLocalFile(str(qml_dir / "Main.qml")))
-
-    if not engine.rootObjects():
-        raise RuntimeError("Could not load the QML settings interface.")
-
-    root_window = engine.rootObjects()[0]
-    if not app_icon.isNull():
-        root_window.setIcon(app_icon)
-    return root_window, engine
+    logger.info("Using Electron settings shell.")
+    return window
 
 
 def _build_tray_icon(
     app,
-    root_window,
+    settings_window,
     controller: SettingsViewModel,
     live_controller: LiveSessionController,
     settings_bridge: SettingsBridgeServer,
@@ -376,7 +325,9 @@ def _build_tray_icon(
     menu.setFont(QFont("SF Pro Text", 13))
 
     show_action = QAction("Open Glance", menu)
-    show_action.triggered.connect(lambda: _toggle_window(root_window, force_show=True))
+    show_action.triggered.connect(
+        lambda: _toggle_window(settings_window, force_show=True)
+    )
     menu.addAction(show_action)
 
     menu.addSeparator()
@@ -434,25 +385,25 @@ def _build_tray_icon(
 
     def on_activated(reason) -> None:
         if reason == QSystemTrayIcon.Trigger:
-            _toggle_window(root_window)
+            _toggle_window(settings_window)
 
     tray.activated.connect(on_activated)
     return tray
 
 
-def _toggle_window(root_window, force_show: bool = False) -> None:
-    if root_window.isVisible() and not force_show:
-        root_window.hide()
+def _toggle_window(settings_window, force_show: bool = False) -> None:
+    if settings_window.isVisible() and not force_show:
+        settings_window.hide()
         return
 
     cursor_pos = QCursor.pos()
-    width = int(root_window.width())
-    height = int(root_window.height())
-    root_window.setX(cursor_pos.x() - width + 24)
-    root_window.setY(cursor_pos.y() + 18)
-    root_window.show()
-    root_window.raise_()
-    root_window.requestActivate()
+    width = int(settings_window.width())
+    height = int(settings_window.height())
+    settings_window.setX(cursor_pos.x() - width + 24)
+    settings_window.setY(cursor_pos.y() + 18)
+    settings_window.show()
+    settings_window.raise_()
+    settings_window.requestActivate()
 
 
 def _create_tray_icon(

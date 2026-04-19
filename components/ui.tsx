@@ -731,8 +731,12 @@ export function AccentPicker({
   onChange: (nextValue: string) => void;
 }) {
   const normalizedValue = normalizeHexColor(value) || "#a7ffde";
+  const initialPreset = presets.find(
+    (preset) => preset.value.toLowerCase() === normalizedValue,
+  );
   const [previewHex, setPreviewHex] = useState(normalizedValue);
   const [draftHex, setDraftHex] = useState(normalizedValue.toUpperCase());
+  const [showCustomControls, setShowCustomControls] = useState(!initialPreset);
   const planeRef = useRef<HTMLDivElement | null>(null);
   const hueRef = useRef<HTMLDivElement | null>(null);
   const hexInputRef = useRef<HTMLInputElement | null>(null);
@@ -741,6 +745,9 @@ export function AccentPicker({
   useEffect(() => {
     setPreviewHex(normalizedValue);
     setDraftHex(normalizedValue.toUpperCase());
+    setShowCustomControls(
+      !presets.some((preset) => preset.value.toLowerCase() === normalizedValue),
+    );
   }, [normalizedValue]);
 
   useEffect(() => {
@@ -833,9 +840,12 @@ export function AccentPicker({
         <button
           type="button"
           role="radio"
-          aria-checked={!currentPreset}
-          className={`accent-swatch accent-swatch--custom${!currentPreset ? " is-active" : ""}`}
-          onClick={() => hexInputRef.current?.focus()}
+          aria-checked={showCustomControls}
+          className={`accent-swatch accent-swatch--custom${showCustomControls ? " is-active" : ""}`}
+          onClick={() => {
+            setShowCustomControls(true);
+            window.requestAnimationFrame(() => hexInputRef.current?.focus());
+          }}
         >
           <span
             className="accent-swatch__dot"
@@ -844,7 +854,7 @@ export function AccentPicker({
           <span>Custom</span>
         </button>
         {presets.map((preset) => {
-          const selected = currentPreset?.value === preset.value;
+          const selected = !showCustomControls && currentPreset?.value === preset.value;
           return (
             <button
               key={preset.value}
@@ -852,7 +862,10 @@ export function AccentPicker({
               role="radio"
               aria-checked={selected}
               className={`accent-swatch${selected ? " is-active" : ""}`}
-              onClick={() => applyPreview(preset.value, true)}
+              onClick={() => {
+                setShowCustomControls(false);
+                applyPreview(preset.value, true);
+              }}
             >
               <span
                 className="accent-swatch__dot"
@@ -864,80 +877,71 @@ export function AccentPicker({
         })}
       </div>
 
-      <div className="accent-picker__detail">
-        <div className="accent-preview" aria-label="Current accent color">
-          <span
-            className="accent-preview__chip"
-            style={{ backgroundColor: previewHex }}
-          />
-          <span className="accent-preview__copy">
-            <span className="accent-preview__label">Accent Studio</span>
-            <span className="accent-preview__value">{previewHex.toUpperCase()}</span>
-          </span>
-        </div>
+      {showCustomControls ? (
+        <div className="accent-picker__detail">
+          <div className="accent-tuner">
+            <div
+              ref={planeRef}
+              className="accent-plane"
+              style={{ "--accent-hue": `${currentHsl.h}deg` } as CSSProperties}
+              onPointerDown={(event) => startPointerDrag(event, updateFromPlane)}
+            >
+              <span
+                className="accent-plane__handle"
+                style={{
+                  left: `clamp(12px, ${currentHsl.s}%, calc(100% - 12px))`,
+                  top: `clamp(12px, ${planeRatioFromLightness(currentHsl.l) * 100}%, calc(100% - 12px))`,
+                }}
+              />
+            </div>
 
-        <div className="accent-tuner">
-          <div
-            ref={planeRef}
-            className="accent-plane"
-            style={{ "--accent-hue": `${currentHsl.h}deg` } as CSSProperties}
-            onPointerDown={(event) => startPointerDrag(event, updateFromPlane)}
-          >
-            <span
-              className="accent-plane__handle"
-              style={{
-                left: `${currentHsl.s}%`,
-                top: `${planeRatioFromLightness(currentHsl.l) * 100}%`,
-              }}
-            />
+            <div
+              ref={hueRef}
+              className="accent-hue"
+              onPointerDown={startHueDrag}
+            >
+              <span
+                className="accent-hue__handle"
+                style={{ left: `clamp(10px, ${(currentHsl.h / 360) * 100}%, calc(100% - 10px))` }}
+              />
+            </div>
+
+            <label className="accent-hex">
+              <span className="sr-only">Accent hex color</span>
+              <input
+                ref={hexInputRef}
+                type="text"
+                inputMode="text"
+                autoComplete="off"
+                spellCheck={false}
+                value={draftHex}
+                aria-label="Accent hex color"
+                onChange={(event) => setDraftHex(event.currentTarget.value.toUpperCase())}
+                onKeyDown={(event) => {
+                  if (event.key !== "Enter") {
+                    return;
+                  }
+                  event.preventDefault();
+                  const nextValue = normalizeHexColor(draftHex);
+                  if (nextValue) {
+                    applyPreview(nextValue, true);
+                    event.currentTarget.blur();
+                  }
+                }}
+                onBlur={() => {
+                  const nextValue = normalizeHexColor(draftHex);
+                  if (nextValue) {
+                    applyPreview(nextValue, true);
+                  } else {
+                    setPreviewHex(normalizedValue);
+                    setDraftHex(normalizedValue.toUpperCase());
+                  }
+                }}
+              />
+            </label>
           </div>
-
-          <div
-            ref={hueRef}
-            className="accent-hue"
-            onPointerDown={startHueDrag}
-          >
-            <span
-              className="accent-hue__handle"
-              style={{ left: `${(currentHsl.h / 360) * 100}%` }}
-            />
-          </div>
         </div>
-
-        <label className="accent-hex">
-          <span className="sr-only">Accent hex color</span>
-          <input
-            ref={hexInputRef}
-            type="text"
-            inputMode="text"
-            autoComplete="off"
-            spellCheck={false}
-            value={draftHex}
-            aria-label="Accent hex color"
-            onChange={(event) => setDraftHex(event.currentTarget.value.toUpperCase())}
-            onKeyDown={(event) => {
-              if (event.key !== "Enter") {
-                return;
-              }
-              event.preventDefault();
-              const nextValue = normalizeHexColor(draftHex);
-              if (nextValue) {
-                applyPreview(nextValue, true);
-                event.currentTarget.blur();
-              }
-            }}
-            onBlur={() => {
-              const nextValue = normalizeHexColor(draftHex);
-              if (nextValue) {
-                applyPreview(nextValue, true);
-              } else {
-                setPreviewHex(normalizedValue);
-                setDraftHex(normalizedValue.toUpperCase());
-              }
-            }}
-          />
-        </label>
-      </div>
+      ) : null}
     </div>
   );
 }
