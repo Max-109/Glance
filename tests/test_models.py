@@ -2,7 +2,11 @@ import unittest
 
 from src.exceptions.app_exceptions import ValidationError
 from src.models.interactions import QuickInteraction, SessionRecord
-from src.models.settings import AppSettings, DEFAULT_TTS_VOICE
+from src.models.settings import (
+    AppSettings,
+    DEFAULT_ACCENT_COLOR,
+    DEFAULT_TTS_VOICE,
+)
 
 
 class AppSettingsTests(unittest.TestCase):
@@ -119,6 +123,31 @@ class AppSettingsTests(unittest.TestCase):
         )
 
         self.assertEqual(settings.llm_reasoning, "minimal")
+
+    def test_from_mapping_coerces_reasoning_toggle_and_accent_color(self) -> None:
+        settings = AppSettings.from_mapping(
+            {
+                "llm_base_url": "https://api.example.com/v1",
+                "llm_model_name": "model-a",
+                "tts_base_url": "https://tts.example.com/v1",
+                "llm_reasoning_enabled": "false",
+                "accent_color": "A7FFDE",
+            }
+        )
+
+        self.assertFalse(settings.llm_reasoning_enabled)
+        self.assertEqual(settings.accent_color, DEFAULT_ACCENT_COLOR)
+
+    def test_validate_rejects_invalid_accent_color(self) -> None:
+        with self.assertRaises(ValidationError):
+            AppSettings.from_mapping(
+                {
+                    "llm_base_url": "https://api.example.com/v1",
+                    "llm_model_name": "model-a",
+                    "tts_base_url": "https://tts.example.com/v1",
+                    "accent_color": "#12zz34",
+                }
+            )
 
 
 class SessionRecordTests(unittest.TestCase):

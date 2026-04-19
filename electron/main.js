@@ -2,10 +2,11 @@ const path = require("node:path");
 const fs = require("node:fs");
 const http = require("node:http");
 const { app, BrowserWindow, ipcMain, nativeTheme } = require("electron");
+const { revealWindow } = require("./window-control");
 
-const DEFAULT_WIDTH = Number.parseInt(process.env.GLANCE_WINDOW_WIDTH || "700", 10);
+const DEFAULT_WIDTH = Number.parseInt(process.env.GLANCE_WINDOW_WIDTH || "924", 10);
 const DEFAULT_HEIGHT = Number.parseInt(
-  process.env.GLANCE_WINDOW_HEIGHT || "560",
+  process.env.GLANCE_WINDOW_HEIGHT || "741",
   10,
 );
 const NEXT_DEV_URL = process.env.GLANCE_NEXT_DEV_URL || "";
@@ -231,13 +232,11 @@ function handleCommand(payload) {
   const window = ensureWindow();
 
   if (command === "show") {
-    applyBounds(window, payload.bounds);
-    if (!window.isVisible()) {
-      window.show();
-    }
-    if (payload.focus) {
-      window.focus();
-    }
+    revealWindow(app, window, {
+      applyBounds,
+      bounds: payload.bounds,
+      focus: Boolean(payload.focus),
+    });
     return;
   }
 
@@ -247,10 +246,7 @@ function handleCommand(payload) {
   }
 
   if (command === "focus") {
-    if (!window.isVisible()) {
-      window.show();
-    }
-    window.focus();
+    revealWindow(app, window, { focus: true });
     return;
   }
 
@@ -287,10 +283,7 @@ ipcMain.handle("glance:window-control", async (_event, action) => {
     return { ok: true };
   }
   if (action === "focus") {
-    if (!window.isVisible()) {
-      window.show();
-    }
-    window.focus();
+    revealWindow(app, window, { focus: true });
     return { ok: true };
   }
   return { ok: false };

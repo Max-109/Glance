@@ -1,14 +1,8 @@
 import type { Metadata } from "next";
-import { IBM_Plex_Mono, Manrope } from "next/font/google";
+import { IBM_Plex_Mono } from "next/font/google";
 import type { ReactNode } from "react";
 
 import "./globals.css";
-
-const bodyFont = Manrope({
-  subsets: ["latin"],
-  variable: "--font-body",
-  display: "swap",
-});
 
 const monoFont = IBM_Plex_Mono({
   subsets: ["latin"],
@@ -29,7 +23,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${bodyFont.variable} ${monoFont.variable}`}>{children}</body>
+      <body className={monoFont.variable}>{children}</body>
     </html>
   );
 }

@@ -84,7 +84,7 @@ class OpenAICompatibleProvider:
         try:
             response = self._client.chat.completions.create(
                 model=self._settings.llm_model_name,
-                reasoning_effort=self._settings.llm_reasoning,
+                **self._llm_reasoning_kwargs(),
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": content},
@@ -95,7 +95,7 @@ class OpenAICompatibleProvider:
                 "LLM request failed after %.1f ms [model=%s reasoning=%s]",
                 _elapsed_ms(started_at),
                 self._settings.llm_model_name,
-                self._settings.llm_reasoning,
+                self._llm_reasoning_label(),
             )
             raise ProviderError(f"LLM request failed: {exc}") from exc
 
@@ -106,7 +106,7 @@ class OpenAICompatibleProvider:
             "LLM reply completed in %.1f ms [model=%s reasoning=%s usage=%s output=%s]",
             _elapsed_ms(started_at),
             self._settings.llm_model_name,
-            self._settings.llm_reasoning,
+            self._llm_reasoning_label(),
             _format_usage(response),
             _preview_text(text),
         )
@@ -122,7 +122,7 @@ class OpenAICompatibleProvider:
         try:
             response = self._client.chat.completions.create(
                 model=self._settings.llm_model_name,
-                reasoning_effort=self._settings.llm_reasoning,
+                **self._llm_reasoning_kwargs(),
                 messages=self._build_live_speech_messages(
                     transcript=transcript,
                     conversation_history=conversation_history,
@@ -133,7 +133,7 @@ class OpenAICompatibleProvider:
                 "Live reply request failed after %.1f ms [model=%s reasoning=%s]",
                 _elapsed_ms(started_at),
                 self._settings.llm_model_name,
-                self._settings.llm_reasoning,
+                self._llm_reasoning_label(),
             )
             raise ProviderError(f"Live reply request failed: {exc}") from exc
 
@@ -145,7 +145,7 @@ class OpenAICompatibleProvider:
             "LLM reply completed in %.1f ms [model=%s reasoning=%s usage=%s voice=%s output=%s]",
             _elapsed_ms(started_at),
             self._settings.llm_model_name,
-            self._settings.llm_reasoning,
+            self._llm_reasoning_label(),
             _format_usage(response),
             get_tts_voice_label(live_reply.voice_id),
             _preview_text(live_reply.text),
@@ -177,7 +177,7 @@ class OpenAICompatibleProvider:
         try:
             response = self._client.chat.completions.create(
                 model=self._settings.llm_model_name,
-                reasoning_effort=self._settings.llm_reasoning,
+                **self._llm_reasoning_kwargs(),
                 messages=[
                     {
                         "role": "system",
@@ -191,7 +191,7 @@ class OpenAICompatibleProvider:
                 "Speech text preparation failed after %.1f ms [model=%s reasoning=%s]",
                 _elapsed_ms(started_at),
                 self._settings.llm_model_name,
-                self._settings.llm_reasoning,
+                self._llm_reasoning_label(),
             )
             raise ProviderError(f"Speech text preparation failed: {exc}") from exc
 
@@ -203,12 +203,22 @@ class OpenAICompatibleProvider:
             "Speech text preparation completed in %.1f ms [model=%s reasoning=%s usage=%s voice=%s output=%s]",
             _elapsed_ms(started_at),
             self._settings.llm_model_name,
-            self._settings.llm_reasoning,
+            self._llm_reasoning_label(),
             _format_usage(response),
             get_tts_voice_label(prepared_reply.voice_id),
             _preview_text(prepared_reply.text),
         )
         return prepared_reply
+
+    def _llm_reasoning_kwargs(self) -> dict[str, str]:
+        if not self._settings.llm_reasoning_enabled:
+            return {}
+        return {"reasoning_effort": self._settings.llm_reasoning}
+
+    def _llm_reasoning_label(self) -> str:
+        if not self._settings.llm_reasoning_enabled:
+            return "off"
+        return self._settings.llm_reasoning
 
     def _build_system_prompt(self, match_user_language: bool) -> str:
         prompt = (
@@ -436,7 +446,7 @@ class NagaTranscriptionProvider:
                 audio_format = path.suffix.lower().lstrip(".") or "wav"
                 response = self._client.chat.completions.create(
                     model=self._settings.transcription_model_name,
-                    reasoning_effort=self._settings.transcription_reasoning,
+                    **self._transcription_reasoning_kwargs(),
                     messages=[
                         {
                             "role": "system",
@@ -467,7 +477,7 @@ class NagaTranscriptionProvider:
                 "Transcription request failed after %.1f ms [model=%s reasoning=%s]",
                 _elapsed_ms(started_at),
                 self._settings.transcription_model_name,
-                self._settings.transcription_reasoning,
+                self._transcription_reasoning_label(),
             )
             raise ProviderError(f"Transcription request failed: {exc}") from exc
 
@@ -481,11 +491,21 @@ class NagaTranscriptionProvider:
             "Transcription completed in %.1f ms [model=%s reasoning=%s usage=%s output=%s]",
             _elapsed_ms(started_at),
             self._settings.transcription_model_name,
-            self._settings.transcription_reasoning,
+            self._transcription_reasoning_label(),
             _format_usage(response),
             _preview_text(text),
         )
         return text.strip()
+
+    def _transcription_reasoning_kwargs(self) -> dict[str, str]:
+        if not self._settings.transcription_reasoning_enabled:
+            return {}
+        return {"reasoning_effort": self._settings.transcription_reasoning}
+
+    def _transcription_reasoning_label(self) -> str:
+        if not self._settings.transcription_reasoning_enabled:
+            return "off"
+        return self._settings.transcription_reasoning
 
     def _uses_transcriptions_api(self) -> bool:
         return self._settings.transcription_model_name.startswith("whisper")

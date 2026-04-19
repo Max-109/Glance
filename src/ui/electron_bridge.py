@@ -70,6 +70,7 @@ def _build_state_snapshot(viewmodel: SettingsViewModel) -> dict[str, Any]:
         "voiceOptions": viewmodel.voiceOptions,
         "voiceOptionLabels": viewmodel.voiceOptionLabels,
         "languageOptions": viewmodel.languageOptions,
+        "historyPreview": viewmodel.buildHistoryPreview(),
     }
 
 

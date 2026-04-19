@@ -7,10 +7,12 @@ ENV_KEY_MAP = {
     "LLM_BASE_URL": "llm_base_url",
     "LLM_API_KEY": "llm_api_key",
     "LLM_MODEL": "llm_model_name",
+    "LLM_REASONING_ENABLED": "llm_reasoning_enabled",
     "LLM_REASONING": "llm_reasoning",
     "TRANSCRIPTION_BASE_URL": "transcription_base_url",
     "TRANSCRIPTION_API_KEY": "transcription_api_key",
     "TRANSCRIPTION_MODEL": "transcription_model_name",
+    "TRANSCRIPTION_REASONING_ENABLED": "transcription_reasoning_enabled",
     "TRANSCRIPTION_REASONING": "transcription_reasoning",
     "TTS_BASE_URL": "tts_base_url",
     "TTS_API_KEY": "tts_api_key",
@@ -21,6 +23,7 @@ ENV_KEY_MAP = {
     "SCREENSHOT_INTERVAL": "screenshot_interval",
     "SCREEN_CHANGE_THRESHOLD": "screen_change_threshold",
     "BATCH_WINDOW_DURATION": "batch_window_duration",
+    "ACCENT_COLOR": "accent_color",
 }
 
 

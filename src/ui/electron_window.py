@@ -62,8 +62,8 @@ class ElectronShellController(QObject):
         self._visible = False
         self._x = 120
         self._y = 48
-        self._width = 700
-        self._height = 560
+        self._width = 924
+        self._height = 741
         self._process: subprocess.Popen[str] | None = None
         self._stdin_lock = Lock()
         self._processEventReceived.connect(self._apply_process_event)

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
+import re
 
 from src.exceptions.app_exceptions import ValidationError
 from src.services.keybinds import keybinds_are_unique, normalize_keybind
@@ -78,6 +79,8 @@ ELEVEN_V3_VOICE_LABELS = {
 DEFAULT_FIXED_TTS_VOICE = "UgBBYS2sOqTuMpoF3BR0"
 DEFAULT_TTS_VOICE = AUTO_TTS_VOICE_ID
 TTS_VOICE_OPTIONS = [AUTO_TTS_VOICE_ID, *ELEVEN_V3_VOICE_BY_ID.keys()]
+DEFAULT_ACCENT_COLOR = "#a7ffde"
+_HEX_COLOR_PATTERN = re.compile(r"^#[0-9a-f]{6}$")
 
 
 @dataclass
@@ -88,10 +91,12 @@ class AppSettings:
     llm_base_url: str = ""
     llm_api_key: str = ""
     llm_model_name: str = "claude-opus-4.6"
+    llm_reasoning_enabled: bool = True
     llm_reasoning: str = "low"
     transcription_base_url: str = "https://api.naga.ac/v1"
     transcription_api_key: str = ""
     transcription_model_name: str = "whisper-large-v3-turbo"
+    transcription_reasoning_enabled: bool = True
     transcription_reasoning: str = "medium"
     tts_base_url: str = "https://api.naga.ac/v1"
     tts_api_key: str = ""
@@ -111,6 +116,7 @@ class AppSettings:
     audio_preroll_seconds: float = 0.25
     system_prompt_override: str = ""
     theme_preference: str = "dark"
+    accent_color: str = DEFAULT_ACCENT_COLOR
 
     def validate(self) -> None:
         self.live_keybind = normalize_keybind(self.live_keybind)
@@ -163,6 +169,7 @@ class AppSettings:
             raise ValidationError("audio_preroll_seconds must be zero or positive.")
         if self.theme_preference not in {"dark", "light", "system"}:
             raise ValidationError("theme_preference must be dark, light, or system.")
+        self.accent_color = normalize_hex_color(self.accent_color)
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -178,6 +185,9 @@ class AppSettings:
             llm_base_url=data.get("llm_base_url", cls.llm_base_url),
             llm_api_key=data.get("llm_api_key", cls.llm_api_key),
             llm_model_name=data.get("llm_model_name", cls.llm_model_name),
+            llm_reasoning_enabled=coerce_bool(
+                data.get("llm_reasoning_enabled", cls.llm_reasoning_enabled)
+            ),
             llm_reasoning=normalize_llm_reasoning(
                 data.get("llm_reasoning", cls.llm_reasoning)
             ),
@@ -190,8 +200,14 @@ class AppSettings:
             transcription_model_name=data.get(
                 "transcription_model_name", cls.transcription_model_name
             ),
-            transcription_reasoning=data.get(
-                "transcription_reasoning", cls.transcription_reasoning
+            transcription_reasoning_enabled=coerce_bool(
+                data.get(
+                    "transcription_reasoning_enabled",
+                    cls.transcription_reasoning_enabled,
+                )
+            ),
+            transcription_reasoning=normalize_llm_reasoning(
+                data.get("transcription_reasoning", cls.transcription_reasoning)
             ),
             tts_base_url=data.get("tts_base_url", cls.tts_base_url),
             tts_api_key=data.get("tts_api_key", cls.tts_api_key),
@@ -233,6 +249,9 @@ class AppSettings:
                 "system_prompt_override", cls.system_prompt_override
             ),
             theme_preference=data.get("theme_preference", cls.theme_preference),
+            accent_color=normalize_hex_color(
+                data.get("accent_color", cls.accent_color)
+            ),
         )
         if validate:
             settings.validate()
@@ -268,6 +287,28 @@ def normalize_llm_reasoning(value: str) -> str:
     if lowered_value in {"minimal", "low", "medium", "high"}:
         return lowered_value
     return lowered_value
+
+
+def coerce_bool(value: object) -> bool:
+    if isinstance(value, bool):
+        return value
+    lowered_value = str(value).strip().lower()
+    if lowered_value in {"1", "true", "yes", "on"}:
+        return True
+    if lowered_value in {"0", "false", "no", "off", ""}:
+        return False
+    return bool(value)
+
+
+def normalize_hex_color(value: object) -> str:
+    normalized_value = str(value).strip().lower()
+    if not normalized_value:
+        return DEFAULT_ACCENT_COLOR
+    if not normalized_value.startswith("#"):
+        normalized_value = f"#{normalized_value}"
+    if not _HEX_COLOR_PATTERN.match(normalized_value):
+        raise ValidationError("accent_color must be a valid six-digit hex color.")
+    return normalized_value
 
 
 def get_tts_voice(voice_id: str) -> ElevenV3Voice | None:

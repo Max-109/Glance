@@ -24,6 +24,7 @@ from src.services.keybinds import (
     normalize_keybind,
     qt_event_to_keybind,
 )
+from src.models.interactions import QuickInteraction
 from src.models.settings import AppSettings
 
 
@@ -121,21 +122,23 @@ class SettingsViewModelKeybindTests(unittest.TestCase):
             "Already used by Live.",
         )
 
-    def test_capture_keybind_persists_immediately(self) -> None:
+    def test_capture_keybind_stays_dirty_until_save(self) -> None:
         self.viewmodel.startKeybindCapture("quick_keybind")
 
         self.viewmodel.captureKeybind(Qt.Key_K, Qt.AltModifier.value, "k")
 
-        self.assertEqual(self.settings_manager.reload().quick_keybind, "ALT+K")
+        self.assertEqual(self.settings_manager.reload().quick_keybind, "CMD+SHIFT+Q")
+        self.assertTrue(self.viewmodel.dirty)
 
-    def test_assign_keybind_updates_and_persists_shortcut(self) -> None:
+    def test_assign_keybind_updates_without_persisting_shortcut(self) -> None:
         self.viewmodel.startKeybindCapture("quick_keybind")
 
         self.viewmodel.assignKeybind("quick_keybind", "alt+k")
 
         self.assertEqual(self.viewmodel.settings["quick_keybind"], "ALT+K")
-        self.assertEqual(self.settings_manager.reload().quick_keybind, "ALT+K")
+        self.assertEqual(self.settings_manager.reload().quick_keybind, "CMD+SHIFT+Q")
         self.assertFalse(self.viewmodel.bindingActive)
+        self.assertTrue(self.viewmodel.dirty)
 
     def test_assign_keybind_rejects_duplicate_shortcut(self) -> None:
         self.viewmodel.startKeybindCapture("quick_keybind")
@@ -169,21 +172,20 @@ class SettingsViewModelKeybindTests(unittest.TestCase):
         self.assertEqual(self.settings_manager.reload().history_length, 12)
         self.assertEqual(self.viewmodel.errors, {})
 
-    def test_regular_field_autosaves_without_manual_save(self) -> None:
+    def test_regular_field_stays_dirty_until_manual_save(self) -> None:
         self.viewmodel.setField("llm_model_name", "claude-sonnet-4.6")
-        self.viewmodel._apply_autosave()
 
         self.assertEqual(
             self.settings_manager.reload().llm_model_name,
-            "claude-sonnet-4.6",
+            "claude-opus-4.6",
         )
-        self.assertFalse(self.viewmodel.dirty)
+        self.assertTrue(self.viewmodel.dirty)
 
-    def test_invalid_autosave_keeps_last_valid_config(self) -> None:
+    def test_invalid_save_keeps_last_valid_config(self) -> None:
         original_threshold = self.settings_manager.reload().screen_change_threshold
 
         self.viewmodel.setField("screen_change_threshold", "1.2")
-        self.viewmodel._apply_autosave()
+        self.viewmodel.save()
 
         self.assertEqual(
             self.settings_manager.reload().screen_change_threshold,
@@ -195,14 +197,36 @@ class SettingsViewModelKeybindTests(unittest.TestCase):
         )
         self.assertTrue(self.viewmodel.dirty)
 
-    def test_audio_fields_autosave_without_manual_save(self) -> None:
+    def test_audio_fields_stay_dirty_until_manual_save(self) -> None:
         self.viewmodel.setField("audio_activation_threshold", "0.08")
-        self.viewmodel._apply_autosave()
 
         self.assertEqual(
-            self.settings_manager.reload().audio_activation_threshold, 0.08
+            self.settings_manager.reload().audio_activation_threshold, 0.02
         )
-        self.assertFalse(self.viewmodel.dirty)
+        self.assertTrue(self.viewmodel.dirty)
+
+    def test_build_history_preview_uses_latest_interaction_summary_and_answer(self) -> None:
+        session = self.viewmodel._history_manager.start_session("quick")
+        self.viewmodel._history_manager.save_interaction(
+            session,
+            QuickInteraction(
+                mode="quick",
+                question="What changed on the screen?",
+                answer="A modal opened with the new deployment summary.\nIt also shows two warnings.",
+                image_path="capture.png",
+            ),
+        )
+
+        preview = self.viewmodel.buildHistoryPreview(limit=1)
+
+        self.assertEqual(len(preview), 1)
+        self.assertEqual(preview[0]["mode"], "quick")
+        self.assertEqual(preview[0]["interactionCount"], 1)
+        self.assertEqual(preview[0]["title"], "Quick: What changed on the screen?")
+        self.assertEqual(
+            preview[0]["excerpt"],
+            "A modal opened with the new deployment summary. It also shows two warnings.",
+        )
 
     def test_reset_audio_defaults_uses_transient_status_for_noop(self) -> None:
         self.viewmodel._set_status("Saved.", "success")
@@ -215,21 +239,21 @@ class SettingsViewModelKeybindTests(unittest.TestCase):
 
         self.viewmodel._apply_deferred_transient_status(
             revision,
-            "Audio settings are already using the defaults.",
+            "Audio settings are already at their defaults.",
             "neutral",
             self.viewmodel._TRANSIENT_INFO_STATUS_DURATION_MS,
         )
 
         self.assertEqual(
             self.viewmodel.statusMessage,
-            "Audio settings are already using the defaults.",
+            "Audio settings are already at their defaults.",
         )
         self.assertEqual(self.viewmodel.statusKind, "neutral")
         self.assertTrue(self.viewmodel._status_timer.isActive())
 
     def test_invalid_audio_preroll_shows_validation_error(self) -> None:
         self.viewmodel.setField("audio_preroll_seconds", "-1")
-        self.viewmodel._apply_autosave()
+        self.viewmodel.save()
 
         self.assertEqual(
             self.viewmodel.errors["audio_preroll_seconds"],

@@ -16,8 +16,10 @@ from src.models.settings import (
     AppSettings,
     ELEVEN_V3_VOICES,
     TTS_VOICE_OPTIONS,
+    coerce_bool,
     get_tts_voice,
     get_tts_voice_label,
+    normalize_hex_color,
 )
 from src.services.audio_devices import AudioDeviceOption, AudioDeviceService
 from src.services.audio_monitor import AudioMonitorService
@@ -34,20 +36,9 @@ from src.services.settings_manager import SettingsManager
 
 
 class SettingsViewModel(QObject):
-    _AUTOSAVE_DELAY_MS = 350
     _SUCCESS_STATUS_DURATION_MS = 2200
     _TRANSIENT_INFO_STATUS_DURATION_MS = 2200
     _STATUS_REPLACE_DELAY_MS = 180
-    _IMMEDIATE_AUTOSAVE_FIELDS = {
-        "llm_reasoning",
-        "transcription_reasoning",
-        "tts_model",
-        "tts_voice_id",
-        "fallback_language",
-        "audio_input_device",
-        "audio_output_device",
-        "theme_preference",
-    }
 
     settingsChanged = Signal()
     savedSettingsChanged = Signal()
@@ -124,9 +115,6 @@ class SettingsViewModel(QObject):
         self._audioLevelRequested.connect(self._apply_audio_level)
         self._audioInputTestFinished.connect(self._handle_audio_input_test_finished)
         self._speakerTestFinished.connect(self._handle_speaker_test_finished)
-        self._autosave_timer = QTimer(self)
-        self._autosave_timer.setSingleShot(True)
-        self._autosave_timer.timeout.connect(self._apply_autosave)
         self.refreshAudioDevices()
         self._status_timer = QTimer(self)
         self._status_timer.setSingleShot(True)
@@ -273,11 +261,9 @@ class SettingsViewModel(QObject):
         self.settingsChanged.emit()
         if field_name.endswith("_keybind"):
             return
-        self._schedule_autosave(field_name)
 
     @Slot()
     def save(self) -> None:
-        self._autosave_timer.stop()
         settings = self._validate_current_settings()
         if settings is None:
             return
@@ -292,31 +278,26 @@ class SettingsViewModel(QObject):
 
     @Slot()
     def reset(self) -> None:
-        self._autosave_timer.stop()
         self._settings_map = deepcopy(self._baseline_map)
         self._errors = {}
         self._dirty = False
-        self._set_status("Changes reset.", "neutral")
+        self._set_status("Changes cleared.", "neutral")
         self.settingsChanged.emit()
         self.errorsChanged.emit()
         self.dirtyChanged.emit()
 
     @Slot()
     def validateDraft(self) -> None:
-        self._autosave_timer.stop()
         settings = self._validate_current_settings()
         if settings is None:
             return
         del settings
-        self._set_status(
-            "These settings look valid and will be used the next time Glance starts.",
-            "success",
-        )
+        self._set_status("Everything looks valid.", "success")
 
     @Slot()
     def clearHistory(self) -> None:
         self._history_manager.clear()
-        self._set_status("Saved history cleared.", "success")
+        self._set_status("History cleared.", "success")
 
     @Slot(str)
     def startKeybindCapture(self, field_name: str) -> None:
@@ -324,7 +305,7 @@ class SettingsViewModel(QObject):
             return
         self._binding_field = field_name
         self.bindingChanged.emit()
-        self._set_status("Press a new shortcut now. Press Escape to cancel.", "neutral")
+        self._set_status("Press a new shortcut. Escape cancels.", "neutral")
 
     @Slot()
     def cancelKeybindCapture(self) -> None:
@@ -332,7 +313,7 @@ class SettingsViewModel(QObject):
             return
         self._binding_field = ""
         self.bindingChanged.emit()
-        self._set_status("Shortcut capture cancelled.", "neutral")
+        self._set_status("Shortcut capture canceled.", "neutral")
 
     @Slot(int, int, str)
     def captureKeybind(self, key: int, modifiers: int, text: str) -> None:
@@ -350,15 +331,14 @@ class SettingsViewModel(QObject):
             self._errors[field_name] = f"Already used by {conflicts_with}."
             self.errorsChanged.emit()
             self._set_status(
-                "Choose a different shortcut so every mode stays unique.", "error"
+                "Pick a different shortcut so they stay unique.", "error"
             )
             return
         self._binding_field = ""
         self.bindingChanged.emit()
         self.setField(field_name, keybind)
-        self._persist_keybind_change(field_name, keybind)
         self._set_status(
-            f"{self._binding_label(field_name)} shortcut set to {keybind}.", "success"
+            f"{self._binding_label(field_name)} shortcut ready to save.", "success"
         )
 
     @Slot(str, str)
@@ -378,7 +358,7 @@ class SettingsViewModel(QObject):
             self._errors[field_name] = f"Already used by {conflicts_with}."
             self.errorsChanged.emit()
             self._set_status(
-                "Choose a different shortcut so every mode stays unique.", "error"
+                "Pick a different shortcut so they stay unique.", "error"
             )
             return
 
@@ -386,9 +366,8 @@ class SettingsViewModel(QObject):
             self._binding_field = ""
             self.bindingChanged.emit()
         self.setField(field_name, normalized_keybind)
-        self._persist_keybind_change(field_name, normalized_keybind)
         self._set_status(
-            f"{self._binding_label(field_name)} shortcut set to {normalized_keybind}.",
+            f"{self._binding_label(field_name)} shortcut ready to save.",
             "success",
         )
 
@@ -556,7 +535,7 @@ class SettingsViewModel(QObject):
             self._errors.pop(field_name, None)
         if not updated:
             self._set_transient_status(
-                "Audio settings are already using the defaults.", "neutral"
+                "Audio settings are already at their defaults.", "neutral"
             )
             return
         self.stopAudioInputTest()
@@ -565,8 +544,7 @@ class SettingsViewModel(QObject):
         self._recompute_dirty()
         self.settingsChanged.emit()
         self.errorsChanged.emit()
-        self._schedule_autosave("audio_output_device")
-        self._set_status("Audio settings reset to the defaults.", "success")
+        self._set_status("Audio settings reset.", "success")
 
     def _validate_current_settings(
         self, *, show_status: bool = True
@@ -585,6 +563,8 @@ class SettingsViewModel(QObject):
         self._require_text(payload, "quick_keybind", errors)
         self._require_text(payload, "ocr_keybind", errors)
         self._require_text(payload, "transcription_model_name", errors)
+        self._coerce_bool(payload, "llm_reasoning_enabled")
+        self._coerce_bool(payload, "transcription_reasoning_enabled")
         self._coerce_positive_int(payload, "history_length", errors)
         self._coerce_positive_float(payload, "screenshot_interval", errors)
         self._coerce_positive_float(payload, "batch_window_duration", errors)
@@ -595,6 +575,7 @@ class SettingsViewModel(QObject):
         self._coerce_positive_float(payload, "audio_max_record_seconds", errors)
         self._coerce_non_negative_float(payload, "audio_preroll_seconds", errors)
         self._coerce_theme(payload, "theme_preference", errors)
+        self._coerce_hex_color(payload, "accent_color", errors)
 
         for keybind_field in ("live_keybind", "quick_keybind", "ocr_keybind"):
             if keybind_field not in errors:
@@ -769,14 +750,6 @@ class SettingsViewModel(QObject):
         }
         return labels.get(field_name, field_name)
 
-    def _persist_keybind_change(self, field_name: str, value: str) -> None:
-        persisted_payload = deepcopy(self._baseline_map)
-        persisted_payload[field_name] = value
-        settings = AppSettings.from_mapping(persisted_payload, validate=False)
-        self._settings_manager.save(settings, validate=False)
-        self._baseline_map[field_name] = value
-        self._recompute_dirty()
-
     def _build_preview_settings(self, voice_name: str) -> AppSettings | None:
         if voice_name == AUTO_TTS_VOICE_ID:
             self._set_status("Choose a fixed voice to preview.", "error")
@@ -926,24 +899,24 @@ class SettingsViewModel(QObject):
                 pass
             self._speakerTestFinished.emit()
 
-    def _schedule_autosave(self, field_name: str) -> None:
-        if self._settings_map == self._baseline_map:
-            self._autosave_timer.stop()
-            return
-        if (
-            QCoreApplication.instance() is None
-            or field_name in self._IMMEDIATE_AUTOSAVE_FIELDS
-        ):
-            self._autosave_timer.stop()
-            self._apply_autosave()
-            return
-        self._autosave_timer.start(self._AUTOSAVE_DELAY_MS)
-
-    def _apply_autosave(self) -> None:
-        settings = self._validate_current_settings(show_status=False)
-        if settings is None or self._settings_map == self._baseline_map:
-            return
-        self._persist_settings(settings, status_message="Settings updated.")
+    def buildHistoryPreview(self, limit: int = 3) -> list[dict[str, Any]]:
+        sessions = self._history_manager.list_sessions()
+        preview_items: list[dict[str, Any]] = []
+        for session in reversed(sessions[-limit:]):
+            latest_interaction = (
+                session.interactions[-1] if session.interactions else None
+            )
+            preview_items.append(
+                {
+                    "id": session.entity_id,
+                    "mode": session.mode,
+                    "createdAt": session.created_at,
+                    "title": self._history_preview_title(session.mode, latest_interaction),
+                    "excerpt": self._history_preview_excerpt(latest_interaction),
+                    "interactionCount": len(session.interactions),
+                }
+            )
+        return preview_items
 
     def _persist_settings(self, settings: AppSettings, *, status_message: str) -> None:
         self._settings_manager.save(settings, validate=False)
@@ -1052,3 +1025,42 @@ class SettingsViewModel(QObject):
         payload[field_name] = value
         if value not in {"dark", "light", "system"}:
             errors[field_name] = "Choose dark, light, or system."
+
+    @staticmethod
+    def _coerce_bool(payload: dict[str, Any], field_name: str) -> None:
+        payload[field_name] = coerce_bool(payload.get(field_name, False))
+
+    @staticmethod
+    def _coerce_hex_color(
+        payload: dict[str, Any],
+        field_name: str,
+        errors: dict[str, str],
+    ) -> None:
+        try:
+            payload[field_name] = normalize_hex_color(payload.get(field_name, ""))
+        except ValidationError:
+            errors[field_name] = "Use a valid hex color such as #A7FFDE."
+
+    @staticmethod
+    def _history_preview_title(mode: str, latest_interaction: Any) -> str:
+        if latest_interaction is not None:
+            return latest_interaction.summary()
+        return f"{mode.title()} session"
+
+    @staticmethod
+    def _history_preview_excerpt(latest_interaction: Any) -> str:
+        if latest_interaction is None:
+            return "No interactions saved yet."
+
+        excerpt_candidates = (
+            getattr(latest_interaction, "answer", ""),
+            getattr(latest_interaction, "response", ""),
+            getattr(latest_interaction, "question", ""),
+            getattr(latest_interaction, "transcript", ""),
+            getattr(latest_interaction, "extracted_text", ""),
+        )
+        for candidate in excerpt_candidates:
+            cleaned = str(candidate).strip().replace("\n", " ")
+            if cleaned:
+                return cleaned
+        return "Saved interaction."
