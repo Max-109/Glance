@@ -84,8 +84,11 @@ textarea:focus-visible {
 
 .desktop-shell {
   --shell-bg: #050506;
-  --shell-side: rgba(24, 24, 27, 0.72);
-  --shell-side-border: rgba(255, 255, 255, 0.075);
+  --shell-side: rgba(18, 19, 24, 0.54);
+  --shell-side-border: rgba(255, 255, 255, 0.095);
+  --workspace-base-start: rgba(11, 12, 15, 0.84);
+  --workspace-base-end: rgba(5, 6, 8, 0.76);
+  --workspace-border: rgba(255, 255, 255, 0.08);
   --panel-bg: rgba(22, 22, 24, 0.88);
   --panel-border: rgba(255, 255, 255, 0.08);
   --panel-divider: rgba(255, 255, 255, 0.065);
@@ -120,32 +123,29 @@ textarea:focus-visible {
   --signal-border: rgba(255, 200, 137, 0.28);
   --signal-glow: rgba(255, 200, 137, 0.28);
   --signal-contrast: #110b07;
+  --mac-window-controls-offset: 0px;
   position: relative;
   min-height: 100vh;
   overflow: hidden;
-  background:
-    radial-gradient(820px 460px at 84% -8%, rgba(167, 255, 222, 0.07), transparent 64%),
-    radial-gradient(540px 340px at 14% 4%, rgba(255, 200, 137, 0.08), transparent 66%),
-    linear-gradient(180deg, #090a0c 0%, #060607 64%, #030304 100%);
+  isolation: isolate;
+  background: transparent;
 }
 
 .desktop-shell::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  opacity: 0.14;
-  background-image:
-    linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.018) 1px, transparent 1px);
-  background-size: 22px 22px;
-  mask-image: radial-gradient(circle at 50% 0%, black, transparent 78%);
+  content: none;
+}
+
+.desktop-shell[data-platform="darwin"] {
+  --mac-window-controls-offset: 38px;
 }
 
 .desktop-shell[data-theme="light"] {
   color-scheme: light;
-  --shell-side: rgba(246, 242, 236, 0.82);
+  --shell-side: rgba(247, 243, 236, 0.58);
   --shell-side-border: rgba(31, 25, 21, 0.08);
+  --workspace-base-start: rgba(249, 246, 241, 0.86);
+  --workspace-base-end: rgba(241, 235, 226, 0.78);
+  --workspace-border: rgba(31, 25, 21, 0.08);
   --panel-bg: rgba(255, 255, 255, 0.88);
   --panel-border: rgba(31, 25, 21, 0.08);
   --panel-divider: rgba(31, 25, 21, 0.07);
@@ -161,15 +161,12 @@ textarea:focus-visible {
   --item-active: rgba(31, 25, 21, 0.075);
   --danger-soft: rgba(201, 80, 61, 0.12);
   --success-soft: rgba(43, 128, 80, 0.1);
-  background:
-    radial-gradient(760px 420px at 86% -6%, rgba(167, 255, 222, 0.1), transparent 62%),
-    radial-gradient(540px 320px at 12% 4%, rgba(255, 200, 137, 0.1), transparent 62%),
-    linear-gradient(180deg, #f6f2ec 0%, #f1ebe2 100%);
+  background: transparent;
 }
 
 .skip-link {
   position: absolute;
-  top: 10px;
+  top: calc(10px + var(--mac-window-controls-offset));
   left: 12px;
   z-index: 5;
   padding: 10px 14px;
@@ -208,10 +205,10 @@ textarea:focus-visible {
   flex-direction: column;
   gap: 18px;
   min-height: 0;
-  padding: 18px 12px 14px;
+  padding: calc(18px + var(--mac-window-controls-offset)) 12px 14px;
   border-right: 1px solid var(--shell-side-border);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.01)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.02)),
     var(--shell-side);
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -461,11 +458,31 @@ textarea:focus-visible {
 }
 
 .workspace-shell {
+  position: relative;
+  z-index: 0;
   display: flex;
   flex-direction: column;
   min-height: 100vh;
   min-width: 0;
   padding: 10px 12px 12px;
+  isolation: isolate;
+}
+
+.workspace-shell::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  border-left: 1px solid var(--workspace-border);
+  background:
+    radial-gradient(820px 460px at 84% -8%, rgba(167, 255, 222, 0.08), transparent 64%),
+    radial-gradient(540px 340px at 14% 4%, rgba(255, 200, 137, 0.09), transparent 66%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.015)),
+    linear-gradient(180deg, var(--workspace-base-start), var(--workspace-base-end));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(24px) saturate(132%);
+  -webkit-backdrop-filter: blur(24px) saturate(132%);
 }
 
 .workspace-shell__header {
@@ -871,6 +888,11 @@ textarea.control::-webkit-scrollbar-thumb {
   border-radius: 10px;
   background: var(--control-bg);
   color: var(--accent-strong);
+}
+
+.stepper-button svg {
+  width: 9px;
+  height: 9px;
 }
 
 .stepper-button:hover {
@@ -1550,6 +1572,11 @@ textarea.control::-webkit-scrollbar-thumb {
   .workspace-shell {
     min-height: auto;
     padding-top: 4px;
+  }
+
+  .workspace-shell::before {
+    border-top: 1px solid var(--workspace-border);
+    border-left: 0;
   }
 
   .workspace-shell__header {

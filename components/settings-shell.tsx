@@ -213,6 +213,14 @@ function toRgba(hex: string, alpha: number) {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
+function isMacDesktopPlatform() {
+  if (typeof navigator === "undefined") {
+    return false;
+  }
+
+  return /mac/i.test(`${navigator.platform} ${navigator.userAgent}`);
+}
+
 function relativeLuminance({ r, g, b }: { r: number; g: number; b: number }) {
   const transform = (channel: number) => {
     const value = channel / 255;
@@ -266,14 +274,17 @@ function buildThemeStyle(
 export function SettingsShell() {
   const [state, setState] = useState<BridgeState | null>(null);
   const [systemTheme, setSystemTheme] = useState<SystemTheme>("dark");
+  const [isMacOs, setIsMacOs] = useState(false);
   const [providerTab, setProviderTab] = useState<ProviderTab>("llm");
   const [openSelect, setOpenSelect] = useState<string | null>(null);
+  const [skipLinkEnabled, setSkipLinkEnabled] = useState(false);
   const [editingField, setEditingField] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [revealedFields, setRevealedFields] = useState<Record<string, boolean>>({});
   const [bridgeError, setBridgeError] = useState("");
   const [thresholdDraft, setThresholdDraft] = useState<number | null>(null);
   const thresholdCommitRef = useRef(0);
+  const skipLinkRef = useRef<HTMLAnchorElement | null>(null);
   const workspaceRef = useRef<HTMLElement | null>(null);
   const scrollViewportRef = useRef<HTMLDivElement | null>(null);
 
@@ -329,6 +340,59 @@ export function SettingsShell() {
   useEffect(() => {
     void refreshState();
   }, [refreshState]);
+
+  useEffect(() => {
+    setIsMacOs(isMacDesktopPlatform());
+  }, []);
+
+  const enableSkipLinkOnTab = useEffectEvent((event: KeyboardEvent) => {
+    if (event.key !== "Tab" || event.ctrlKey || event.metaKey || event.altKey) {
+      return;
+    }
+
+    const activeElement = document.activeElement;
+    const shouldFocusSkipLink =
+      activeElement === null ||
+      activeElement === document.body ||
+      activeElement === document.documentElement;
+
+    if (!shouldFocusSkipLink) {
+      return;
+    }
+
+    setSkipLinkEnabled(true);
+    event.preventDefault();
+    window.requestAnimationFrame(() => {
+      skipLinkRef.current?.focus({ preventScroll: true });
+    });
+  });
+
+  const hideSkipLink = useEffectEvent(() => {
+    if (document.activeElement === skipLinkRef.current) {
+      skipLinkRef.current?.blur();
+    }
+    setSkipLinkEnabled(false);
+  });
+
+  const hideSkipLinkWhenHidden = useEffectEvent(() => {
+    if (document.visibilityState === "visible") {
+      return;
+    }
+    hideSkipLink();
+  });
+
+  useEffect(() => {
+    window.addEventListener("keydown", enableSkipLinkOnTab, true);
+    window.addEventListener("pointerdown", hideSkipLink, true);
+    window.addEventListener("blur", hideSkipLink);
+    document.addEventListener("visibilitychange", hideSkipLinkWhenHidden);
+    return () => {
+      window.removeEventListener("keydown", enableSkipLinkOnTab, true);
+      window.removeEventListener("pointerdown", hideSkipLink, true);
+      window.removeEventListener("blur", hideSkipLink);
+      document.removeEventListener("visibilitychange", hideSkipLinkWhenHidden);
+    };
+  }, [enableSkipLinkOnTab, hideSkipLink, hideSkipLinkWhenHidden]);
 
   useEffect(() => {
     if (!liveState.dirty) {
@@ -734,10 +798,21 @@ export function SettingsShell() {
         : "All changes saved";
 
   return (
-    <main className="desktop-shell" data-theme={resolvedTheme} style={themeStyle}>
-      <a className="skip-link" href="#workspace-content">
-        Skip to Content
-      </a>
+    <main
+      className="desktop-shell"
+      data-theme={resolvedTheme}
+      data-platform={isMacOs ? "darwin" : "other"}
+      style={themeStyle}
+    >
+      {skipLinkEnabled ? (
+        <a
+          ref={skipLinkRef}
+          className="skip-link"
+          href="#workspace-content"
+        >
+          Skip to Content
+        </a>
+      ) : null}
 
       <div className="desktop-shell__frame">
         <Sidebar

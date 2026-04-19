@@ -3,6 +3,10 @@ const fs = require("node:fs");
 const http = require("node:http");
 const { app, BrowserWindow, ipcMain, nativeTheme } = require("electron");
 const { revealWindow } = require("./window-control");
+const {
+  applyWindowChrome,
+  buildWindowChromeOptions,
+} = require("./window-chrome");
 
 const DEFAULT_WIDTH = Number.parseInt(process.env.GLANCE_WINDOW_WIDTH || "924", 10);
 const DEFAULT_HEIGHT = Number.parseInt(
@@ -39,26 +43,13 @@ function emit(payload) {
 }
 
 function buildWindow() {
-  const vibrancy = process.platform === "darwin" ? "under-window" : undefined;
-  const visualEffectState = process.platform === "darwin" ? "active" : undefined;
-
   const window = new BrowserWindow({
     show: false,
     width: DEFAULT_WIDTH,
     height: DEFAULT_HEIGHT,
     minWidth: 640,
     minHeight: 500,
-    frame: false,
-    transparent: true,
-    backgroundColor: "#00000000",
-    vibrancy,
-    visualEffectState,
-    roundedCorners: true,
-    resizable: true,
-    fullscreenable: false,
-    maximizable: false,
-    minimizable: false,
-    skipTaskbar: true,
+    ...buildWindowChromeOptions(),
     title: "Glance",
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
@@ -67,6 +58,7 @@ function buildWindow() {
       spellcheck: false,
     },
   });
+  applyWindowChrome(window);
 
   loadRenderer(window).catch((error) => {
     emit({
