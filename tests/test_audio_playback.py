@@ -191,7 +191,9 @@ class AudioPlaybackServiceStateMachineTests(unittest.TestCase):
 
     @staticmethod
     def _make_service() -> audio_playback.QtAudioPlaybackService:
-        service = object.__new__(audio_playback.QtAudioPlaybackService)
+        service = audio_playback.QtAudioPlaybackService.__new__(
+            audio_playback.QtAudioPlaybackService
+        )
         service._lock = Lock()
         service._completion_event = None
         service._completion_playback_id = None

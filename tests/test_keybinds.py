@@ -3,13 +3,14 @@ import unittest
 from pathlib import Path
 
 try:
-    from PySide6.QtCore import Qt
+    from PySide6.QtCore import QCoreApplication, Qt
     from src.services.history_manager import HistoryManager
     from src.services.settings_manager import SettingsManager
     from src.storage.json_storage import JsonHistoryRepository, JsonSettingsStore
     from src.ui.settings_viewmodel import SettingsViewModel
     from src.services.audio_devices import AudioDeviceOption
 except ImportError:  # pragma: no cover - optional GUI dependency.
+    QCoreApplication = None
     Qt = None
     HistoryManager = None
     SettingsManager = None
@@ -64,6 +65,11 @@ class KeybindUtilityTests(unittest.TestCase):
 
 @unittest.skipIf(Qt is None, "PySide6 is not installed")
 class SettingsViewModelKeybindTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        super().setUpClass()
+        cls.qt_app = QCoreApplication.instance() or QCoreApplication([])
+
     def setUp(self) -> None:
         self.temp_dir = tempfile.TemporaryDirectory()
         temp_path = Path(self.temp_dir.name)
@@ -122,6 +128,26 @@ class SettingsViewModelKeybindTests(unittest.TestCase):
 
         self.assertEqual(self.settings_manager.reload().quick_keybind, "ALT+K")
 
+    def test_assign_keybind_updates_and_persists_shortcut(self) -> None:
+        self.viewmodel.startKeybindCapture("quick_keybind")
+
+        self.viewmodel.assignKeybind("quick_keybind", "alt+k")
+
+        self.assertEqual(self.viewmodel.settings["quick_keybind"], "ALT+K")
+        self.assertEqual(self.settings_manager.reload().quick_keybind, "ALT+K")
+        self.assertFalse(self.viewmodel.bindingActive)
+
+    def test_assign_keybind_rejects_duplicate_shortcut(self) -> None:
+        self.viewmodel.startKeybindCapture("quick_keybind")
+
+        self.viewmodel.assignKeybind("quick_keybind", "cmd+shift+l")
+
+        self.assertEqual(
+            self.viewmodel.errors["quick_keybind"],
+            "Already used by Live.",
+        )
+        self.assertTrue(self.viewmodel.bindingActive)
+
     def test_escape_cancels_capture_without_changing_saved_keybind(self) -> None:
         emitted = []
         self.viewmodel.savedSettingsChanged.connect(lambda: emitted.append(True))
@@ -145,6 +171,7 @@ class SettingsViewModelKeybindTests(unittest.TestCase):
 
     def test_regular_field_autosaves_without_manual_save(self) -> None:
         self.viewmodel.setField("llm_model_name", "claude-sonnet-4.6")
+        self.viewmodel._apply_autosave()
 
         self.assertEqual(
             self.settings_manager.reload().llm_model_name,
@@ -156,6 +183,7 @@ class SettingsViewModelKeybindTests(unittest.TestCase):
         original_threshold = self.settings_manager.reload().screen_change_threshold
 
         self.viewmodel.setField("screen_change_threshold", "1.2")
+        self.viewmodel._apply_autosave()
 
         self.assertEqual(
             self.settings_manager.reload().screen_change_threshold,
@@ -169,6 +197,7 @@ class SettingsViewModelKeybindTests(unittest.TestCase):
 
     def test_audio_fields_autosave_without_manual_save(self) -> None:
         self.viewmodel.setField("audio_activation_threshold", "0.08")
+        self.viewmodel._apply_autosave()
 
         self.assertEqual(
             self.settings_manager.reload().audio_activation_threshold, 0.08
@@ -200,6 +229,7 @@ class SettingsViewModelKeybindTests(unittest.TestCase):
 
     def test_invalid_audio_preroll_shows_validation_error(self) -> None:
         self.viewmodel.setField("audio_preroll_seconds", "-1")
+        self.viewmodel._apply_autosave()
 
         self.assertEqual(
             self.viewmodel.errors["audio_preroll_seconds"],

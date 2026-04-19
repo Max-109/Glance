@@ -1,0 +1,342 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Glance — Radical Signal Deck Mockup</title>
+<style>
+:root{
+  --bg:#050608;
+  --panel:rgba(255,255,255,.055);
+  --panel-2:rgba(255,255,255,.075);
+  --stroke:rgba(255,255,255,.12);
+  --stroke-soft:rgba(255,255,255,.075);
+  --text:rgba(255,255,255,.88);
+  --muted:rgba(255,255,255,.52);
+  --faint:rgba(255,255,255,.31);
+  --accent:#a6ffde;
+  --llm:#b9a7ff;
+  --speak:#ffcf99;
+  --idle:#aab7c7;
+  --danger:#ff7b98;
+  --radius:16px;
+  --control:9px;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
+}
+*{box-sizing:border-box}
+body{
+  margin:0;
+  min-height:100vh;
+  background:
+    radial-gradient(800px 600px at 20% 0%, rgba(40,55,88,.35), transparent 65%),
+    radial-gradient(680px 520px at 82% 0%, rgba(32,96,82,.22), transparent 60%),
+    radial-gradient(720px 540px at 90% 90%, rgba(20,45,39,.26), transparent 60%),
+    #050608;
+  color:var(--text);
+  overflow:hidden;
+}
+body::before{
+  content:"";
+  position:fixed;
+  inset:0;
+  pointer-events:none;
+  opacity:.3;
+  background:
+    repeating-linear-gradient(45deg, rgba(255,255,255,.025) 0 1px, transparent 1px 28px),
+    radial-gradient(circle at 50% 45%, transparent 0 460px, rgba(0,0,0,.44) 850px);
+}
+.window{
+  position:absolute;
+  inset:18px;
+  border:1px solid rgba(255,255,255,.1);
+  border-radius:26px;
+  overflow:hidden;
+  background:rgba(5,6,9,.76);
+  box-shadow:0 28px 90px rgba(0,0,0,.55), inset 0 1px rgba(255,255,255,.07);
+}
+.traffic{position:absolute;left:24px;top:20px;display:flex;gap:10px}
+.traffic span{width:12px;height:12px;border-radius:999px;display:block}
+.traffic span:nth-child(1){background:#ff5f57}.traffic span:nth-child(2){background:#ffca3a}.traffic span:nth-child(3){background:#28c858}
+.rail{
+  position:absolute;left:0;top:0;bottom:0;width:68px;
+  border-right:1px solid rgba(255,255,255,.1);
+  background:rgba(255,255,255,.035);
+}
+.brand-mark{
+  position:absolute;left:16px;top:58px;width:36px;height:36px;border-radius:10px;
+  border:1px solid rgba(255,255,255,.14);
+  background:rgba(255,255,255,.05);
+}
+.mark{
+  --size:1;
+  position:relative;
+  width:100%;
+  height:100%;
+}
+.mark .seg{
+  position:absolute;
+  background:rgba(190,202,220,.56);
+  border-radius:999px;
+  transition:background .2s ease, box-shadow .2s ease, opacity .2s ease;
+}
+.mark .top,.mark .bottom{width:36%;height:11%;left:32%}
+.mark .left,.mark .right{height:36%;width:11%;top:32%}
+.mark .top{top:16%}.mark .bottom{bottom:16%}.mark .left{left:16%}.mark .right{right:16%}
+.mark.got .top,.mark.listen .top{background:var(--accent);box-shadow:0 0 18px color-mix(in srgb, var(--accent) 55%, transparent)}
+.mark.llm .right{background:var(--llm);box-shadow:0 0 18px color-mix(in srgb, var(--llm) 55%, transparent)}
+.mark.speak .bottom{background:var(--speak);box-shadow:0 0 18px color-mix(in srgb, var(--speak) 55%, transparent)}
+.mark.idle .left{background:var(--idle);box-shadow:0 0 14px rgba(170,183,199,.25)}
+.nav{
+  position:absolute;top:132px;left:10px;right:10px;display:grid;gap:18px;justify-items:center;
+}
+.nav .item{
+  width:46px;height:36px;border-radius:10px;display:grid;place-items:center;
+  color:rgba(255,255,255,.44);font-size:16px;position:relative;
+}
+.nav .item span{position:absolute;top:28px;font-size:8px;letter-spacing:.08em;text-transform:uppercase}
+.nav .item.active{
+  background:rgba(166,255,222,.12);
+  border:1px solid rgba(166,255,222,.28);
+  color:rgba(235,255,249,.9);
+}
+.nav .item.active::before{
+  content:"";position:absolute;left:-3px;top:6px;bottom:6px;width:3px;border-radius:2px;background:var(--accent);
+}
+.state-stack{position:absolute;bottom:84px;left:24px;width:20px;display:grid;gap:5px}
+.state-stack i{height:3px;border-radius:999px;background:rgba(255,255,255,.2)}
+.state-stack i:nth-child(1){background:rgba(170,183,199,.55)}
+.state-stack i:nth-child(2){background:var(--accent)}
+.state-stack i:nth-child(3){background:rgba(185,167,255,.7)}
+.state-stack i:nth-child(4){background:rgba(255,207,153,.68)}
+.gear{position:absolute;bottom:36px;left:16px;width:36px;height:32px;border-radius:9px;border:1px solid rgba(255,255,255,.11);display:grid;place-items:center;color:rgba(255,255,255,.55)}
+.main{position:absolute;left:94px;right:384px;top:44px;bottom:70px}
+h1{margin:0;font-size:38px;letter-spacing:-.04em;line-height:1}
+.subtitle{margin-top:8px;color:var(--muted);font-size:14px}
+.tabs{display:flex;gap:8px;margin-top:18px}
+.tab{font-size:12px;padding:8px 14px;border-radius:8px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.035);color:rgba(255,255,255,.54)}
+.tab.active{background:rgba(166,255,222,.12);border-color:rgba(166,255,222,.35);color:rgba(235,255,248,.92);box-shadow:inset 0 -2px var(--accent)}
+.status{
+  position:absolute;right:58px;top:28px;width:646px;height:56px;border-radius:18px;
+  border:1px solid rgba(255,255,255,.12);
+  background:linear-gradient(180deg,rgba(255,255,255,.08),rgba(255,255,255,.035));
+  box-shadow:inset 0 1px rgba(255,255,255,.1),0 12px 45px rgba(0,0,0,.32);
+  display:flex;align-items:center;padding:0 16px;gap:14px;
+}
+.status .tiny-mark{width:30px;height:30px;flex:0 0 auto}
+.status b{font-size:10px;color:var(--accent);letter-spacing:.08em;text-transform:uppercase}
+.status p{font-size:13px;margin:2px 0 0;color:rgba(255,255,255,.66)}
+.wave{margin-left:auto;display:flex;align-items:center;gap:4px;height:28px}
+.wave i{width:2px;height:8px;border-radius:2px;background:rgba(166,255,222,.6)}
+.wave i:nth-child(3n){height:16px}.wave i:nth-child(5n){height:22px}.wave i:nth-child(7n){height:5px}
+.badges{display:flex;gap:6px;margin-left:12px}
+.badges span{font-size:8px;letter-spacing:.08em;text-transform:uppercase;padding:5px 7px;border-radius:6px;background:rgba(255,255,255,.045);color:rgba(255,255,255,.45)}
+.close{position:absolute;right:24px;top:38px;width:50px;height:36px;border-radius:14px;border:1px solid rgba(255,255,255,.09);display:grid;place-items:center;color:rgba(255,255,255,.56)}
+.grid{
+  position:absolute;left:0;right:0;top:130px;bottom:0;
+  display:grid;grid-template-columns:2fr 1fr;grid-template-rows:164px 298px 178px;gap:22px;
+}
+.card{
+  border:1px solid var(--stroke-soft);
+  border-radius:var(--radius);
+  background:
+    linear-gradient(180deg,rgba(255,255,255,.065),rgba(255,255,255,.04));
+  box-shadow:inset 0 1px rgba(255,255,255,.09),0 16px 50px rgba(0,0,0,.28);
+  padding:20px 22px;
+  overflow:hidden;
+}
+.card h2{font-size:14px;margin:0 0 3px;letter-spacing:-.01em}
+.card .hint{font-size:12px;margin:0;color:rgba(255,255,255,.47)}
+.devices{grid-column:1 / 3}
+.matrix{display:grid;grid-template-columns:1fr 1fr;gap:36px;margin-top:18px}
+.label{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.35);margin-bottom:8px}
+.select{height:36px;border-radius:9px;border:1px solid rgba(255,255,255,.1);background:rgba(0,0,0,.14);display:flex;align-items:center;justify-content:space-between;padding:0 14px;color:rgba(255,255,255,.78);font-size:13px}
+.device-actions{margin-top:20px;border-top:1px solid rgba(255,255,255,.08);padding-top:12px;display:flex;align-items:center;gap:10px}
+button{font:inherit;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.045);color:rgba(255,255,255,.66);border-radius:8px;height:30px;padding:0 14px}
+button.primary{color:rgba(235,255,248,.95);border-color:rgba(166,255,222,.28);background:rgba(166,255,222,.12)}
+.meter{margin-top:18px;height:116px;border-radius:12px;border:1px solid rgba(255,255,255,.09);background:#020306;position:relative;overflow:hidden}
+.meter::before{
+  content:"";position:absolute;inset:0;background:
+    repeating-linear-gradient(to right,transparent 0 51px,rgba(255,255,255,.08) 51px 52px),
+    repeating-linear-gradient(to bottom,transparent 0 19px,rgba(255,255,255,.08) 19px 20px);
+}
+.meter svg{position:absolute;inset:0;width:100%;height:100%}
+.metrics{display:flex;gap:12px;margin-top:26px}
+.metric{height:58px;min-width:106px;border-radius:12px;border:1px solid rgba(255,255,255,.09);background:rgba(0,0,0,.13);padding:12px}
+.metric small{font-size:8px;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.35)}
+.metric strong{display:block;margin-top:6px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:16px;color:rgba(255,255,255,.86)}
+.start{float:right;margin-top:-48px;width:140px}
+.segmented{margin-top:18px;height:36px;border-radius:10px;border:1px solid rgba(255,255,255,.09);display:grid;grid-template-columns:repeat(3,1fr);padding:3px;background:rgba(0,0,0,.16)}
+.segmented span{display:grid;place-items:center;font-size:11px;color:rgba(255,255,255,.45);border-radius:8px}
+.segmented .on{background:rgba(166,255,222,.16);color:rgba(235,255,249,.94);border:1px solid rgba(166,255,222,.2)}
+.slider{margin-top:26px}
+.slider header{display:flex;justify-content:space-between;font-size:11px;color:rgba(255,255,255,.55)}
+.track{height:6px;margin-top:14px;background:rgba(255,255,255,.08);border-radius:999px}
+.fill{height:100%;background:var(--accent);border-radius:999px;position:relative}
+.fill::after{content:"";position:absolute;right:-6px;top:-4px;width:14px;height:14px;border-radius:50%;background:rgba(255,255,255,.88)}
+.route{grid-column:1 / 3}
+.flow{height:88px;margin-top:18px;display:grid;grid-template-columns:104px 1fr 104px 1fr 104px 1fr 104px 120px;align-items:center}
+.node{height:58px;border-radius:14px;border:1px solid rgba(255,255,255,.09);background:rgba(0,0,0,.14);display:grid;place-items:center;font-size:12px}
+.node .mark{width:28px;height:28px}
+.dots{height:1px;background:linear-gradient(90deg,transparent,rgba(166,255,222,.55),transparent)}
+.sidebar{
+  position:absolute;right:82px;top:156px;width:336px;bottom:80px;display:grid;grid-template-rows:286px 204px 154px;gap:22px;
+}
+.big-mark-wrap{height:164px;margin:18px auto 0;width:164px;border-radius:34px;border:1px solid rgba(255,255,255,.1);background:rgba(0,0,0,.12);display:grid;place-items:center;position:relative}
+.big-mark-wrap .mark{width:112px;height:112px}
+.big-mark-wrap em{position:absolute;font-size:9px;font-style:normal;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+.big-mark-wrap .top-l{top:-10px;color:var(--accent)}.big-mark-wrap .right-l{right:-34px;color:var(--llm)}.big-mark-wrap .bottom-l{bottom:-23px;color:var(--speak)}.big-mark-wrap .left-l{left:-34px;color:rgba(170,183,199,.65)}
+.states{margin-top:18px;display:grid;gap:12px}
+.state-row{display:grid;grid-template-columns:28px 1fr;gap:10px;align-items:center}
+.state-row .mark{width:26px;height:26px}
+.state-row b{font-size:12px}.state-row p{margin:2px 0 0;font-size:11px;color:rgba(255,255,255,.43)}
+.swatches{display:flex;gap:14px;margin-top:16px}
+.swatch{width:34px;height:34px;border-radius:10px;border:1px solid rgba(255,255,255,.12)}
+.swatch.active{outline:1px solid var(--accent);outline-offset:4px}
+.preview-bar{float:right;margin-top:14px;width:94px;height:30px;border-radius:12px;background:rgba(145,166,210,.42);display:grid;place-items:center}
+.preview-bar .mark{width:28px;height:28px}
+code{display:block;margin-top:18px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;color:rgba(255,255,255,.75)}
+</style>
+</head>
+<body>
+<div class="window">
+  <div class="traffic"><span></span><span></span><span></span></div>
+  <aside class="rail">
+    <div class="brand-mark"><div class="mark got"><i class="seg top"></i><i class="seg right"></i><i class="seg bottom"></i><i class="seg left"></i></div></div>
+    <nav class="nav">
+      <div class="item">◌<span>cap</span></div>
+      <div class="item active">≋<span>aud</span></div>
+      <div class="item">⌁<span>run</span></div>
+      <div class="item">⛓<span>api</span></div>
+      <div class="item">◷<span>log</span></div>
+    </nav>
+    <div class="state-stack"><i></i><i></i><i></i><i></i></div>
+    <div class="gear">⚙</div>
+  </aside>
+
+  <section class="status">
+    <div class="tiny-mark mark got"><i class="seg top"></i><i class="seg right"></i><i class="seg bottom"></i><i class="seg left"></i></div>
+    <div><b id="state-title">Got speech</b><p id="state-copy">LLM standby · output muted · 41 ms input path</p></div>
+    <div class="wave" aria-hidden="true">
+      <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+    </div>
+    <div class="badges"><span>idle</span><span>llm</span><span>say</span></div>
+  </section>
+  <div class="close">×</div>
+
+  <main class="main">
+    <h1>Audio</h1>
+    <div class="subtitle">Input, output, gate, and spoken-turn timing — tuned around the live Glance mark.</div>
+    <div class="tabs">
+      <div class="tab">Capture</div><div class="tab active">Audio</div><div class="tab">Speech</div><div class="tab">Runtime</div><div class="tab">Storage</div>
+    </div>
+
+    <div class="grid">
+      <section class="card devices">
+        <h2>Device matrix</h2>
+        <p class="hint">Hard I/O is one compact matrix instead of giant settings rows.</p>
+        <div class="matrix">
+          <div><div class="label">Input</div><div class="select"><span>◖ &nbsp; System Default Input</span><span>⌄</span></div></div>
+          <div><div class="label">Output</div><div class="select"><span>◗ &nbsp; System Default Output</span><span>⌄</span></div></div>
+        </div>
+        <div class="device-actions"><button>Refresh</button><button>Speaker test</button><button>Live monitor</button><span style="margin-left:auto;color:rgba(255,255,255,.36);font-size:12px">2 in · 2 out</span></div>
+      </section>
+
+      <section class="card">
+        <h2>Mic gate</h2>
+        <p class="hint">Threshold is the hero. Everything else gets out of the way.</p>
+        <div class="meter">
+          <svg viewBox="0 0 520 116" preserveAspectRatio="none">
+            <polyline points="10,54 30,35 50,70 75,72 95,44 115,49 140,42 160,70 185,75 208,56 230,38 250,66 278,77 300,63 328,73 350,52 375,38 400,68 426,75 448,55 472,48 510,38" fill="none" stroke="rgba(166,255,222,.72)" stroke-width="2"/>
+            <line x1="10" y1="46" x2="510" y2="46" stroke="rgba(255,207,153,.7)" stroke-width="1"/>
+          </svg>
+        </div>
+        <div class="metrics">
+          <div class="metric"><small>sensitivity</small><strong>0.026</strong></div>
+          <div class="metric"><small>level</small><strong>0.000</strong></div>
+          <div class="metric"><small>noise floor</small><strong>-54 dB</strong></div>
+        </div>
+        <button class="primary start">Start mic test</button>
+      </section>
+
+      <section class="card">
+        <h2>Turn feel</h2>
+        <p class="hint">A human preset first, raw knobs second.</p>
+        <div class="segmented"><span>fast</span><span class="on">natural</span><span>careful</span></div>
+        <div class="slider"><header><span>Silence timeout</span><span>2.0 s</span></header><div class="track"><div class="fill" style="width:42%"></div></div></div>
+        <div class="slider"><header><span>Pre-speech buffer</span><span>600 ms</span></header><div class="track"><div class="fill" style="width:58%;background:var(--llm)"></div></div></div>
+        <div class="slider"><header><span>Hold after reply</span><span>0.4 s</span></header><div class="track"><div class="fill" style="width:25%;background:var(--speak)"></div></div></div>
+      </section>
+
+      <section class="card route">
+        <h2>Audio route preview</h2>
+        <p class="hint">What the user hears is previewable without opening another panel.</p>
+        <div class="flow">
+          <div class="node">●<br>Mic</div><div class="dots"></div>
+          <div class="node"><div class="mark got"><i class="seg top"></i><i class="seg right"></i><i class="seg bottom"></i><i class="seg left"></i></div>Gate</div><div class="dots"></div>
+          <div class="node">●<br>LLM</div><div class="dots"></div>
+          <div class="node">●<br>Voice</div>
+          <div style="font:13px ui-monospace,SFMono-Regular,monospace;color:rgba(255,255,255,.72)">input rms<br><b>-36 dB</b><br><br>route<br><b>system</b></div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <aside class="sidebar">
+    <section class="card">
+      <h2>State mark</h2>
+      <p class="hint">The new icon becomes the live OS for the product.</p>
+      <div class="big-mark-wrap">
+        <em class="top-l">got it</em><em class="right-l">LLM</em><em class="bottom-l">speak</em><em class="left-l">idle</em>
+        <div class="mark got" id="bigmark"><i class="seg top"></i><i class="seg right"></i><i class="seg bottom"></i><i class="seg left"></i></div>
+      </div>
+      <p class="hint" style="margin-top:28px">No status words in the sidebar. The mark itself carries the state.</p>
+    </section>
+
+    <section class="card">
+      <h2>Four-state contract</h2>
+      <div class="states">
+        <div class="state-row" data-state="idle"><div class="mark idle"><i class="seg top"></i><i class="seg right"></i><i class="seg bottom"></i><i class="seg left"></i></div><div><b>idle</b><p>low opacity</p></div></div>
+        <div class="state-row" data-state="got"><div class="mark got"><i class="seg top"></i><i class="seg right"></i><i class="seg bottom"></i><i class="seg left"></i></div><div><b>got speech</b><p>mint accent</p></div></div>
+        <div class="state-row" data-state="llm"><div class="mark llm"><i class="seg top"></i><i class="seg right"></i><i class="seg bottom"></i><i class="seg left"></i></div><div><b>waiting LLM</b><p>violet pulse</p></div></div>
+        <div class="state-row" data-state="speak"><div class="mark speak"><i class="seg top"></i><i class="seg right"></i><i class="seg bottom"></i><i class="seg left"></i></div><div><b>speaking</b><p>warm glow</p></div></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Accent</h2>
+      <p class="hint">Accent is not decoration; it is the active-state color.</p>
+      <div class="swatches">
+        <div class="swatch active" style="background:#a6ffde"></div>
+        <div class="swatch" style="background:#a8ddff"></div>
+        <div class="swatch" style="background:#b9a7ff"></div>
+        <div class="swatch" style="background:#ffcf99"></div>
+        <div class="swatch" style="background:#ff8fb1"></div>
+      </div>
+      <div class="preview-bar"><div class="mark got"><i class="seg top"></i><i class="seg right"></i><i class="seg bottom"></i><i class="seg left"></i></div></div>
+      <code>Signal Mint · #A6FFDE</code>
+    </section>
+  </aside>
+</div>
+<script>
+const stateCopy = {
+  idle: ["Idle", "Mic armed · no active speech · menu mark dimmed"],
+  got: ["Got speech", "LLM standby · output muted · 41 ms input path"],
+  llm: ["Waiting LLM", "Context sent · streaming soon · right segment pulses"],
+  speak: ["Speaking", "Voice active · output route system · bottom segment glows"]
+};
+document.querySelectorAll(".state-row").forEach(row => {
+  row.style.cursor = "pointer";
+  row.addEventListener("click", () => {
+    const state = row.dataset.state;
+    document.querySelectorAll(".mark").forEach(m => {
+      if (m.closest(".state-row")) return;
+      m.classList.remove("idle","got","listen","llm","speak");
+      m.classList.add(state);
+    });
+    document.getElementById("state-title").textContent = stateCopy[state][0];
+    document.getElementById("state-copy").textContent = stateCopy[state][1];
+  });
+});
+</script>
+</body>
+</html>

@@ -361,6 +361,37 @@ class SettingsViewModel(QObject):
             f"{self._binding_label(field_name)} shortcut set to {keybind}.", "success"
         )
 
+    @Slot(str, str)
+    def assignKeybind(self, field_name: str, keybind: str) -> None:
+        if field_name not in {"live_keybind", "quick_keybind", "ocr_keybind"}:
+            return
+        try:
+            normalized_keybind = normalize_keybind(keybind)
+        except ValidationError as exc:
+            self._errors[field_name] = str(exc)
+            self.errorsChanged.emit()
+            self._set_status(str(exc), "error")
+            return
+
+        conflicts_with = self._find_keybind_conflict(field_name, normalized_keybind)
+        if conflicts_with is not None:
+            self._errors[field_name] = f"Already used by {conflicts_with}."
+            self.errorsChanged.emit()
+            self._set_status(
+                "Choose a different shortcut so every mode stays unique.", "error"
+            )
+            return
+
+        if self._binding_field:
+            self._binding_field = ""
+            self.bindingChanged.emit()
+        self.setField(field_name, normalized_keybind)
+        self._persist_keybind_change(field_name, normalized_keybind)
+        self._set_status(
+            f"{self._binding_label(field_name)} shortcut set to {normalized_keybind}.",
+            "success",
+        )
+
     @Slot(str)
     def previewVoice(self, voice_name: str) -> None:
         if self._previewing_voice == voice_name:

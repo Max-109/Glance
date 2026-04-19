@@ -29,6 +29,8 @@ from src.services.providers import (
 )
 from src.services.settings_manager import SettingsManager
 from src.storage.json_storage import JsonHistoryRepository, JsonSettingsStore
+from src.ui.electron_bridge import SettingsBridgeServer
+from src.ui.electron_window import ElectronShellController, ElectronUnavailableError
 from src.ui.qt_icons import IconLibrary
 from src.ui.settings_viewmodel import SettingsViewModel
 
@@ -184,30 +186,33 @@ def run_settings_app() -> int:
         audio_dir=paths.audio_dir,
     )
     icon_library = IconLibrary()
+    settings_bridge = SettingsBridgeServer(controller)
     live_controller = _build_live_controller(
         settings_manager=settings_manager,
         history_manager=history_manager,
         paths=paths,
     )
-
-    qml_dir = Path(__file__).resolve().parent / "qml"
-    engine = QQmlApplicationEngine()
-    engine.setInitialProperties(
-        {
-            "settingsController": controller,
-            "iconLibrary": icon_library,
-        }
+    settings_window, qml_engine = _build_settings_window(
+        app=app,
+        controller=controller,
+        icon_library=icon_library,
+        app_icon=app_icon,
+        bridge_url=settings_bridge.url,
+        logger=logger,
     )
-    engine.load(QUrl.fromLocalFile(str(qml_dir / "Main.qml")))
-
-    if not engine.rootObjects():
-        raise RuntimeError("Could not load the QML settings interface.")
-
-    root_window = engine.rootObjects()[0]
-    if not app_icon.isNull():
-        root_window.setIcon(app_icon)
-    tray = _build_tray_icon(app, root_window, controller, live_controller, log_file)
+    tray = _build_tray_icon(
+        app,
+        settings_window,
+        controller,
+        live_controller,
+        settings_bridge,
+        log_file,
+    )
     tray.show()
+    if _env_flag_enabled("GLANCE_AUTO_OPEN"):
+        QTimer.singleShot(
+            0, lambda: _toggle_window(settings_window, force_show=True)
+        )
     hotkey_manager = GlobalHotkeyManager(
         callbacks={
             "live": live_controller.toggle,
@@ -282,15 +287,74 @@ def run_settings_app() -> int:
 
     controller.savedSettingsChanged.connect(schedule_runtime_refresh)
     controller.bindingChanged.connect(handle_binding_change)
-    root_window.visibleChanged.connect(restore_hotkeys_if_pending)
+    settings_window.visibleChanged.connect(restore_hotkeys_if_pending)
     app.aboutToQuit.connect(hotkey_manager.stop)
     app.aboutToQuit.connect(live_controller.stop)
     app.aboutToQuit.connect(controller.stopVoicePreview)
     app.aboutToQuit.connect(controller.stopAudioInputTest)
     app.aboutToQuit.connect(controller.stopSpeakerTest)
+    app.aboutToQuit.connect(settings_bridge.close)
+    app.aboutToQuit.connect(settings_window.close)
     refresh_runtime()
 
     return app.exec()
+
+
+def _env_flag_enabled(name: str) -> bool:
+    value = os.environ.get(name, "")
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _build_settings_window(
+    *,
+    app: QApplication,
+    controller: SettingsViewModel,
+    icon_library: IconLibrary,
+    app_icon: QIcon,
+    bridge_url: str,
+    logger: logging.Logger,
+):
+    del app
+    try:
+        window = ElectronShellController(
+            project_root=Path(__file__).resolve().parents[2],
+            bridge_url=bridge_url,
+            logger=logger,
+        )
+        logger.info("Using Electron settings shell.")
+        return window, None
+    except ElectronUnavailableError as exc:
+        logger.warning("Electron shell unavailable, falling back to QML: %s", exc)
+        return _build_qml_settings_window(
+            controller=controller,
+            icon_library=icon_library,
+            app_icon=app_icon,
+        )
+
+
+def _build_qml_settings_window(
+    *,
+    controller: SettingsViewModel,
+    icon_library: IconLibrary,
+    app_icon: QIcon,
+):
+    qml_dir = Path(__file__).resolve().parent / "qml"
+    engine = QQmlApplicationEngine()
+    engine.setInitialProperties(
+        {
+            "settingsController": controller,
+            "iconLibrary": icon_library,
+        }
+    )
+    engine.load(QUrl.fromLocalFile(str(qml_dir / "Main.qml")))
+
+    if not engine.rootObjects():
+        raise RuntimeError("Could not load the QML settings interface.")
+
+    root_window = engine.rootObjects()[0]
+    if not app_icon.isNull():
+        root_window.setIcon(app_icon)
+    return root_window, engine
 
 
 def _build_tray_icon(
@@ -298,6 +362,7 @@ def _build_tray_icon(
     root_window,
     controller: SettingsViewModel,
     live_controller: LiveSessionController,
+    settings_bridge: SettingsBridgeServer,
     log_file: Path,
 ) -> QSystemTrayIcon:
     tray = QSystemTrayIcon(
@@ -345,6 +410,7 @@ def _build_tray_icon(
 
     def update_live_status(state: str, message: str) -> None:
         tray_icon_controller.set_state(state)
+        settings_bridge.set_runtime_status(state, message)
         live_state_action.setText(f"Live status: {state}")
         tray.setToolTip(f"Glance\n{message}")
         if any(
