@@ -92,33 +92,20 @@ export function AudioTab({
         </div>
       </Card>
 
-      <Card
-        title="Mic Threshold"
-        footer={
-          <div className="card-actions">
-            <Button
-              label={state.audioInputTestActive ? "Stop Mic Test" : "Start Mic Test"}
-              icon={state.audioInputTestActive ? "stop" : "mic"}
-              variant="signal"
-              onClick={() =>
-                onRunAction(
-                  state.audioInputTestActive
-                    ? "stopAudioInputTest"
-                    : "startAudioInputTest",
-                )
-              }
-            />
-          </div>
+      <MicThreshold
+        level={audioLevel}
+        threshold={thresholdValue}
+        active={state.audioInputTestActive}
+        onPointerDown={onThresholdPointerDown}
+        onNudge={onThresholdNudge}
+        onToggleTest={() =>
+          onRunAction(
+            state.audioInputTestActive
+              ? "stopAudioInputTest"
+              : "startAudioInputTest",
+          )
         }
-      >
-        <MicThreshold
-          level={audioLevel}
-          threshold={thresholdValue}
-          active={state.audioInputTestActive}
-          onPointerDown={onThresholdPointerDown}
-          onNudge={onThresholdNudge}
-        />
-      </Card>
+      />
 
       <Card
         title="Timing"

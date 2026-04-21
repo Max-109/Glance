@@ -4,6 +4,8 @@ import type {
 } from "react";
 import { useEffect, useRef, useState } from "react";
 
+import { Button } from "./button";
+
 const MIC_GATE_HISTORY_SECONDS = 6;
 const MIC_GATE_SAMPLE_HZ = 30;
 const MIC_GATE_HISTORY_LENGTH = MIC_GATE_HISTORY_SECONDS * MIC_GATE_SAMPLE_HZ;
@@ -28,12 +30,14 @@ export function MicThreshold({
   active,
   onPointerDown,
   onNudge,
+  onToggleTest,
 }: {
   level: number;
   threshold: number;
   active: boolean;
   onPointerDown: (event: ReactPointerEvent<HTMLDivElement>) => void;
   onNudge: (delta: number) => void;
+  onToggleTest: () => void;
 }) {
   const vizRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -580,6 +584,14 @@ export function MicThreshold({
             </span>
           </span>
         </div>
+
+        <Button
+          label={active ? "Stop Mic Test" : "Start Mic Test"}
+          icon={active ? "stop" : "mic"}
+          variant="signal"
+          className="mic-gate__test-button"
+          onClick={onToggleTest}
+        />
       </div>
     </div>
   );
