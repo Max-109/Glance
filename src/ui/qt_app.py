@@ -4,6 +4,7 @@ import os
 import sys
 import logging
 from pathlib import Path
+from threading import Thread
 
 from PySide6.QtCore import QByteArray, QCoreApplication, QObject, Qt, QTimer, Signal
 from PySide6.QtGui import QAction, QColor, QCursor, QFont, QIcon, QPainter, QPixmap
@@ -15,6 +16,7 @@ from src.services.app_paths import build_app_paths
 from src.services.app_logging import configure_app_logging
 from src.services.audio_playback import QtAudioPlaybackService
 from src.services.audio_recording import ThresholdAudioRecorder
+from src.services.audio_signal import AudioTestSignalService
 from src.services.global_hotkeys import GlobalHotkeyManager
 from src.services.history_manager import HistoryManager
 from src.services.live_session import LiveSessionController
@@ -150,6 +152,64 @@ class TrayIconController(QObject):
         )
 
 
+class LiveCueController:
+    def __init__(
+        self,
+        *,
+        audio_dir: Path,
+        output_device_id: str,
+        logger: logging.Logger,
+        signal_service: AudioTestSignalService | None = None,
+    ) -> None:
+        self._logger = logger
+        self._playback_service = QtAudioPlaybackService(
+            output_device_id=output_device_id,
+        )
+        self._cue_paths = (signal_service or AudioTestSignalService()).write_live_mode_cues(
+            audio_dir / "live-cues"
+        )
+        self._previous_state: str | None = None
+
+    def set_output_device(self, output_device_id: str) -> None:
+        self._playback_service.set_output_device_id(output_device_id)
+
+    def stop(self) -> None:
+        self._playback_service.stop()
+
+    def handle_status(self, state: str, message: str) -> None:
+        del message
+        normalized_state = _normalize_tray_state(state)
+        previous_state = self._previous_state
+        self._previous_state = normalized_state
+        if previous_state is None:
+            return
+
+        cue_key = ""
+        if previous_state == "idle" and normalized_state == "listening":
+            cue_key = "start"
+        elif previous_state == "processing" and normalized_state == "speaking":
+            cue_key = "reply_ready"
+        if not cue_key:
+            return
+
+        cue_path = self._cue_paths.get(cue_key)
+        if cue_path is None or not cue_path.exists():
+            return
+
+        Thread(
+            target=self._play_cue,
+            args=(cue_key, cue_path),
+            name=f"glance-live-cue-{cue_key}",
+            daemon=True,
+        ).start()
+
+    def _play_cue(self, cue_key: str, cue_path: Path) -> None:
+        try:
+            self._playback_service.play_blocking(str(cue_path))
+        except Exception as exc:
+            self._logger.warning("Live cue '%s' failed: %s", cue_key, exc)
+
+
 def run_settings_app() -> int:
     QCoreApplication.setAttribute(Qt.AA_MacDontSwapCtrlAndMeta, True)
     app = QApplication(sys.argv)
@@ -183,6 +243,11 @@ def run_settings_app() -> int:
         history_manager=history_manager,
         paths=paths,
     )
+    live_cue_controller = _build_live_cue_controller(
+        paths=paths,
+        output_device_id=settings.audio_output_device,
+        logger=logger,
+    )
     settings_window = _build_settings_window(
         bridge_url=settings_bridge.url,
         logger=logger,
@@ -192,6 +257,7 @@ def run_settings_app() -> int:
         settings_window,
         controller,
         live_controller,
+        live_cue_controller,
         settings_bridge,
         log_file,
     )
@@ -231,6 +297,10 @@ def run_settings_app() -> int:
             )
             live_controller.set_recorder(ThresholdAudioRecorder(persisted_settings))
             live_controller.set_output_device(persisted_settings.audio_output_device)
+            if live_cue_controller is not None:
+                live_cue_controller.set_output_device(
+                    persisted_settings.audio_output_device
+                )
         except Exception as exc:
             live_controller.set_orchestrator(None)
             live_controller.set_recorder(None)
@@ -277,6 +347,8 @@ def run_settings_app() -> int:
     settings_window.visibleChanged.connect(restore_hotkeys_if_pending)
     app.aboutToQuit.connect(hotkey_manager.stop)
     app.aboutToQuit.connect(live_controller.stop)
+    if live_cue_controller is not None:
+        app.aboutToQuit.connect(live_cue_controller.stop)
     app.aboutToQuit.connect(controller.stopVoicePreview)
     app.aboutToQuit.connect(controller.stopAudioInputTest)
     app.aboutToQuit.connect(controller.stopSpeakerTest)
@@ -311,6 +383,7 @@ def _build_tray_icon(
     settings_window,
     controller: SettingsViewModel,
     live_controller: LiveSessionController,
+    live_cue_controller: LiveCueController | None,
     settings_bridge: SettingsBridgeServer,
     log_file: Path,
 ) -> QSystemTrayIcon:
@@ -362,6 +435,8 @@ def _build_tray_icon(
     def update_live_status(state: str, message: str) -> None:
         tray_icon_controller.set_state(state)
         settings_bridge.set_runtime_status(state, message)
+        if live_cue_controller is not None:
+            live_cue_controller.handle_status(state, message)
         live_state_action.setText(f"Live status: {state}")
         tray.setToolTip(f"Glance\n{message}")
         if any(
@@ -599,3 +674,20 @@ def _build_live_controller(
         ),
         audio_dir=paths.audio_dir,
     )
+
+
+def _build_live_cue_controller(
+    *,
+    paths,
+    output_device_id: str,
+    logger: logging.Logger,
+) -> LiveCueController | None:
+    try:
+        return LiveCueController(
+            audio_dir=paths.audio_dir,
+            output_device_id=output_device_id,
+            logger=logger,
+        )
+    except Exception as exc:
+        logger.warning("Live cues unavailable: %s", exc)
+        return None

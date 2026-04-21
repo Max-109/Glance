@@ -1,6 +1,7 @@
 import tempfile
 import unittest
 from pathlib import Path
+import wave
 
 from src.models.settings import AppSettings
 from src.services.audio_devices import AudioDeviceService
@@ -99,6 +100,25 @@ class AudioTestSignalServiceTests(unittest.TestCase):
             self.assertEqual(written_path, output_path)
             self.assertTrue(output_path.exists())
             self.assertGreater(output_path.stat().st_size, 44)
+
+    def test_write_live_mode_cues_creates_start_and_reply_ready_wavs(self) -> None:
+        service = AudioTestSignalService()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            cue_paths = service.write_live_mode_cues(Path(temp_dir))
+
+            self.assertEqual(set(cue_paths.keys()), {"start", "reply_ready"})
+            self.assertTrue(cue_paths["start"].exists())
+            self.assertTrue(cue_paths["reply_ready"].exists())
+
+            with wave.open(str(cue_paths["start"]), "rb") as start_file:
+                self.assertEqual(start_file.getnchannels(), 1)
+                self.assertEqual(start_file.getframerate(), 24000)
+                self.assertGreater(start_file.getnframes(), 0)
+
+            with wave.open(str(cue_paths["reply_ready"]), "rb") as reply_ready_file:
+                self.assertEqual(reply_ready_file.getnchannels(), 1)
+                self.assertEqual(reply_ready_file.getframerate(), 24000)
+                self.assertGreater(reply_ready_file.getnframes(), 0)
 
 
 if __name__ == "__main__":

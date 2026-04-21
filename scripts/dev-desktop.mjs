@@ -5,6 +5,7 @@ const port = process.env.GLANCE_DEV_PORT || "3000";
 const devUrl = `http://${host}:${port}`;
 const bunCommand = process.env.BUN_BIN || "bun";
 const pythonCommand = process.env.GLANCE_PYTHON || "./venv/bin/python";
+const supportsProcessGroups = process.platform !== "win32";
 
 let shuttingDown = false;
 let desktopProcess = null;
@@ -30,9 +31,22 @@ async function waitForServer(url, timeoutMs = 30000) {
 }
 
 function terminateChild(child, signal = "SIGTERM") {
-  if (!child || child.exitCode !== null) {
+  if (!child || child.exitCode !== null || child.pid === undefined) {
     return;
   }
+
+  if (supportsProcessGroups) {
+    try {
+      process.kill(-child.pid, signal);
+      return;
+    } catch (error) {
+      if (!(error instanceof Error) || error.code !== "ESRCH") {
+        throw error;
+      }
+      return;
+    }
+  }
+
   child.kill(signal);
 }
 
@@ -42,6 +56,7 @@ function forwardExit(code) {
   }
   shuttingDown = true;
   terminateChild(desktopProcess);
+  terminateChild(nextProcess);
   process.exit(code);
 }
 
@@ -50,6 +65,7 @@ const nextProcess = spawn(
   ["run", "dev", "--", "--hostname", host, "--port", port],
   {
     stdio: "inherit",
+    detached: supportsProcessGroups,
     env: process.env,
   },
 );
@@ -79,6 +95,7 @@ try {
   await waitForServer(devUrl);
   desktopProcess = spawn(pythonCommand, ["main.py"], {
     stdio: "inherit",
+    detached: supportsProcessGroups,
     env: {
       ...process.env,
       GLANCE_NEXT_DEV_URL: devUrl,

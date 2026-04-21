@@ -286,10 +286,13 @@ ipcMain.handle("glance:system-theme", async () =>
 );
 
 app.on("window-all-closed", (event) => {
-  event.preventDefault();
+  if (!isQuitting) {
+    event.preventDefault();
+  }
 });
 
 app.on("before-quit", () => {
+  isQuitting = true;
   if (staticServer) {
     staticServer.close();
     staticServer = null;
