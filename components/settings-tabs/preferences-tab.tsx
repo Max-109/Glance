@@ -1,21 +1,12 @@
-import { Card } from "../ui/card";
 import { ColorPicker } from "../ui/color-picker";
 import { Input } from "../ui/input";
 import { Keybinds } from "../ui/keybinds";
-import { SelectInput } from "../ui/select-input";
+import { Panel } from "../ui/panel";
 
-import {
-  ACCENT_PRESETS,
-  THEME_LABELS,
-  type SettingsTabProps,
-  settingValue,
-} from "./shared";
+import { ACCENT_PRESETS, type SettingsTabProps, settingValue } from "./shared";
 
 export function PreferencesTab({
   state,
-  openSelect,
-  onToggleSelect,
-  onSelectValue,
   onSetField,
   onDraftChange,
   onDraftCommit,
@@ -25,9 +16,6 @@ export function PreferencesTab({
 }: Pick<
   SettingsTabProps,
   | "state"
-  | "openSelect"
-  | "onToggleSelect"
-  | "onSelectValue"
   | "onSetField"
   | "onDraftChange"
   | "onDraftCommit"
@@ -39,18 +27,21 @@ export function PreferencesTab({
     {
       id: "live_keybind",
       title: "Live",
+      icon: "zap",
       value: String(state.settings.live_keybind || "-"),
       active: state.bindingField === "live_keybind",
     },
     {
       id: "quick_keybind",
       title: "Quick Ask",
+      icon: "bot",
       value: String(state.settings.quick_keybind || "-"),
       active: state.bindingField === "quick_keybind",
     },
     {
       id: "ocr_keybind",
       title: "Read Screen",
+      icon: "capture",
       value: String(state.settings.ocr_keybind || "-"),
       active: state.bindingField === "ocr_keybind",
     },
@@ -58,61 +49,39 @@ export function PreferencesTab({
 
   return (
     <div className="stack">
-      <Card title="Appearance" description="Choose a theme and accent color.">
-        <SelectInput
-          fieldName="theme_preference"
-          label="Theme"
-          icon={
-            settingValue(state, "theme_preference") === "light"
-              ? "sun"
-              : settingValue(state, "theme_preference") === "system"
-                ? "monitor"
-                : "moon"
-          }
-          value={settingValue(state, "theme_preference") || "dark"}
-          options={state.themeOptions}
-          labels={THEME_LABELS}
-          helperText="Use dark, light, or follow the system."
-          open={openSelect === "theme_preference"}
-          onToggle={() => onToggleSelect("theme_preference")}
-          onSelect={(value) => onSelectValue("theme_preference", value)}
+      <Panel
+        title="Accent"
+        description="Pick the color used for highlights, icons, and the mic threshold."
+      >
+        <ColorPicker
+          value={settingValue(state, "accent_color") || "#a7ffde"}
+          presets={ACCENT_PRESETS}
+          onChange={(nextValue) => onSetField("accent_color", nextValue)}
         />
+      </Panel>
 
-        <div className="field">
-          <span className="field__label">Accent Color</span>
-          <ColorPicker
-            value={settingValue(state, "accent_color") || "#a7ffde"}
-            presets={ACCENT_PRESETS}
-            onChange={(nextValue) => onSetField("accent_color", nextValue)}
-          />
-          <span className="field__meta">
-            Used for highlights, notices, icons, and the mic threshold.
-          </span>
-        </div>
-      </Card>
-
-      <Card
-        title="Prompt & Keybinds"
-        description="Prompt override and keybinds."
+      <Panel
+        title="Extra instructions"
+        description="Anything here gets appended to every reply."
       >
         <Input
           fieldName="system_prompt_override"
-          label="Extra Instructions"
-          icon="quote"
+          label=""
           multiline
           value={getDraftValue("system_prompt_override")}
-          helperText="Optional instructions added to each reply."
-          placeholder="Keep replies short and useful."
+          placeholder="e.g. Keep replies short and useful."
           onChange={(value) => onDraftChange("system_prompt_override", value)}
           onCommit={(value) => onDraftCommit("system_prompt_override", value)}
           onFocus={() => onDraftFocus("system_prompt_override")}
         />
+      </Panel>
 
-        <Keybinds
-          rows={shortcutRows}
-          onActivate={onStartKeybindCapture}
-        />
-      </Card>
+      <Panel
+        title="Keyboard shortcuts"
+        description="Pick how you trigger each mode."
+      >
+        <Keybinds rows={shortcutRows} onActivate={onStartKeybindCapture} />
+      </Panel>
     </div>
   );
 }

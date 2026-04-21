@@ -74,6 +74,7 @@ const EMPTY_STATE: BridgeState = {
   },
   errors: {},
   dirty: false,
+  manualSaveDirty: false,
   saving: false,
   statusMessage: "",
   statusKind: "neutral",
@@ -687,10 +688,16 @@ export function SettingsPage() {
   const footerStatus = bridgeError
     ? "Not connected"
     : liveState.saving
-      ? "Saving changes"
-      : liveState.dirty
-        ? "Unsaved changes"
-        : "All changes saved";
+      ? "Saving provider changes"
+      : liveState.manualSaveDirty
+        ? "Provider changes not saved"
+        : liveState.dirty
+          ? "Fix highlighted fields"
+          : "All changes saved";
+
+  const discardLabel = liveState.manualSaveDirty
+    ? "Discard provider changes"
+    : "Discard changes";
 
   return (
     <main
@@ -764,15 +771,16 @@ export function SettingsPage() {
           <footer className="action-dock">
             <div className="action-dock__status">{footerStatus}</div>
             <div className="action-dock__actions">
+              {liveState.manualSaveDirty ? (
+                <Button
+                  label="Save Provider Changes"
+                  icon="check"
+                  variant="primary"
+                  onClick={() => handleRunAction("save")}
+                />
+              ) : null}
               <Button
-                label="Save"
-                icon="check"
-                variant="primary"
-                disabled={!liveState.dirty}
-                onClick={() => handleRunAction("save")}
-              />
-              <Button
-                label="Discard changes"
+                label={discardLabel}
                 icon="undo"
                 variant="ghost"
                 disabled={!liveState.dirty}

@@ -107,9 +107,16 @@ export function Input({
               type="button"
               className="field__icon-button"
               aria-label={revealed ? "Hide secret" : "Show secret"}
+              aria-pressed={revealed}
               onClick={onToggleReveal}
             >
-              <Icon name="eye" />
+              <span
+                className="icon--toggle"
+                key={revealed ? "eye-off" : "eye"}
+                data-enter="true"
+              >
+                <Icon name={revealed ? "eye-off" : "eye"} />
+              </span>
             </button>
           ) : null}
         </span>

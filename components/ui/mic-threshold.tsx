@@ -11,6 +11,8 @@ const MIC_GATE_SAMPLE_HZ = 30;
 const MIC_GATE_HISTORY_LENGTH = MIC_GATE_HISTORY_SECONDS * MIC_GATE_SAMPLE_HZ;
 const MIC_GATE_PEAK_DECAY = 0.94;
 const MIC_GATE_GLOW_LAYER_SCALE = 0.6;
+const MIC_GATE_PLOT_TOP_INSET = 10;
+const MIC_GATE_PLOT_BOTTOM_INSET = 8;
 
 type MicGateStatus = "idle" | "quiet" | "speech" | "noisy";
 
@@ -236,6 +238,11 @@ export function MicThreshold({
       const height = host.clientHeight;
       if (width <= 0 || height <= 0) return;
 
+      const plotTop = MIC_GATE_PLOT_TOP_INSET;
+      const plotBottom = MIC_GATE_PLOT_BOTTOM_INSET;
+      const plotHeight = Math.max(1, height - plotTop - plotBottom);
+      const plotBottomY = height - plotBottom;
+
       const colors = cachedColors;
       const history = historyRef.current;
       const peak = peakRef.current;
@@ -249,7 +256,7 @@ export function MicThreshold({
       ctx.lineWidth = 1;
       ctx.beginPath();
       for (const p of [0.25, 0.5, 0.75]) {
-        const y = Math.round((1 - p) * height) + 0.5;
+        const y = Math.round(plotTop + (1 - p) * plotHeight) + 0.5;
         ctx.moveTo(0, y);
         ctx.lineTo(width, y);
       }
@@ -258,7 +265,7 @@ export function MicThreshold({
       ctx.strokeStyle = "rgba(255, 255, 255, 0.05)";
       ctx.setLineDash([3, 5]);
       ctx.beginPath();
-      const headroomY = Math.round(height * 0.05) + 0.5;
+      const headroomY = Math.round(plotTop + plotHeight * 0.05) + 0.5;
       ctx.moveTo(0, headroomY);
       ctx.lineTo(width, headroomY);
       ctx.stroke();
@@ -283,17 +290,17 @@ export function MicThreshold({
         const v = history[srcIdx];
         const p = peak[srcIdx];
         const x = i * step + slotOffset;
-        const barH = Math.max(1, v * height);
-        ctx.fillRect(x, height - barH, barWidth, barH);
+        const barH = Math.max(1, v * plotHeight);
+        ctx.fillRect(x, plotBottomY - barH, barWidth, barH);
 
         traceX[i] = x + barWidth / 2;
-        traceY[i] = height - Math.max(1, p * height);
+        traceY[i] = plotBottomY - Math.max(1, p * plotHeight);
         const above = thr > 0 && p >= thr ? 1 : 0;
         traceAbove[i] = above;
         hasAboveTrace ||= above === 1;
       }
 
-      const thresholdY = (1 - thr) * height;
+      const thresholdY = plotTop + (1 - thr) * plotHeight;
       const thrY = Math.round(thresholdY) + 0.5;
       const lineEnd = Math.max(0, width - handleInset);
       ctx.strokeStyle = colors.line;
@@ -470,6 +477,7 @@ export function MicThreshold({
 
   const thresholdPct = Math.round(normalizedThreshold * 100);
   const levelPct = Math.round(normalizedLevel * 100);
+  const thresholdTickBottom = `calc(${normalizedThreshold * 100}% + ${MIC_GATE_PLOT_BOTTOM_INSET - normalizedThreshold * (MIC_GATE_PLOT_TOP_INSET + MIC_GATE_PLOT_BOTTOM_INSET)}px)`;
   const statusLabel =
     status === "speech"
       ? "Speech detected"
@@ -544,7 +552,7 @@ export function MicThreshold({
 
         <div
           className="mic-gate__tick"
-          style={{ bottom: `${normalizedThreshold * 100}%` }}
+          style={{ bottom: thresholdTickBottom }}
           aria-hidden="true"
         >
           <span className="mic-gate__tick-mark" />

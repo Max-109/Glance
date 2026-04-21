@@ -47,6 +47,7 @@ def _build_state_snapshot(viewmodel: SettingsViewModel) -> dict[str, Any]:
         "settings": viewmodel.settings,
         "errors": viewmodel.errors,
         "dirty": viewmodel.dirty,
+        "manualSaveDirty": viewmodel.manualSaveDirty,
         "saving": viewmodel.saving,
         "statusMessage": viewmodel.statusMessage,
         "statusKind": viewmodel.statusKind,

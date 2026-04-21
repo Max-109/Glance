@@ -39,6 +39,16 @@ class SettingsViewModel(QObject):
     _SUCCESS_STATUS_DURATION_MS = 2200
     _TRANSIENT_INFO_STATUS_DURATION_MS = 2200
     _STATUS_REPLACE_DELAY_MS = 180
+    _MANUAL_SAVE_FIELDS = frozenset(
+        {
+            "llm_base_url",
+            "llm_api_key",
+            "tts_base_url",
+            "tts_api_key",
+            "transcription_base_url",
+            "transcription_api_key",
+        }
+    )
 
     settingsChanged = Signal()
     savedSettingsChanged = Signal()
@@ -131,6 +141,13 @@ class SettingsViewModel(QObject):
     @Property(bool, notify=dirtyChanged)
     def dirty(self) -> bool:
         return self._dirty
+
+    @Property(bool, notify=dirtyChanged)
+    def manualSaveDirty(self) -> bool:
+        return any(
+            self._settings_map.get(field_name) != self._baseline_map.get(field_name)
+            for field_name in self._MANUAL_SAVE_FIELDS
+        )
 
     @Property(bool, notify=savingChanged)
     def saving(self) -> bool:
@@ -259,8 +276,9 @@ class SettingsViewModel(QObject):
             self.errorsChanged.emit()
         self._recompute_dirty()
         self.settingsChanged.emit()
-        if field_name.endswith("_keybind"):
+        if field_name in self._MANUAL_SAVE_FIELDS:
             return
+        self._apply_autosave()
 
     @Slot()
     def save(self) -> None:
@@ -269,7 +287,12 @@ class SettingsViewModel(QObject):
             return
         self._set_saving(True)
         try:
-            self._persist_settings(settings, status_message="Settings saved.")
+            status_message = (
+                "Provider changes saved."
+                if self.manualSaveDirty
+                else "Settings saved."
+            )
+            self._persist_settings(settings, status_message=status_message)
         finally:
             if QCoreApplication.instance() is None:
                 self._clear_saving()
@@ -338,7 +361,7 @@ class SettingsViewModel(QObject):
         self.bindingChanged.emit()
         self.setField(field_name, keybind)
         self._set_status(
-            f"{self._binding_label(field_name)} keybind ready to save.", "success"
+            f"{self._binding_label(field_name)} keybind saved.", "success"
         )
 
     @Slot(str, str)
@@ -367,7 +390,7 @@ class SettingsViewModel(QObject):
             self.bindingChanged.emit()
         self.setField(field_name, normalized_keybind)
         self._set_status(
-            f"{self._binding_label(field_name)} keybind ready to save.",
+            f"{self._binding_label(field_name)} keybind saved.",
             "success",
         )
 
@@ -549,9 +572,12 @@ class SettingsViewModel(QObject):
         self._set_status("Audio settings reset to defaults.", "success")
 
     def _validate_current_settings(
-        self, *, show_status: bool = True
+        self,
+        *,
+        show_status: bool = True,
+        payload: dict[str, Any] | None = None,
     ) -> AppSettings | None:
-        payload = deepcopy(self._settings_map)
+        payload = deepcopy(self._settings_map if payload is None else payload)
         errors: dict[str, str] = {}
 
         self._validate_optional_url(payload, "llm_base_url", errors)
@@ -923,6 +949,36 @@ class SettingsViewModel(QObject):
                 }
             )
         return preview_items
+
+    def _apply_autosave(self) -> None:
+        settings = self._validate_current_settings(
+            show_status=False,
+            payload=self._build_autosave_payload(),
+        )
+        if settings is None:
+            return
+        self._persist_autosaved_settings(settings)
+
+    def _build_autosave_payload(self) -> dict[str, Any]:
+        payload = deepcopy(self._settings_map)
+        for field_name in self._MANUAL_SAVE_FIELDS:
+            payload[field_name] = self._baseline_map.get(field_name, payload.get(field_name))
+        return payload
+
+    def _persist_autosaved_settings(self, settings: AppSettings) -> None:
+        current_settings = deepcopy(self._settings_map)
+        self._settings_manager.save(settings, validate=False)
+        self._baseline_map = settings.to_dict()
+        self._settings_map = deepcopy(self._baseline_map)
+        for field_name in self._MANUAL_SAVE_FIELDS:
+            self._settings_map[field_name] = current_settings.get(
+                field_name,
+                self._baseline_map.get(field_name),
+            )
+        self._recompute_dirty()
+        self.savedSettingsChanged.emit()
+        self.settingsChanged.emit()
+        self.dirtyChanged.emit()
 
     def _persist_settings(self, settings: AppSettings, *, status_message: str) -> None:
         self._settings_manager.save(settings, validate=False)
