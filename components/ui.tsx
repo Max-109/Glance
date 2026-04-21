@@ -1211,21 +1211,25 @@ export function MicGateMeter({
         muted: "rgba(255, 255, 255, 0.18)",
         mutedSoft: "rgba(255, 255, 255, 0.09)",
         threshold: "#a7ffde",
+        thresholdZone: "rgba(167, 255, 222, 0.1)",
       };
     }
     const styles = getComputedStyle(document.documentElement);
     return {
-      accent: styles.getPropertyValue("--accent").trim() || "#a7ffde",
-      accentStrong:
-        styles.getPropertyValue("--accent-strong").trim() || "#d3fff0",
-      accentGlow:
-        styles.getPropertyValue("--accent-glow").trim() ||
-        "rgba(167, 255, 222, 0.38)",
-      muted: "rgba(255, 255, 255, 0.22)",
-      mutedSoft: "rgba(255, 255, 255, 0.08)",
-      threshold: styles.getPropertyValue("--accent").trim() || "#a7ffde",
+        accent: styles.getPropertyValue("--accent").trim() || "#a7ffde",
+        accentStrong:
+          styles.getPropertyValue("--accent-strong").trim() || "#d3fff0",
+        accentGlow:
+          styles.getPropertyValue("--accent-glow").trim() ||
+          "rgba(167, 255, 222, 0.38)",
+        muted: "rgba(255, 255, 255, 0.22)",
+        mutedSoft: "rgba(255, 255, 255, 0.08)",
+        threshold: styles.getPropertyValue("--accent").trim() || "#a7ffde",
+        thresholdZone:
+          styles.getPropertyValue("--mic-gate-threshold-zone").trim() ||
+          "rgba(167, 255, 222, 0.1)",
+      };
     };
-  };
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -1294,17 +1298,21 @@ export function MicGateMeter({
         ctx.stroke();
       }
 
-      // Threshold line (drawn under bars so peaks can glow over it)
-      const thrY = Math.round((1 - thr) * height) + 0.5;
+      // Threshold zone: keep the floor visible without a harsh full-width beam.
+      const thresholdY = (1 - thr) * height;
+      const thrY = Math.round(thresholdY) + 0.5;
+      ctx.save();
+      ctx.fillStyle = colors.thresholdZone;
+      ctx.fillRect(0, thresholdY, width, Math.max(0, height - thresholdY));
       ctx.strokeStyle = colors.threshold;
-      ctx.shadowColor = colors.accentGlow;
-      ctx.shadowBlur = 14;
+      ctx.globalAlpha = 0.38;
       ctx.lineWidth = 1;
+      ctx.setLineDash([4, 5]);
       ctx.beginPath();
       ctx.moveTo(0, thrY);
       ctx.lineTo(width, thrY);
       ctx.stroke();
-      ctx.shadowBlur = 0;
+      ctx.restore();
 
       // Dashed segment above threshold (showing headroom zone)
       ctx.save();
@@ -1316,14 +1324,12 @@ export function MicGateMeter({
       ctx.stroke();
       ctx.restore();
 
-      // Bars: oldest on the left, newest on the right.
-      const barWidth = 2;
-      const gap = 1;
-      const step = barWidth + gap;
-      const visibleCount = Math.min(
-        MIC_GATE_HISTORY_LENGTH,
-        Math.floor(width / step),
-      );
+      // Bars: oldest on the left, newest on the right, stretched across the full 6s window.
+      const visibleCount = MIC_GATE_HISTORY_LENGTH;
+      const step = width / visibleCount;
+      const gap = Math.min(1.25, step * 0.22);
+      const barWidth = step > 1 ? Math.max(1, step - gap) : 1;
+      const slotOffset = Math.max(0, (step - barWidth) / 2);
       const startReadIdx =
         (head - visibleCount + MIC_GATE_HISTORY_LENGTH) %
         MIC_GATE_HISTORY_LENGTH;
@@ -1335,8 +1341,7 @@ export function MicGateMeter({
         const srcIdx = (startReadIdx + i) % MIC_GATE_HISTORY_LENGTH;
         const v = history[srcIdx];
         const p = peak[srcIdx];
-        // Anchor to the right edge so newest samples hug the "now" line
-        const x = width - (visibleCount - i) * step;
+        const x = i * step + slotOffset;
         const barH = Math.max(1, v * height);
         const y = height - barH;
 

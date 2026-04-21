@@ -457,8 +457,14 @@ def _build_tray_icon(
 
     menu.addSeparator()
 
+    def request_quit() -> None:
+        try:
+            settings_window.close()
+        finally:
+            app.quit()
+
     quit_action = QAction("Quit", menu)
-    quit_action.triggered.connect(app.quit)
+    quit_action.triggered.connect(request_quit)
     menu.addAction(quit_action)
 
     tray.setContextMenu(menu)

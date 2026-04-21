@@ -21,6 +21,7 @@ let stdinBuffer = "";
 let staticServer = null;
 let staticServerUrl = "";
 let appReady = false;
+let stdoutClosed = false;
 const pendingCommands = [];
 
 const CONTENT_TYPES = {
@@ -39,7 +40,19 @@ const CONTENT_TYPES = {
 };
 
 function emit(payload) {
-  process.stdout.write(`${JSON.stringify(payload)}\n`);
+  if (stdoutClosed || process.stdout.destroyed || !process.stdout.writable) {
+    return;
+  }
+
+  try {
+    process.stdout.write(`${JSON.stringify(payload)}\n`);
+  } catch (error) {
+    if (error && typeof error === "object" && error.code === "EPIPE") {
+      stdoutClosed = true;
+      return;
+    }
+    throw error;
+  }
 }
 
 function buildWindow() {
@@ -67,8 +80,16 @@ function buildWindow() {
     });
   });
 
-  window.on("show", () => emit({ type: "visible", visible: true }));
-  window.on("hide", () => emit({ type: "visible", visible: false }));
+  window.on("show", () => {
+    if (!isQuitting) {
+      emit({ type: "visible", visible: true });
+    }
+  });
+  window.on("hide", () => {
+    if (!isQuitting) {
+      emit({ type: "visible", visible: false });
+    }
+  });
   window.on("moved", () => emitBounds(window));
   window.on("resized", () => emitBounds(window));
   window.on("close", (event) => {

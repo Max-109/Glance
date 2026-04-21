@@ -1206,6 +1206,11 @@ textarea.control::-webkit-scrollbar-thumb {
 }
 
 .mic-gate {
+  --mic-gate-threshold-zone: color-mix(
+    in srgb,
+    var(--accent) 10%,
+    transparent
+  );
   display: grid;
   gap: 0;
   overflow: hidden;
