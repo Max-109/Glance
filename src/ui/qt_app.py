@@ -13,7 +13,7 @@ from PySide6.QtWidgets import QApplication, QMenu, QSystemTrayIcon
 
 from src.core.orchestrator import build_orchestrator_with_dependencies
 from src.services.app_paths import build_app_paths
-from src.services.app_logging import configure_app_logging
+from src.services.app_logging import configure_app_logging, update_console_logging_accent
 from src.services.audio_playback import QtAudioPlaybackService
 from src.services.audio_recording import ThresholdAudioRecorder
 from src.services.audio_signal import AudioTestSignalService
@@ -29,6 +29,14 @@ from src.services.settings_manager import SettingsManager
 from src.storage.json_storage import JsonHistoryRepository, JsonSettingsStore
 from src.ui.electron_bridge import SettingsBridgeServer
 from src.ui.electron_window import ElectronShellController
+from src.ui.runtime_visual import (
+    current_epoch_ms,
+    effective_visual_state,
+    frame_for_phase,
+    next_visual_update_at_ms,
+    normalize_runtime_state,
+    state_blink_interval_ms,
+)
 from src.ui.settings_viewmodel import SettingsViewModel
 
 
@@ -37,117 +45,85 @@ class LiveStatusBridge(QObject):
 
 
 class TrayIconController(QObject):
-    _ANIMATION_INTERVAL_MS = {
-        "listening": 420,
-        "processing": 560,
-        "speaking": 420,
-        "ready": 420,
-    }
     _ERROR_FLASH_MS = 1400
-    _READY_FLASH_MS = 520
 
     def __init__(self, tray: QSystemTrayIcon, app: QApplication) -> None:
         super().__init__(tray)
         self._tray = tray
         self._base_state = "idle"
-        self._override_state: str | None = None
-        self._frame = 0
+        self._phase_started_at_ms = current_epoch_ms()
+        self._blink_interval_ms = 0
+        self._error_flash_until_ms = 0
         self._color_scheme = app.styleHints().colorScheme()
 
         self._animation_timer = QTimer(self)
-        self._animation_timer.timeout.connect(self._advance_frame)
-
-        self._ready_timer = QTimer(self)
-        self._ready_timer.setSingleShot(True)
-        self._ready_timer.timeout.connect(self._clear_ready_override)
-
-        self._error_timer = QTimer(self)
-        self._error_timer.setSingleShot(True)
-        self._error_timer.timeout.connect(self._clear_override)
+        self._animation_timer.setSingleShot(True)
+        self._animation_timer.timeout.connect(self._handle_visual_tick)
 
         app.styleHints().colorSchemeChanged.connect(self._handle_color_scheme_changed)
         self._refresh_animation()
         self._apply_icon()
 
     def set_state(self, state: str) -> None:
-        normalized_state = _normalize_tray_state(state)
-        if normalized_state == self._base_state and self._override_state is None:
+        normalized_state = normalize_runtime_state(state)
+        if normalized_state == self._base_state:
             return
-        previous_state = self._base_state
         self._base_state = normalized_state
-
-        if self._override_state == "ready" and normalized_state != "listening":
-            self._clear_ready_override()
-
-        if previous_state == "speaking" and normalized_state == "listening":
-            self._start_ready_override()
-            return
-
-        if self._override_state is None:
-            self._frame = 0
-            self._refresh_animation()
-            self._apply_icon()
+        self._phase_started_at_ms = current_epoch_ms()
+        self._blink_interval_ms = state_blink_interval_ms(normalized_state)
+        self._refresh_animation()
+        self._apply_icon()
 
     def flash_error(self) -> None:
-        self._ready_timer.stop()
-        self._override_state = "error"
-        self._frame = 0
-        self._animation_timer.stop()
-        self._apply_icon()
-        self._error_timer.start(self._ERROR_FLASH_MS)
-
-    def _start_ready_override(self) -> None:
-        self._override_state = "ready"
-        self._frame = 0
-        self._refresh_animation()
-        self._apply_icon()
-        self._ready_timer.start(self._READY_FLASH_MS)
-
-    def _clear_ready_override(self) -> None:
-        if self._override_state != "ready":
-            self._ready_timer.stop()
-            return
-        self._ready_timer.stop()
-        self._override_state = None
-        self._frame = 0
+        self._error_flash_until_ms = current_epoch_ms() + self._ERROR_FLASH_MS
         self._refresh_animation()
         self._apply_icon()
 
-    def _advance_frame(self) -> None:
-        self._frame = 1 - self._frame
-        self._apply_icon()
+    def runtime_status(self, *, message: str, revision: int) -> dict[str, int | str]:
+        return {
+            "runtimeState": self._base_state,
+            "runtimeMessage": str(message).strip() or "Live is idle.",
+            "runtimeRevision": max(0, int(revision)),
+            "runtimePhaseStartedAtMs": self._phase_started_at_ms,
+            "runtimeBlinkIntervalMs": self._blink_interval_ms,
+            "runtimeErrorFlashUntilMs": self._error_flash_until_ms,
+        }
 
-    def _clear_override(self) -> None:
-        self._ready_timer.stop()
-        self._override_state = None
-        self._frame = 0
-        self._refresh_animation()
+    def _handle_visual_tick(self) -> None:
         self._apply_icon()
+        self._refresh_animation()
 
     def _handle_color_scheme_changed(self, color_scheme) -> None:
         self._color_scheme = color_scheme
         self._apply_icon()
 
     def _refresh_animation(self) -> None:
-        interval = self._ANIMATION_INTERVAL_MS.get(self._effective_state())
-        if interval is None:
+        next_update_at_ms = next_visual_update_at_ms(
+            phase_started_at_ms=self._phase_started_at_ms,
+            blink_interval_ms=self._blink_interval_ms,
+            error_flash_until_ms=self._error_flash_until_ms,
+        )
+        if next_update_at_ms is None:
             self._animation_timer.stop()
-            self._frame = 0
             return
-        if self._animation_timer.interval() != interval:
-            self._animation_timer.setInterval(interval)
-        if not self._animation_timer.isActive():
-            self._animation_timer.start()
-
-    def _effective_state(self) -> str:
-        return self._override_state or self._base_state
+        delay_ms = max(1, next_update_at_ms - current_epoch_ms())
+        self._animation_timer.start(delay_ms)
 
     def _apply_icon(self) -> None:
+        now_ms = current_epoch_ms()
         self._tray.setIcon(
             _create_tray_icon(
                 color_scheme=self._color_scheme,
-                state=self._effective_state(),
-                frame=self._frame,
+                state=effective_visual_state(
+                    base_state=self._base_state,
+                    error_flash_until_ms=self._error_flash_until_ms,
+                    now_ms=now_ms,
+                ),
+                frame=frame_for_phase(
+                    phase_started_at_ms=self._phase_started_at_ms,
+                    blink_interval_ms=self._blink_interval_ms,
+                    now_ms=now_ms,
+                ),
             )
         )
 
@@ -169,6 +145,7 @@ class LiveCueController:
             audio_dir / "live-cues"
         )
         self._previous_state: str | None = None
+        self._previous_message = ""
         self._enabled = True
 
     def set_output_device(self, output_device_id: str) -> None:
@@ -181,18 +158,22 @@ class LiveCueController:
     def handle_status(self, state: str, message: str) -> None:
         if not self._enabled:
             return
-        normalized_state = _normalize_tray_state(state)
+        normalized_state = normalize_runtime_state(state)
+        normalized_message = str(message).strip()
         previous_state = self._previous_state
+        previous_message = self._previous_message
         self._previous_state = normalized_state
+        self._previous_message = normalized_message
         if previous_state is None:
             return
 
         cue_key = ""
         if previous_state == "idle" and normalized_state == "listening":
             cue_key = "start"
-        elif previous_state == "processing" and normalized_state == "speaking":
-            cue_key = "reply_ready"
-        elif normalized_state == "idle" and message == "Live stopped.":
+        elif normalized_state == "speaking" and normalized_message == "Speaking...":
+            if previous_state != "speaking" or previous_message != normalized_message:
+                cue_key = "reply_ready"
+        elif normalized_state == "idle" and normalized_message == "Live stopped.":
             cue_key = "cancel"
         if not cue_key:
             return
@@ -216,6 +197,7 @@ class LiveCueController:
 
 
 def run_settings_app() -> int:
+    os.environ.setdefault("QT_LOGGING_RULES", "qt.multimedia.ffmpeg=false")
     QCoreApplication.setAttribute(Qt.AA_MacDontSwapCtrlAndMeta, True)
     app = QApplication(sys.argv)
     app.setApplicationName("Glance")
@@ -227,12 +209,12 @@ def run_settings_app() -> int:
         app.setWindowIcon(app_icon)
 
     paths = build_app_paths()
-    log_file = configure_app_logging(paths.root_dir)
-    logger = logging.getLogger("glance.ui")
-    logger.info("================ launch pid=%s ================", os.getpid())
-    logger.info("Log file: %s", log_file)
     settings_manager = SettingsManager(store=JsonSettingsStore(paths.config_file))
     settings = settings_manager.load()
+    log_file = configure_app_logging(paths.root_dir, accent_color=settings.accent_color)
+    logger = logging.getLogger("glance.ui")
+    logger.debug("launch pid=%s", os.getpid())
+    logger.debug("log file: %s", log_file)
     history_manager = HistoryManager(
         JsonHistoryRepository(paths.history_file),
         history_limit=settings.history_length,
@@ -290,7 +272,8 @@ def run_settings_app() -> int:
 
     def refresh_runtime() -> None:
         persisted_settings = settings_manager.reload()
-        logger.info("Refreshing runtime from saved settings")
+        update_console_logging_accent(persisted_settings.accent_color)
+        logger.debug("refreshing runtime from saved settings")
         history_manager.set_history_limit(persisted_settings.history_length)
         try:
             live_controller.set_orchestrator(
@@ -333,18 +316,16 @@ def run_settings_app() -> int:
         if not pending_hotkey_refresh or settings_window.isVisible():
             return
         pending_hotkey_refresh = False
-        logger.info("Settings window hidden; scheduling hotkey refresh")
+        logger.debug("settings window hidden; scheduling hotkey refresh")
         schedule_runtime_refresh(300)
 
     def handle_binding_change() -> None:
         if controller.bindingActive:
-            logger.info(
-                "Suspending hotkeys for keybind capture: %s", controller.bindingField
-            )
+            logger.debug("suspending hotkeys for keybind capture: %s", controller.bindingField)
             hotkey_manager.set_enabled(False)
             runtime_refresh_timer.stop()
             return
-        logger.info("Keybind capture ended; waiting for window hide before refresh")
+        logger.debug("keybind capture ended; waiting for window hide before refresh")
         schedule_hotkey_refresh_when_window_hides()
 
     controller.savedSettingsChanged.connect(schedule_runtime_refresh)
@@ -379,7 +360,7 @@ def _build_settings_window(
         bridge_url=bridge_url,
         logger=logger,
     )
-    logger.info("Using Electron settings shell.")
+    logger.debug("using Electron settings shell")
     return window
 
 
@@ -436,10 +417,11 @@ def _build_tray_icon(
 
     update_keybind_actions()
     controller.settingsChanged.connect(update_keybind_actions)
+    runtime_revision = 0
 
     def update_live_status(state: str, message: str) -> None:
+        nonlocal runtime_revision
         tray_icon_controller.set_state(state)
-        settings_bridge.set_runtime_status(state, message)
         if live_cue_controller is not None:
             live_cue_controller.handle_status(state, message)
         live_state_action.setText(f"Live status: {state}")
@@ -449,6 +431,13 @@ def _build_tray_icon(
         ):
             tray_icon_controller.flash_error()
             tray.showMessage("Glance", f"{message}\nSee log: {log_file}")
+        runtime_revision += 1
+        runtime_status = tray_icon_controller.runtime_status(
+            message=message,
+            revision=runtime_revision,
+        )
+        settings_bridge.set_runtime_status(runtime_status)
+        settings_window.push_runtime_status(runtime_status)
 
     status_bridge = LiveStatusBridge(tray)
     status_bridge.statusChanged.connect(update_live_status)
@@ -562,14 +551,6 @@ def _tray_icon_color(color_scheme: Qt.ColorScheme | None) -> str:
     return "#FFFFFF"
 
 
-def _normalize_tray_state(state: str) -> str:
-    if state in {"listening", "processing", "speaking", "ready"}:
-        return state
-    if state == "error":
-        return state
-    return "idle"
-
-
 def _tray_segment_opacities(state: str, frame: int) -> tuple[float, float, float, float]:
     pulse_alpha = 1.0 if frame else 0.38
     completed_alpha = 0.9
@@ -578,11 +559,11 @@ def _tray_segment_opacities(state: str, frame: int) -> tuple[float, float, float
 
     if state == "listening":
         return pulse_alpha, inactive_alpha, inactive_alpha, inactive_alpha
-    if state == "processing":
+    if state == "transcribing":
         return completed_alpha, pulse_alpha, inactive_alpha, inactive_alpha
-    if state == "speaking":
+    if state == "generating":
         return completed_alpha, completed_alpha, pulse_alpha, inactive_alpha
-    if state == "ready":
+    if state == "speaking":
         return completed_alpha, completed_alpha, completed_alpha, pulse_alpha
     if state == "error":
         return 1.0, 1.0, 1.0, 1.0

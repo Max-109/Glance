@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import logging
 import wave
 from collections import deque
 from pathlib import Path
 from threading import Event
+from time import perf_counter
 
 from src.exceptions.app_exceptions import PermissionDeniedError, ValidationError
 from src.models.settings import AppSettings
@@ -18,6 +20,9 @@ try:
     import sounddevice as sd
 except ImportError:  # pragma: no cover - optional runtime dependency.
     sd = None
+
+
+logger = logging.getLogger("glance.audio")
 
 
 class ThresholdAudioRecorder:
@@ -82,15 +87,13 @@ class ThresholdAudioRecorder:
         silence_chunk_limit = max(
             1, int(self._silence_seconds * self._sample_rate / self._chunk_size)
         )
-        max_wait_chunks = max(
-            1, int(self._max_wait_seconds * self._sample_rate / self._chunk_size)
-        )
         max_record_chunks = max(
             1, int(self._max_record_seconds * self._sample_rate / self._chunk_size)
         )
         silence_chunks = 0
-        total_chunks = 0
         started = False
+        wait_started_at = perf_counter()
+        overflowed_chunks = 0
 
         device = self._device_service.resolve_input_device(
             self._settings.audio_input_device
@@ -109,10 +112,18 @@ class ThresholdAudioRecorder:
                         raise ValidationError("Recording stopped.")
 
                     block, overflowed = stream.read(self._chunk_size)
+                    elapsed_wait = perf_counter() - wait_started_at
                     if overflowed:
+                        overflowed_chunks += 1
+                        if not started and elapsed_wait >= self._max_wait_seconds:
+                            logger.info(
+                                "Live capture wait expired after %.2f s with %d overflowed chunks",
+                                elapsed_wait,
+                                overflowed_chunks,
+                            )
+                            raise ValidationError("No speech was detected.")
                         continue
 
-                    total_chunks += 1
                     level = self._level(block)
                     copied_block = block.copy()
 
@@ -123,7 +134,12 @@ class ThresholdAudioRecorder:
                             frames.extend(pre_roll_frames)
                             silence_chunks = 0
                             continue
-                        if total_chunks >= max_wait_chunks:
+                        if elapsed_wait >= self._max_wait_seconds:
+                            logger.info(
+                                "Live capture wait expired after %.2f s with %d overflowed chunks",
+                                elapsed_wait,
+                                overflowed_chunks,
+                            )
                             raise ValidationError("No speech was detected.")
                         continue
 

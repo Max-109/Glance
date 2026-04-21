@@ -1,6 +1,8 @@
 const { contextBridge, ipcRenderer } = require("electron");
 
 const bridgeUrl = process.env.GLANCE_BRIDGE_URL || "";
+const runtimeStatusListeners = new Map();
+let nextRuntimeSubscriptionId = 1;
 
 async function request(path, options = {}) {
   const response = await fetch(`${bridgeUrl}${path}`, {
@@ -43,4 +45,20 @@ contextBridge.exposeInMainWorld("glanceBridge", {
   hideWindow: () => ipcRenderer.invoke("glance:window-control", "hide"),
   focusWindow: () => ipcRenderer.invoke("glance:window-control", "focus"),
   getSystemTheme: () => ipcRenderer.invoke("glance:system-theme"),
+  subscribeRuntimeStatus: (callback) => {
+    const subscriptionId = nextRuntimeSubscriptionId;
+    nextRuntimeSubscriptionId += 1;
+    const listener = (_event, payload) => callback(payload);
+    runtimeStatusListeners.set(subscriptionId, listener);
+    ipcRenderer.on("glance:runtime-status", listener);
+    return subscriptionId;
+  },
+  unsubscribeRuntimeStatus: (subscriptionId) => {
+    const listener = runtimeStatusListeners.get(subscriptionId);
+    if (!listener) {
+      return;
+    }
+    runtimeStatusListeners.delete(subscriptionId);
+    ipcRenderer.removeListener("glance:runtime-status", listener);
+  },
 });

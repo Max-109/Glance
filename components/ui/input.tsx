@@ -21,7 +21,7 @@ export function Input({
   onToggleReveal,
 }: {
   fieldName: string;
-  label: string;
+  label?: string;
   value: string;
   helperText?: string;
   errorText?: string;
@@ -55,7 +55,7 @@ export function Input({
 
   return (
     <label className="field">
-      <span className="field__label">{label}</span>
+      {label ? <span className="field__label">{label}</span> : null}
       {multiline ? (
         <div className="field__control-shell field__control-shell--textarea">
           {icon ? (

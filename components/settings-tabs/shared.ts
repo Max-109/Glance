@@ -6,6 +6,7 @@ export type ProviderTab = "llm" | "speech" | "transcription";
 
 export interface SettingsTabProps {
   state: BridgeState;
+  stateReady: boolean;
   providerTab: ProviderTab;
   openSelect: string | null;
   thresholdValue: number;

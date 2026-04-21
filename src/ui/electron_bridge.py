@@ -8,6 +8,7 @@ from typing import Any, Callable
 
 from PySide6.QtCore import QObject, QThread, Signal, Slot
 
+from src.ui.runtime_visual import coerce_runtime_status, default_runtime_status
 from src.ui.settings_viewmodel import SettingsViewModel
 
 
@@ -71,6 +72,7 @@ def _build_state_snapshot(viewmodel: SettingsViewModel) -> dict[str, Any]:
         "voiceOptions": viewmodel.voiceOptions,
         "voiceOptionLabels": viewmodel.voiceOptionLabels,
         "languageOptions": viewmodel.languageOptions,
+        "promptDefaults": viewmodel.promptDefaults,
         "historyPreview": viewmodel.buildHistoryPreview(),
     }
 
@@ -88,8 +90,7 @@ class SettingsBridgeServer:
         self._viewmodel = viewmodel
         self._executor = _UiThreadExecutor()
         self._runtime_lock = Lock()
-        self._runtime_state = "idle"
-        self._runtime_message = "Live is idle."
+        self._runtime_status = default_runtime_status()
         server = ThreadingHTTPServer(("127.0.0.1", 0), self._build_handler())
         server.bridge = self  # type: ignore[attr-defined]
         self._server = server
@@ -112,17 +113,15 @@ class SettingsBridgeServer:
     def snapshot(self) -> dict[str, Any]:
         snapshot = self._executor.call(_build_state_snapshot, self._viewmodel)
         with self._runtime_lock:
-            snapshot["runtimeState"] = self._runtime_state
-            snapshot["runtimeMessage"] = self._runtime_message
+            snapshot.update(self._runtime_status)
         return snapshot
 
     def audio_state(self) -> dict[str, Any]:
         return self._executor.call(_build_audio_state_snapshot, self._viewmodel)
 
-    def set_runtime_status(self, state: str, message: str) -> None:
+    def set_runtime_status(self, status: dict[str, Any]) -> None:
         with self._runtime_lock:
-            self._runtime_state = str(state).strip() or "idle"
-            self._runtime_message = str(message).strip() or "Live is idle."
+            self._runtime_status = coerce_runtime_status(status)
 
     def set_section(self, section: str) -> dict[str, Any]:
         self._executor.call(self._viewmodel.setCurrentSection, section)

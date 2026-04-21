@@ -4,6 +4,13 @@ from dataclasses import asdict, dataclass
 import re
 
 from src.exceptions.app_exceptions import ValidationError
+from src.models.prompt_defaults import (
+    DEFAULT_TEXT_REPLY_PROMPT,
+    DEFAULT_TRANSCRIPTION_PROMPT,
+    DEFAULT_TTS_PREPARATION_PROMPT,
+    DEFAULT_VOICE_REPLY_PROMPT,
+    normalize_prompt_value,
+)
 from src.services.keybinds import keybinds_are_unique, normalize_keybind
 
 
@@ -115,6 +122,10 @@ class AppSettings:
     audio_max_record_seconds: float = 30.0
     audio_preroll_seconds: float = 0.25
     system_prompt_override: str = ""
+    text_prompt_override: str = DEFAULT_TEXT_REPLY_PROMPT
+    voice_prompt_override: str = DEFAULT_VOICE_REPLY_PROMPT
+    voice_polish_prompt_override: str = DEFAULT_TTS_PREPARATION_PROMPT
+    transcription_prompt_override: str = DEFAULT_TRANSCRIPTION_PROMPT
     theme_preference: str = "dark"
     accent_color: str = DEFAULT_ACCENT_COLOR
 
@@ -247,6 +258,28 @@ class AppSettings:
             ),
             system_prompt_override=data.get(
                 "system_prompt_override", cls.system_prompt_override
+            ),
+            text_prompt_override=normalize_prompt_value(
+                "text_prompt_override",
+                data.get("text_prompt_override", cls.text_prompt_override),
+            ),
+            voice_prompt_override=normalize_prompt_value(
+                "voice_prompt_override",
+                data.get("voice_prompt_override", cls.voice_prompt_override),
+            ),
+            voice_polish_prompt_override=normalize_prompt_value(
+                "voice_polish_prompt_override",
+                data.get(
+                    "voice_polish_prompt_override",
+                    cls.voice_polish_prompt_override,
+                ),
+            ),
+            transcription_prompt_override=normalize_prompt_value(
+                "transcription_prompt_override",
+                data.get(
+                    "transcription_prompt_override",
+                    cls.transcription_prompt_override,
+                ),
             ),
             theme_preference=data.get("theme_preference", cls.theme_preference),
             accent_color=normalize_hex_color(

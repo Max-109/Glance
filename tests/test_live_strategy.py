@@ -112,6 +112,34 @@ class LiveStrategyTests(unittest.TestCase):
             ],
         )
 
+    def test_execute_emits_stage_updates_for_transcribe_reply_and_voice(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            stages: list[tuple[str, str]] = []
+            strategy = LiveStrategy(
+                transcription_agent=FakeTranscriptionAgent(),
+                llm_agent=FakeLLMAgent(),
+                tts_agent=FakeTTSAgent(),
+                audio_dir=Path(temp_dir),
+            )
+
+            strategy.execute(
+                {
+                    "recording_path": "input.wav",
+                    "status_callback": lambda state, message: stages.append(
+                        (state, message)
+                    ),
+                }
+            )
+
+        self.assertEqual(
+            stages,
+            [
+                ("transcribing", "Transcribing..."),
+                ("generating", "Writing a reply..."),
+                ("speaking", "Preparing speech..."),
+            ],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

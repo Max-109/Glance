@@ -2,6 +2,12 @@ import unittest
 
 from src.exceptions.app_exceptions import ValidationError
 from src.models.interactions import QuickInteraction, SessionRecord
+from src.models.prompt_defaults import (
+    DEFAULT_TEXT_REPLY_PROMPT,
+    DEFAULT_TRANSCRIPTION_PROMPT,
+    DEFAULT_TTS_PREPARATION_PROMPT,
+    DEFAULT_VOICE_REPLY_PROMPT,
+)
 from src.models.settings import (
     AppSettings,
     DEFAULT_ACCENT_COLOR,
@@ -137,6 +143,56 @@ class AppSettingsTests(unittest.TestCase):
 
         self.assertFalse(settings.llm_reasoning_enabled)
         self.assertEqual(settings.accent_color, DEFAULT_ACCENT_COLOR)
+
+    def test_from_mapping_loads_prompt_overrides(self) -> None:
+        settings = AppSettings.from_mapping(
+            {
+                "llm_base_url": "https://api.example.com/v1",
+                "llm_model_name": "model-a",
+                "tts_base_url": "https://tts.example.com/v1",
+                "system_prompt_override": "Be crisp.",
+                "text_prompt_override": "Text mode custom prompt.",
+                "voice_prompt_override": "Voice mode custom prompt.",
+                "voice_polish_prompt_override": "Voice polish custom prompt.",
+                "transcription_prompt_override": "Transcription custom prompt.",
+            }
+        )
+
+        self.assertEqual(settings.system_prompt_override, "Be crisp.")
+        self.assertEqual(settings.text_prompt_override, "Text mode custom prompt.")
+        self.assertEqual(settings.voice_prompt_override, "Voice mode custom prompt.")
+        self.assertEqual(
+            settings.voice_polish_prompt_override,
+            "Voice polish custom prompt.",
+        )
+        self.assertEqual(
+            settings.transcription_prompt_override,
+            "Transcription custom prompt.",
+        )
+
+    def test_from_mapping_normalizes_blank_prompt_fields_back_to_defaults(self) -> None:
+        settings = AppSettings.from_mapping(
+            {
+                "llm_base_url": "https://api.example.com/v1",
+                "llm_model_name": "model-a",
+                "tts_base_url": "https://tts.example.com/v1",
+                "text_prompt_override": "   ",
+                "voice_prompt_override": "",
+                "voice_polish_prompt_override": "\n\n",
+                "transcription_prompt_override": "  ",
+            }
+        )
+
+        self.assertEqual(settings.text_prompt_override, DEFAULT_TEXT_REPLY_PROMPT)
+        self.assertEqual(settings.voice_prompt_override, DEFAULT_VOICE_REPLY_PROMPT)
+        self.assertEqual(
+            settings.voice_polish_prompt_override,
+            DEFAULT_TTS_PREPARATION_PROMPT,
+        )
+        self.assertEqual(
+            settings.transcription_prompt_override,
+            DEFAULT_TRANSCRIPTION_PROMPT,
+        )
 
     def test_validate_rejects_invalid_accent_color(self) -> None:
         with self.assertRaises(ValidationError):

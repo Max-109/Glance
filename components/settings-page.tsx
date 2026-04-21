@@ -16,6 +16,7 @@ import type {
 import {
   sectionMeta,
   type BridgeState,
+  type RuntimeStatusPayload,
   type SectionId,
 } from "@/lib/glance-bridge";
 import {
@@ -36,6 +37,15 @@ import { Notice } from "./ui/notice";
 import { Sidebar } from "./ui/sidebar";
 
 type SystemTheme = "dark" | "light";
+
+const EMPTY_RUNTIME_STATUS: RuntimeStatusPayload = {
+  runtimeState: "idle",
+  runtimeMessage: "Live is idle.",
+  runtimeRevision: 0,
+  runtimePhaseStartedAtMs: 0,
+  runtimeBlinkIntervalMs: 0,
+  runtimeErrorFlashUntilMs: 0,
+};
 
 const EMPTY_STATE: BridgeState = {
   settings: {
@@ -69,6 +79,10 @@ const EMPTY_STATE: BridgeState = {
     audio_max_record_seconds: 100,
     audio_preroll_seconds: 0.25,
     system_prompt_override: "",
+    text_prompt_override: "",
+    voice_prompt_override: "",
+    voice_polish_prompt_override: "",
+    transcription_prompt_override: "",
     theme_preference: "dark",
     accent_color: "#a7ffde",
   },
@@ -78,8 +92,7 @@ const EMPTY_STATE: BridgeState = {
   saving: false,
   statusMessage: "",
   statusKind: "neutral",
-  runtimeState: "idle",
-  runtimeMessage: "Live is idle.",
+  ...EMPTY_RUNTIME_STATUS,
   audioInputDeviceOptions: ["default"],
   audioInputDeviceLabels: { default: "System Default Input" },
   audioOutputDeviceOptions: ["default"],
@@ -102,8 +115,27 @@ const EMPTY_STATE: BridgeState = {
     auto: "Auto",
   },
   languageOptions: ["en", "lt", "fr", "de", "es"],
+  promptDefaults: {},
   historyPreview: [],
 };
+
+function pickRuntimeStatus(snapshot: RuntimeStatusPayload): RuntimeStatusPayload {
+  return {
+    runtimeState: snapshot.runtimeState,
+    runtimeMessage: snapshot.runtimeMessage,
+    runtimeRevision: snapshot.runtimeRevision,
+    runtimePhaseStartedAtMs: snapshot.runtimePhaseStartedAtMs,
+    runtimeBlinkIntervalMs: snapshot.runtimeBlinkIntervalMs,
+    runtimeErrorFlashUntilMs: snapshot.runtimeErrorFlashUntilMs,
+  };
+}
+
+function mergeRuntimeSnapshot(current: BridgeState | null, snapshot: BridgeState): BridgeState {
+  if (current === null || current.runtimeRevision <= snapshot.runtimeRevision) {
+    return snapshot;
+  }
+  return { ...snapshot, ...pickRuntimeStatus(current) };
+}
 
 function getBridge() {
   if (typeof window === "undefined") {
@@ -195,7 +227,7 @@ export function SettingsPage() {
   const applySnapshot = useEffectEvent(
     (snapshot: BridgeState, nextSystemTheme?: SystemTheme) => {
       startTransition(() => {
-        setState(snapshot);
+        setState((current) => mergeRuntimeSnapshot(current, snapshot));
         setBridgeError("");
         setDrafts((current) => {
           if (!editingField || current[editingField] === undefined) {
@@ -209,6 +241,19 @@ export function SettingsPage() {
       });
     },
   );
+
+  const applyRuntimeStatus = useEffectEvent((runtimeStatus: RuntimeStatusPayload) => {
+    startTransition(() => {
+      setState((current) => {
+        const baseState = current ?? EMPTY_STATE;
+        if (runtimeStatus.runtimeRevision < baseState.runtimeRevision) {
+          return current;
+        }
+        return { ...baseState, ...pickRuntimeStatus(runtimeStatus) };
+      });
+      setBridgeError("");
+    });
+  });
 
   const refreshState = useEffectEvent(async () => {
     const bridge = getBridge();
@@ -231,6 +276,25 @@ export function SettingsPage() {
   useEffect(() => {
     void refreshState();
   }, [refreshState]);
+
+  useEffect(() => {
+    const bridge = getBridge();
+    if (
+      !bridge ||
+      typeof bridge.subscribeRuntimeStatus !== "function" ||
+      typeof bridge.unsubscribeRuntimeStatus !== "function"
+    ) {
+      return;
+    }
+
+    const subscriptionId = bridge.subscribeRuntimeStatus((runtimeStatus) => {
+      applyRuntimeStatus(runtimeStatus);
+    });
+
+    return () => {
+      bridge.unsubscribeRuntimeStatus(subscriptionId);
+    };
+  }, [applyRuntimeStatus]);
 
   useEffect(() => {
     setIsMacOs(isMacDesktopPlatform());
@@ -300,9 +364,7 @@ export function SettingsPage() {
   }, [liveState.dirty]);
 
   const pollMs =
-    liveState.previewActive || liveState.speakerTestActive || liveState.saving
-      ? 240
-      : 1200;
+    liveState.previewActive || liveState.speakerTestActive || liveState.saving ? 240 : 1200;
 
   useEffect(() => {
     const interval = window.setInterval(() => {
@@ -747,6 +809,7 @@ export function SettingsPage() {
           >
             <SettingsTab
               state={liveState}
+              stateReady={state !== null}
               providerTab={providerTab}
               openSelect={openSelect}
               thresholdValue={thresholdValue}

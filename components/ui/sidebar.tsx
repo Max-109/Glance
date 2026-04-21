@@ -7,9 +7,10 @@ import { Indicator } from "./indicator";
 const RUNTIME_LABELS: Record<string, string> = {
   idle: "Idle",
   listening: "Listening",
-  processing: "Processing",
+  processing: "Transcribing",
+  transcribing: "Transcribing",
+  generating: "Generating",
   speaking: "Speaking",
-  ready: "Ready",
   error: "Error",
 };
 
@@ -27,9 +28,11 @@ export function Sidebar({
       <div className="sidebar-brand">
         <Indicator
           state={state.runtimeState}
-          message={state.runtimeMessage}
           size="large"
           label={`Glance live state: ${runtimeLabel}`}
+          phaseStartedAtMs={state.runtimePhaseStartedAtMs}
+          blinkIntervalMs={state.runtimeBlinkIntervalMs}
+          errorFlashUntilMs={state.runtimeErrorFlashUntilMs}
         />
         <div className="sidebar-brand__copy">
           <p className="sidebar-brand__title">Glance</p>

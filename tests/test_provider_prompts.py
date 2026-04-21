@@ -4,9 +4,13 @@ from unittest.mock import Mock
 
 from src.models.settings import AppSettings
 from src.services.providers import (
+    DEFAULT_TEXT_REPLY_PROMPT,
+    DEFAULT_TRANSCRIPTION_PROMPT,
+    DEFAULT_TTS_PREPARATION_PROMPT,
+    DEFAULT_VOICE_REPLY_PROMPT,
     LiveSpeechReply,
-    OpenAICompatibleProvider,
     NagaTranscriptionProvider,
+    OpenAICompatibleProvider,
     _format_usage,
     _preview_text,
 )
@@ -36,6 +40,14 @@ class ProviderPromptTests(unittest.TestCase):
             prompt,
         )
 
+    def test_text_prompt_override_replaces_default_base(self) -> None:
+        self.provider._settings.text_prompt_override = "You are a terse text assistant."
+
+        prompt = self.provider._build_system_prompt(match_user_language=False)
+
+        self.assertIn("You are a terse text assistant.", prompt)
+        self.assertNotIn(DEFAULT_TEXT_REPLY_PROMPT, prompt)
+
     def test_system_prompt_supports_immediate_language_switch(self) -> None:
         prompt = self.provider._build_system_prompt(match_user_language=True)
 
@@ -60,11 +72,30 @@ class ProviderPromptTests(unittest.TestCase):
     def test_transcription_prompt_allows_high_confidence_context_inference(
         self,
     ) -> None:
-        prompt = NagaTranscriptionProvider._build_transcription_prompt()
+        provider = NagaTranscriptionProvider.__new__(NagaTranscriptionProvider)
+        provider._settings = self.settings
+        prompt = provider._build_transcription_prompt()
 
         self.assertIn("use the surrounding context to infer", prompt)
         self.assertIn("high confidence", prompt)
         self.assertIn("stay conservative rather than inventing content", prompt)
+
+    def test_transcription_prompt_override_replaces_default_base(self) -> None:
+        provider = NagaTranscriptionProvider.__new__(NagaTranscriptionProvider)
+        provider._settings = AppSettings.from_mapping(
+            {
+                "llm_base_url": "https://api.example.com/v1",
+                "llm_model_name": "model-a",
+                "tts_base_url": "https://tts.example.com/v1",
+                "transcription_prompt_override": "Return a clean transcript and nothing else.",
+            },
+            validate=False,
+        )
+
+        prompt = provider._build_transcription_prompt()
+
+        self.assertIn("Return a clean transcript and nothing else.", prompt)
+        self.assertNotIn(DEFAULT_TRANSCRIPTION_PROMPT, prompt)
 
     def test_live_speech_prompt_merges_reply_and_delivery_rules(self) -> None:
         prompt = self.provider._build_live_speech_system_prompt()
@@ -83,6 +114,27 @@ class ProviderPromptTests(unittest.TestCase):
             "Small conversational turns should usually be one short sentence", prompt
         )
         self.assertIn("ask at most one follow-up question", prompt)
+
+    def test_voice_prompt_override_replaces_default_base(self) -> None:
+        self.provider._settings.voice_prompt_override = "Speak with dry, understated clarity."
+
+        prompt = self.provider._build_live_speech_system_prompt()
+
+        self.assertIn("Speak with dry, understated clarity.", prompt)
+        self.assertNotIn(DEFAULT_VOICE_REPLY_PROMPT, prompt)
+
+    def test_voice_polish_prompt_override_replaces_default_base(self) -> None:
+        self.provider._settings.voice_polish_prompt_override = (
+            "Polish the text gently, but keep the rhythm understated."
+        )
+
+        prompt = self.provider._build_tts_preparation_prompt()
+
+        self.assertIn(
+            "Polish the text gently, but keep the rhythm understated.",
+            prompt,
+        )
+        self.assertNotIn(DEFAULT_TTS_PREPARATION_PROMPT, prompt)
 
     def test_live_speech_prompt_lists_auto_voice_contract(self) -> None:
         prompt = self.provider._build_live_speech_system_prompt()

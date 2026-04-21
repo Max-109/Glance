@@ -104,6 +104,9 @@ class LiveSessionController:
             while not self._stop_event.is_set():
                 recording_path = self._audio_dir / f"live-input-{uuid4().hex}.wav"
                 turn_started_at = perf_counter()
+                capture_elapsed_ms = 0.0
+                pipeline_elapsed_ms = 0.0
+                playback_elapsed_ms = 0.0
                 self._set_status("listening", "Listening...")
                 capture_started_at = perf_counter()
                 try:
@@ -115,23 +118,24 @@ class LiveSessionController:
                     if self._stop_event.is_set():
                         break
                     if str(exc) == "No speech was detected.":
-                        continue
+                        logger.info("No speech detected before wait timeout; going idle")
+                        self._set_status("idle", "No speech detected. Live is idle.")
+                        break
                     self._set_status("idle", str(exc))
                     break
 
                 capture_elapsed_ms = _elapsed_ms(capture_started_at)
-                logger.info("Audio capture completed in %.1f ms", capture_elapsed_ms)
 
                 if self._stop_event.is_set():
                     break
 
-                self._set_status("processing", "Preparing a reply...")
                 pipeline_started_at = perf_counter()
                 try:
                     interaction = self._orchestrator.run_mode(
                         "live",
                         session=self._session,
                         recording_path=str(recording_path),
+                        status_callback=self._set_status,
                     )
                 except GlanceError as exc:
                     logger.exception("Live mode failed")
@@ -139,9 +143,6 @@ class LiveSessionController:
                     break
 
                 pipeline_elapsed_ms = _elapsed_ms(pipeline_started_at)
-                logger.info(
-                    "Assistant pipeline completed in %.1f ms", pipeline_elapsed_ms
-                )
 
                 if self._stop_event.is_set():
                     break
@@ -165,9 +166,11 @@ class LiveSessionController:
                     break
 
                 playback_elapsed_ms = _elapsed_ms(playback_started_at)
-                logger.info("Playback completed in %.1f ms", playback_elapsed_ms)
                 logger.info(
-                    "Live turn completed in %.1f ms total",
+                    "live turn completed\ncapture    %.1f ms\npipeline   %.1f ms\nplayback   %.1f ms\ntotal      %.1f ms",
+                    capture_elapsed_ms,
+                    pipeline_elapsed_ms,
+                    playback_elapsed_ms,
                     _elapsed_ms(turn_started_at),
                 )
         except Exception as exc:  # pragma: no cover - defensive runtime logging.

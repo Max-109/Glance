@@ -52,7 +52,7 @@ class GlobalHotkeyManager:
             self._ensure_listener_locked()
             self._hotkey_specs = self._build_hotkey_specs(settings)
             self._rebuild_hotkeys_locked()
-            logger.info(
+            logger.debug(
                 "Active hotkeys updated in place: %s",
                 ", ".join(description for description, _ in self._hotkey_specs),
             )
@@ -63,7 +63,7 @@ class GlobalHotkeyManager:
                 return
             self._enabled = enabled
             self._rebuild_hotkeys_locked()
-            logger.info("Hotkeys %s", "enabled" if enabled else "suspended")
+            logger.debug("Hotkeys %s", "enabled" if enabled else "suspended")
 
     def stop(self) -> None:
         with self._lock:
@@ -91,11 +91,11 @@ class GlobalHotkeyManager:
                 on_press=self._on_press,
                 on_release=self._on_release,
             )
-            logger.info("Starting hotkey listener")
+            logger.debug("Starting hotkey listener")
             listener.start()
             wait_method = getattr(listener, "wait", None)
             if callable(wait_method):
-                logger.info("Waiting for hotkey listener to become active")
+                logger.debug("Waiting for hotkey listener to become active")
                 wait_method()
         except Exception as exc:
             if _is_accessibility_permission_error(exc):
@@ -107,7 +107,7 @@ class GlobalHotkeyManager:
                 ) from exc
             raise
         self._listener = listener
-        logger.info("Hotkey listener active")
+        logger.debug("Hotkey listener active")
 
     def _rebuild_hotkeys_locked(self) -> None:
         if keyboard is None:
@@ -139,14 +139,14 @@ class GlobalHotkeyManager:
     def _stop_locked(self) -> None:
         if self._listener is None:
             return
-        logger.info("Stopping hotkeys")
+        logger.debug("Stopping hotkeys")
         listener = self._listener
         listener.stop()
         join_method = getattr(listener, "join", None)
         if callable(join_method):
-            logger.info("Waiting for hotkey listener to stop")
+            logger.debug("Waiting for hotkey listener to stop")
             join_method(timeout=1.0)
-        logger.info("Hotkey listener stopped")
+        logger.debug("Hotkey listener stopped")
         self._listener = None
         self._hotkeys = []
 

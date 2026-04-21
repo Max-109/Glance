@@ -22,6 +22,7 @@ let staticServer = null;
 let staticServerUrl = "";
 let appReady = false;
 let stdoutClosed = false;
+let latestRuntimeStatus = null;
 const pendingCommands = [];
 
 const CONTENT_TYPES = {
@@ -72,6 +73,11 @@ function buildWindow() {
     },
   });
   applyWindowChrome(window);
+  window.webContents.on("did-finish-load", () => {
+    if (latestRuntimeStatus) {
+      window.webContents.send("glance:runtime-status", latestRuntimeStatus);
+    }
+  });
 
   loadRenderer(window).catch((error) => {
     emit({
@@ -204,6 +210,22 @@ function emitBounds(window) {
   });
 }
 
+function broadcastRuntimeStatus(payload) {
+  const window = mainWindow;
+  if (!window || window.isDestroyed()) {
+    return;
+  }
+
+  try {
+    window.webContents.send("glance:runtime-status", payload);
+  } catch (error) {
+    emit({
+      type: "error",
+      message: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
 function ensureWindow() {
   if (mainWindow && !mainWindow.isDestroyed()) {
     return mainWindow;
@@ -242,9 +264,9 @@ function handleCommand(payload) {
     return;
   }
   const command = String(payload.type || "").trim();
-  const window = ensureWindow();
 
   if (command === "show") {
+    const window = ensureWindow();
     revealWindow(app, window, {
       applyBounds,
       bounds: payload.bounds,
@@ -254,11 +276,13 @@ function handleCommand(payload) {
   }
 
   if (command === "hide") {
+    const window = ensureWindow();
     window.hide();
     return;
   }
 
   if (command === "focus") {
+    const window = ensureWindow();
     revealWindow(app, window, { focus: true });
     return;
   }
@@ -266,6 +290,16 @@ function handleCommand(payload) {
   if (command === "terminate") {
     isQuitting = true;
     app.quit();
+    return;
+  }
+
+  if (command === "runtime-status") {
+    latestRuntimeStatus = payload.status && typeof payload.status === "object"
+      ? payload.status
+      : null;
+    if (latestRuntimeStatus) {
+      broadcastRuntimeStatus(latestRuntimeStatus);
+    }
   }
 }
 

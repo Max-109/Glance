@@ -11,6 +11,7 @@ from uuid import uuid4
 from PySide6.QtCore import Property, QCoreApplication, QTimer, QObject, Signal, Slot
 
 from src.exceptions.app_exceptions import ValidationError
+from src.models.prompt_defaults import PROMPT_DEFAULTS, normalize_prompt_value
 from src.models.settings import (
     AUTO_TTS_VOICE_ID,
     AppSettings,
@@ -247,6 +248,10 @@ class SettingsViewModel(QObject):
     def languageOptions(self) -> list[str]:
         return ["en", "lt", "fr", "de", "es"]
 
+    @Property("QVariantMap", constant=True)
+    def promptDefaults(self) -> dict[str, str]:
+        return dict(PROMPT_DEFAULTS)
+
     @Slot(str)
     def setCurrentSection(self, section: str) -> None:
         if section == self._current_section:
@@ -266,6 +271,8 @@ class SettingsViewModel(QObject):
         normalized_value = value
         if isinstance(value, str):
             normalized_value = value
+        if field_name in PROMPT_DEFAULTS:
+            normalized_value = normalize_prompt_value(field_name, value)
         if field_name.endswith("_keybind"):
             normalized_value = normalize_keybind(str(value))
         if self._settings_map[field_name] == normalized_value:

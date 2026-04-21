@@ -1,11 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
 type ActivityMarkState =
   | "idle"
   | "listening"
-  | "processing"
+  | "transcribing"
+  | "generating"
   | "speaking"
-  | "ready"
   | "error";
 
 const ACTIVITY_MARK_SEGMENTS = [
@@ -19,31 +19,64 @@ const ACTIVITY_MARK_ANIMATION_INTERVAL_MS: Partial<
   Record<ActivityMarkState, number>
 > = {
   listening: 420,
-  processing: 560,
+  transcribing: 560,
+  generating: 560,
   speaking: 420,
-  ready: 420,
 };
-
-const ACTIVITY_MARK_READY_FLASH_MS = 520;
-const ACTIVITY_MARK_ERROR_FLASH_MS = 1400;
-const ACTIVITY_MARK_ERROR_TOKENS = ["failed", "unavailable", "error"];
 
 function normalizeActivityMarkState(state: string): ActivityMarkState {
   if (
     state === "listening" ||
-    state === "processing" ||
+    state === "transcribing" ||
+    state === "generating" ||
     state === "speaking" ||
-    state === "ready" ||
     state === "error"
   ) {
     return state;
   }
+  if (state === "processing") {
+    return "transcribing";
+  }
   return "idle";
 }
 
-function messageNeedsErrorFlash(message?: string) {
-  const normalizedMessage = message?.trim().toLowerCase() || "";
-  return ACTIVITY_MARK_ERROR_TOKENS.some((token) => normalizedMessage.includes(token));
+function resolveBlinkIntervalMs(
+  state: ActivityMarkState,
+  blinkIntervalMs: number,
+): number {
+  if (blinkIntervalMs > 0) {
+    return blinkIntervalMs;
+  }
+  return ACTIVITY_MARK_ANIMATION_INTERVAL_MS[state] ?? 0;
+}
+
+function getActivityMarkFrame(
+  phaseStartedAtMs: number,
+  blinkIntervalMs: number,
+  nowMs: number,
+): number {
+  if (phaseStartedAtMs <= 0 || blinkIntervalMs <= 0) {
+    return 0;
+  }
+  const elapsedMs = Math.max(0, nowMs - phaseStartedAtMs);
+  return Math.floor(elapsedMs / blinkIntervalMs) % 2;
+}
+
+function getNextActivityMarkUpdateAtMs(
+  phaseStartedAtMs: number,
+  blinkIntervalMs: number,
+  errorFlashUntilMs: number,
+  nowMs: number,
+): number | null {
+  if (errorFlashUntilMs > nowMs) {
+    return errorFlashUntilMs;
+  }
+  if (phaseStartedAtMs <= 0 || blinkIntervalMs <= 0) {
+    return null;
+  }
+  const elapsedMs = Math.max(0, nowMs - phaseStartedAtMs);
+  const completedSteps = Math.floor(elapsedMs / blinkIntervalMs);
+  return phaseStartedAtMs + (completedSteps + 1) * blinkIntervalMs;
 }
 
 function getActivityMarkSegmentOpacities(
@@ -58,13 +91,13 @@ function getActivityMarkSegmentOpacities(
   if (state === "listening") {
     return [pulseOpacity, inactiveOpacity, inactiveOpacity, inactiveOpacity];
   }
-  if (state === "processing") {
+  if (state === "transcribing") {
     return [completedOpacity, pulseOpacity, inactiveOpacity, inactiveOpacity];
   }
-  if (state === "speaking") {
+  if (state === "generating") {
     return [completedOpacity, completedOpacity, pulseOpacity, inactiveOpacity];
   }
-  if (state === "ready") {
+  if (state === "speaking") {
     return [completedOpacity, completedOpacity, completedOpacity, pulseOpacity];
   }
   if (state === "error") {
@@ -75,97 +108,60 @@ function getActivityMarkSegmentOpacities(
 
 export function Indicator({
   state,
-  message,
   size = "compact",
   label,
+  phaseStartedAtMs = 0,
+  blinkIntervalMs = 0,
+  errorFlashUntilMs = 0,
 }: {
   state: string;
-  message?: string;
   size?: "compact" | "large";
   label?: string;
+  phaseStartedAtMs?: number;
+  blinkIntervalMs?: number;
+  errorFlashUntilMs?: number;
 }) {
   const normalizedState = normalizeActivityMarkState(state);
-  const [overrideState, setOverrideState] = useState<ActivityMarkState | null>(null);
-  const [frame, setFrame] = useState(0);
-  const previousStateRef = useRef<ActivityMarkState>(normalizedState);
-  const previousErrorFlashRef = useRef(messageNeedsErrorFlash(message));
-  const readyTimerRef = useRef<number | null>(null);
-  const errorTimerRef = useRef<number | null>(null);
+  const [renderTick, setRenderTick] = useState(0);
+  const nowMs = Date.now();
+  const effectiveState = errorFlashUntilMs > nowMs ? "error" : normalizedState;
+  const resolvedBlinkInterval = resolveBlinkIntervalMs(normalizedState, blinkIntervalMs);
+  const frame =
+    effectiveState === "error"
+      ? 0
+      : getActivityMarkFrame(phaseStartedAtMs, resolvedBlinkInterval, nowMs);
+  const segmentOpacities = getActivityMarkSegmentOpacities(effectiveState, frame);
 
   useEffect(() => {
+    const syncPhase = () => {
+      setRenderTick((current) => current + 1);
+    };
+
+    window.addEventListener("focus", syncPhase);
+    document.addEventListener("visibilitychange", syncPhase);
     return () => {
-      if (readyTimerRef.current !== null) {
-        window.clearTimeout(readyTimerRef.current);
-      }
-      if (errorTimerRef.current !== null) {
-        window.clearTimeout(errorTimerRef.current);
-      }
+      window.removeEventListener("focus", syncPhase);
+      document.removeEventListener("visibilitychange", syncPhase);
     };
   }, []);
 
   useEffect(() => {
-    const previousState = previousStateRef.current;
-    previousStateRef.current = normalizedState;
-
-    if (normalizedState !== "listening" && readyTimerRef.current !== null) {
-      window.clearTimeout(readyTimerRef.current);
-      readyTimerRef.current = null;
-      setOverrideState((current) => (current === "ready" ? null : current));
-    }
-
-    if (previousState === "speaking" && normalizedState === "listening") {
-      if (readyTimerRef.current !== null) {
-        window.clearTimeout(readyTimerRef.current);
-      }
-      setOverrideState("ready");
-      readyTimerRef.current = window.setTimeout(() => {
-        readyTimerRef.current = null;
-        setOverrideState((current) => (current === "ready" ? null : current));
-      }, ACTIVITY_MARK_READY_FLASH_MS);
-    }
-  }, [normalizedState]);
-
-  const shouldFlashError = messageNeedsErrorFlash(message);
-
-  useEffect(() => {
-    const wasFlashingError = previousErrorFlashRef.current;
-    previousErrorFlashRef.current = shouldFlashError;
-
-    if (!shouldFlashError || wasFlashingError) {
+    const nextUpdateAtMs = getNextActivityMarkUpdateAtMs(
+      phaseStartedAtMs,
+      resolvedBlinkInterval,
+      errorFlashUntilMs,
+      nowMs,
+    );
+    if (nextUpdateAtMs === null) {
       return;
     }
 
-    if (readyTimerRef.current !== null) {
-      window.clearTimeout(readyTimerRef.current);
-      readyTimerRef.current = null;
-    }
-    if (errorTimerRef.current !== null) {
-      window.clearTimeout(errorTimerRef.current);
-    }
+    const timer = window.setTimeout(() => {
+      setRenderTick((current) => current + 1);
+    }, Math.max(1, nextUpdateAtMs - Date.now()));
 
-    setOverrideState("error");
-    errorTimerRef.current = window.setTimeout(() => {
-      errorTimerRef.current = null;
-      setOverrideState((current) => (current === "error" ? null : current));
-    }, ACTIVITY_MARK_ERROR_FLASH_MS);
-  }, [shouldFlashError]);
-
-  const effectiveState = overrideState ?? normalizedState;
-  const segmentOpacities = getActivityMarkSegmentOpacities(effectiveState, frame);
-
-  useEffect(() => {
-    setFrame(0);
-    const interval = ACTIVITY_MARK_ANIMATION_INTERVAL_MS[effectiveState];
-    if (!interval) {
-      return;
-    }
-
-    const timer = window.setInterval(() => {
-      setFrame((current) => 1 - current);
-    }, interval);
-
-    return () => window.clearInterval(timer);
-  }, [effectiveState]);
+    return () => window.clearTimeout(timer);
+  }, [errorFlashUntilMs, nowMs, phaseStartedAtMs, renderTick, resolvedBlinkInterval]);
 
   return (
     <div

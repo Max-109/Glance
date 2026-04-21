@@ -23,8 +23,11 @@ class LiveStrategy(ModeStrategy):
         self._audio_dir = audio_dir
 
     def execute(self, context: dict) -> LiveInteraction:
+        status_callback = context.get("status_callback")
         recording_path = str(context["recording_path"])
+        _emit_stage_status(status_callback, "transcribing", "Transcribing...")
         transcript = self._transcription_agent.run(audio_path=recording_path)
+        _emit_stage_status(status_callback, "generating", "Writing a reply...")
         live_reply = self._llm_agent.generate_live_speech_reply(
             transcript=transcript,
             conversation_history=self._build_conversation_history(
@@ -32,6 +35,7 @@ class LiveStrategy(ModeStrategy):
             ),
         )
         speech_path = self._audio_dir / f"live-{Path(recording_path).stem}.wav"
+        _emit_stage_status(status_callback, "speaking", "Preparing speech...")
         generated_speech_path = self._tts_agent.run(
             text=force_pause_at_end_for_tts(live_reply.text),
             output_path=str(speech_path),
@@ -59,3 +63,14 @@ class LiveStrategy(ModeStrategy):
             history.append({"role": "user", "content": interaction.transcript})
             history.append({"role": "assistant", "content": interaction.response})
         return history
+
+
+def _emit_stage_status(
+    callback: object,
+    state: str,
+    message: str,
+) -> None:
+    if not callable(callback):
+        return
+    stage_callback = callback
+    stage_callback(state, message)

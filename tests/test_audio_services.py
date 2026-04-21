@@ -1,10 +1,14 @@
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import patch
 import wave
 
+from src.exceptions.app_exceptions import ValidationError
 from src.models.settings import AppSettings
 from src.services.audio_devices import AudioDeviceService
+import src.services.audio_recording as audio_recording
 from src.services.audio_recording import ThresholdAudioRecorder
 from src.services.audio_signal import AudioTestSignalService
 
@@ -87,6 +91,51 @@ class ThresholdAudioRecorderTests(unittest.TestCase):
         self.assertEqual(recorder._max_wait_seconds, 9.5)
         self.assertEqual(recorder._max_record_seconds, 18.0)
         self.assertEqual(recorder._preroll_seconds, 0.4)
+
+    def test_capture_turn_respects_wait_timeout_during_input_overflow(self) -> None:
+        settings = AppSettings.from_mapping(
+            {
+                "llm_base_url": "https://api.example.com/v1",
+                "llm_model_name": "model-a",
+                "tts_base_url": "https://tts.example.com/v1",
+                "audio_max_wait_seconds": 1.5,
+            }
+        )
+        recorder = ThresholdAudioRecorder(
+            settings,
+            device_service=SimpleNamespace(resolve_input_device=lambda device_id: None),
+        )
+        recorder._level = lambda block: 0.0
+
+        class FakeBlock:
+            def copy(self):
+                return self
+
+        class FakeInputStream:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, tb):
+                return False
+
+            def read(self, chunk_size):
+                del chunk_size
+                return FakeBlock(), True
+
+        fake_sd = SimpleNamespace(InputStream=lambda **kwargs: FakeInputStream())
+        clock_values = iter([0.0, 0.6, 1.2, 1.8])
+
+        with tempfile.TemporaryDirectory() as temp_dir, patch.object(
+            audio_recording, "sd", fake_sd
+        ), patch.object(audio_recording, "np", object()), patch.object(
+            audio_recording,
+            "perf_counter",
+            side_effect=lambda: next(clock_values),
+        ):
+            with self.assertRaises(ValidationError) as error_context:
+                recorder.capture_turn(str(Path(temp_dir) / "input.wav"))
+
+        self.assertEqual(str(error_context.exception), "No speech was detected.")
 
 
 class AudioTestSignalServiceTests(unittest.TestCase):

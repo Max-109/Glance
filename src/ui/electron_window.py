@@ -112,6 +112,11 @@ class ElectronShellController(QObject):
             return
         self._send_command({"type": "focus"})
 
+    def push_runtime_status(self, status: dict[str, Any]) -> None:
+        if self._process is None or self._process.poll() is not None:
+            return
+        self._send_command({"type": "runtime-status", "status": status})
+
     def close(self) -> None:
         if self._process is None:
             return
@@ -134,7 +139,7 @@ class ElectronShellController(QObject):
         environment["GLANCE_WINDOW_WIDTH"] = str(self._width)
         environment["GLANCE_WINDOW_HEIGHT"] = str(self._height)
 
-        self._logger.info(
+        self._logger.debug(
             "Launching Electron settings shell: %s %s",
             self._electron_binary,
             self._entrypoint,
@@ -171,7 +176,7 @@ class ElectronShellController(QObject):
             try:
                 payload = json.loads(line)
             except json.JSONDecodeError:
-                self._logger.info("[electron] %s", line)
+                self._logger.debug("[electron] %s", line)
                 continue
             self._processEventReceived.emit(payload)
 
@@ -184,7 +189,10 @@ class ElectronShellController(QObject):
         for raw_line in process.stderr:
             line = raw_line.strip()
             if line:
-                self._logger.warning("[electron] %s", line)
+                if _looks_like_electron_error(line):
+                    self._logger.warning("[electron] %s", line)
+                    continue
+                self._logger.debug("[electron] %s", line)
 
     def _send_command(self, payload: dict[str, Any]) -> None:
         process = self._process
@@ -222,7 +230,7 @@ class ElectronShellController(QObject):
                 self._height = int(bounds.get("height", self._height))
             return
         if event_type == "ready":
-            self._logger.info("Electron settings shell is ready.")
+            self._logger.debug("Electron settings shell is ready.")
             return
         if event_type == "closed":
             self._process = None
@@ -230,3 +238,11 @@ class ElectronShellController(QObject):
             return
         if event_type == "error":
             self._logger.error("Electron shell error: %s", event.get("message", ""))
+
+
+def _looks_like_electron_error(line: str) -> bool:
+    lowered_line = line.lower()
+    return any(
+        token in lowered_line
+        for token in ("error", "exception", "fatal", "failed", "traceback")
+    )
