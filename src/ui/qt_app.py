@@ -167,14 +167,12 @@ class LiveCueController:
         if previous_state is None:
             return
 
-        cue_key = ""
-        if previous_state == "idle" and normalized_state == "listening":
-            cue_key = "start"
-        elif normalized_state == "speaking" and normalized_message == "Speaking...":
-            if previous_state != "speaking" or previous_message != normalized_message:
-                cue_key = "reply_ready"
-        elif normalized_state == "idle" and normalized_message == "Live stopped.":
-            cue_key = "cancel"
+        cue_key = _cue_key_for_status_transition(
+            previous_state,
+            previous_message,
+            normalized_state,
+            normalized_message,
+        )
         if not cue_key:
             return
 
@@ -194,6 +192,25 @@ class LiveCueController:
             self._playback_service.play_blocking(str(cue_path))
         except Exception as exc:
             self._logger.warning("Live cue '%s' failed: %s", cue_key, exc)
+
+
+def _cue_key_for_status_transition(
+    previous_state: str,
+    previous_message: str,
+    normalized_state: str,
+    normalized_message: str,
+) -> str:
+    if previous_state == "idle" and normalized_state == "listening":
+        return "start"
+    if normalized_state == "speaking" and normalized_message == "Speaking...":
+        if previous_state != "speaking" or previous_message != normalized_message:
+            return "reply_ready"
+    if normalized_state == "idle" and normalized_message in {
+        "Live stopped.",
+        "No speech detected. Live is idle.",
+    }:
+        return "cancel"
+    return ""
 
 
 def run_settings_app() -> int:
