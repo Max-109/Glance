@@ -1,4 +1,4 @@
-import type { KeyboardEvent } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 
 import { Icon } from "../icons";
 
@@ -48,6 +48,22 @@ export function NumberInput({
       ? `${fieldName}-helper`
       : undefined;
 
+  const [flash, setFlash] = useState(false);
+  const previousValue = useRef(value);
+  const flashTimer = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (previousValue.current !== value) {
+      previousValue.current = value;
+      setFlash(true);
+      if (flashTimer.current) window.clearTimeout(flashTimer.current);
+      flashTimer.current = window.setTimeout(() => setFlash(false), 260);
+    }
+    return () => {
+      if (flashTimer.current) window.clearTimeout(flashTimer.current);
+    };
+  }, [value]);
+
   const adjustValue = (direction: -1 | 1) => {
     const parsedValue = Number.parseFloat(value);
     const baseValue = Number.isFinite(parsedValue)
@@ -87,7 +103,7 @@ export function NumberInput({
     <label className="field">
       <span className="field__label">{label}</span>
       <span
-        className={`field__control-shell field__control-shell--stepper${errorText ? " has-error" : ""}`}
+        className={`field__control-shell field__control-shell--stepper${errorText ? " has-error" : ""}${flash ? " is-just-changed" : ""}`}
       >
         {icon ? (
           <span className="field__icon">

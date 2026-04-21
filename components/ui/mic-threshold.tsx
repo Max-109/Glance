@@ -589,6 +589,7 @@ export function MicThreshold({
           label={active ? "Stop Mic Test" : "Start Mic Test"}
           icon={active ? "stop" : "mic"}
           variant="signal"
+          active={active}
           className="mic-gate__test-button"
           onClick={onToggleTest}
         />
