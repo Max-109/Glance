@@ -1204,7 +1204,17 @@ export function MicThreshold({
   const activeRef = useRef(false);
   const rafRef = useRef<number | null>(null);
   const lastSampleRef = useRef(0);
+  const lastStatsAtRef = useRef(0);
   const aboveSinceRef = useRef<number | null>(null);
+  const traceXRef = useRef<Float32Array>(
+    new Float32Array(MIC_GATE_HISTORY_LENGTH),
+  );
+  const traceYRef = useRef<Float32Array>(
+    new Float32Array(MIC_GATE_HISTORY_LENGTH),
+  );
+  const traceAboveRef = useRef<Uint8Array>(
+    new Uint8Array(MIC_GATE_HISTORY_LENGTH),
+  );
 
   const [status, setStatus] = useState<MicGateStatus>("idle");
 
@@ -1270,6 +1280,49 @@ export function MicThreshold({
     };
 
     cachedColors = readColors();
+
+    let warmupHandle: number | null = null;
+
+    const warmAccentTrace = () => {
+      if (typeof document === "undefined") {
+        return;
+      }
+      const warmCanvas = document.createElement("canvas");
+      warmCanvas.width = 96;
+      warmCanvas.height = 48;
+      const warmCtx = warmCanvas.getContext("2d");
+      if (!warmCtx) {
+        return;
+      }
+
+      warmCtx.strokeStyle = cachedColors.accent;
+      warmCtx.lineWidth = 1.6;
+      warmCtx.lineCap = "round";
+      warmCtx.lineJoin = "round";
+      warmCtx.shadowColor = cachedColors.accentGlow;
+      warmCtx.shadowBlur = 6;
+      warmCtx.beginPath();
+      warmCtx.moveTo(8, 34);
+      warmCtx.lineTo(28, 12);
+      warmCtx.lineTo(50, 24);
+      warmCtx.lineTo(72, 10);
+      warmCtx.stroke();
+
+      warmCtx.shadowBlur = 0;
+      warmCtx.clearRect(0, 0, warmCanvas.width, warmCanvas.height);
+    };
+
+    if (typeof window !== "undefined") {
+      const browserWindow = window as Window & {
+        requestIdleCallback?: (callback: () => void) => number;
+        cancelIdleCallback?: (handle: number) => void;
+      };
+      if (browserWindow.requestIdleCallback) {
+        warmupHandle = browserWindow.requestIdleCallback(() => warmAccentTrace());
+      } else {
+        warmupHandle = window.setTimeout(() => warmAccentTrace(), 0);
+      }
+    }
 
     let handleInset = 96; // pixels from right edge reserved for the pill
 
@@ -1356,13 +1409,25 @@ export function MicThreshold({
         (head - visibleCount + MIC_GATE_HISTORY_LENGTH) %
         MIC_GATE_HISTORY_LENGTH;
 
+      const traceX = traceXRef.current;
+      const traceY = traceYRef.current;
+      const traceAbove = traceAboveRef.current;
+      let hasAboveTrace = false;
+
       ctx.fillStyle = colors.muted;
       for (let i = 0; i < visibleCount; i++) {
         const srcIdx = (startReadIdx + i) % MIC_GATE_HISTORY_LENGTH;
         const v = history[srcIdx];
+        const p = peak[srcIdx];
         const x = i * step + slotOffset;
         const barH = Math.max(1, v * height);
         ctx.fillRect(x, height - barH, barWidth, barH);
+
+        traceX[i] = x + barWidth / 2;
+        traceY[i] = height - Math.max(1, p * height);
+        const above = thr > 0 && p >= thr ? 1 : 0;
+        traceAbove[i] = above;
+        hasAboveTrace ||= above === 1;
       }
 
       // Threshold line — just a quiet baseline.
@@ -1380,21 +1445,16 @@ export function MicThreshold({
       ctx.strokeStyle = "rgba(255, 255, 255, 0.28)";
       ctx.lineWidth = 1;
       ctx.beginPath();
-      let moved = false;
-      for (let i = 0; i < visibleCount; i++) {
-        const srcIdx = (startReadIdx + i) % MIC_GATE_HISTORY_LENGTH;
-        const p = peak[srcIdx];
-        const x = i * step + slotOffset + barWidth / 2;
-        const y = height - Math.max(1, p * height);
-        if (!moved) {
-          ctx.moveTo(x, y);
-          moved = true;
-        } else ctx.lineTo(x, y);
+      if (visibleCount > 0) {
+        ctx.moveTo(traceX[0], traceY[0]);
+        for (let i = 1; i < visibleCount; i++) {
+          ctx.lineTo(traceX[i], traceY[i]);
+        }
       }
       ctx.stroke();
 
       // Accent only the trace segments that rise above threshold.
-      if (thr > 0) {
+      if (thr > 0 && hasAboveTrace) {
         ctx.strokeStyle = colors.accent;
         ctx.lineWidth = 1.6;
         ctx.lineCap = "round";
@@ -1403,26 +1463,15 @@ export function MicThreshold({
         ctx.shadowBlur = 6;
         ctx.beginPath();
 
-        let hasPrev = false;
-        let prevX = 0;
-        let prevY = 0;
-        let prevAbove = false;
+        let prevX = traceX[0];
+        let prevY = traceY[0];
+        let prevAbove = traceAbove[0] === 1;
         let segmentOpen = false;
 
-        for (let i = 0; i < visibleCount; i++) {
-          const srcIdx = (startReadIdx + i) % MIC_GATE_HISTORY_LENGTH;
-          const p = peak[srcIdx];
-          const x = i * step + slotOffset + barWidth / 2;
-          const y = height - Math.max(1, p * height);
-          const above = p >= thr;
-
-          if (!hasPrev) {
-            hasPrev = true;
-            prevX = x;
-            prevY = y;
-            prevAbove = above;
-            continue;
-          }
+        for (let i = 1; i < visibleCount; i++) {
+          const x = traceX[i];
+          const y = traceY[i];
+          const above = traceAbove[i] === 1;
 
           if (prevAbove && above) {
             if (!segmentOpen) {
@@ -1491,7 +1540,8 @@ export function MicThreshold({
       }
 
       // Noise floor + status compute every ~200ms.
-      if ((now | 0) % 6 === 0) {
+      if (now - lastStatsAtRef.current >= 200) {
+        lastStatsAtRef.current = now;
         const arr = Array.from(historyRef.current);
         const nf = percentile(arr, 0.1);
         const thr = thresholdRef.current;
@@ -1525,9 +1575,20 @@ export function MicThreshold({
 
     return () => {
       observer?.disconnect();
+      if (typeof window !== "undefined" && warmupHandle != null) {
+        const browserWindow = window as Window & {
+          cancelIdleCallback?: (handle: number) => void;
+        };
+        if (browserWindow.cancelIdleCallback) {
+          browserWindow.cancelIdleCallback(warmupHandle);
+        } else {
+          window.clearTimeout(warmupHandle);
+        }
+      }
       if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
       rafRef.current = null;
       lastSampleRef.current = 0;
+      lastStatsAtRef.current = 0;
     };
   }, []);
 

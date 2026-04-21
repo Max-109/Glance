@@ -14,7 +14,12 @@ import type {
   PointerEvent as ReactPointerEvent,
 } from "react";
 
-import { sectionMeta, type BridgeState, type SectionId } from "@/lib/glance-bridge";
+import {
+  sectionMeta,
+  type AudioBridgeState,
+  type BridgeState,
+  type SectionId,
+} from "@/lib/glance-bridge";
 import { eventToKeybind } from "@/lib/keybinds";
 
 import { Button, Notice, Sidebar } from "./ui";
@@ -102,6 +107,19 @@ function formatError(error: unknown): string {
     return error.message;
   }
   return "Glance isn't connected right now.";
+}
+
+function selectAudioState(
+  snapshot: Pick<
+    BridgeState,
+    "audioInputLevel" | "audioInputTestActive" | "audioDeviceStatusMessage"
+  >,
+): AudioBridgeState {
+  return {
+    audioInputLevel: snapshot.audioInputLevel,
+    audioInputTestActive: snapshot.audioInputTestActive,
+    audioDeviceStatusMessage: snapshot.audioDeviceStatusMessage,
+  };
 }
 
 function clamp(value: number, min: number, max: number) {
@@ -273,6 +291,7 @@ function buildThemeStyle(
 
 export function SettingsShell() {
   const [state, setState] = useState<BridgeState | null>(null);
+  const [audioState, setAudioState] = useState<AudioBridgeState | null>(null);
   const [systemTheme, setSystemTheme] = useState<SystemTheme>("dark");
   const [isMacOs, setIsMacOs] = useState(false);
   const [providerTab, setProviderTab] = useState<ProviderTab>("llm");
@@ -289,7 +308,10 @@ export function SettingsShell() {
   const scrollViewportRef = useRef<HTMLDivElement | null>(null);
 
   const liveState = state ?? EMPTY_STATE;
-  const deferredAudioLevel = useDeferredValue(liveState.audioInputLevel);
+  const liveAudioLevel = audioState?.audioInputLevel ?? liveState.audioInputLevel;
+  const audioInputTestActive =
+    audioState?.audioInputTestActive ?? liveState.audioInputTestActive;
+  const deferredAudioLevel = useDeferredValue(liveAudioLevel);
   const thresholdValue = thresholdDraft ?? Number(liveState.settings.audio_activation_threshold || 0.026);
   const themePreference = String(liveState.settings.theme_preference || "dark");
   const resolvedTheme =
@@ -305,6 +327,7 @@ export function SettingsShell() {
     (snapshot: BridgeState, nextSystemTheme?: SystemTheme) => {
       startTransition(() => {
         setState(snapshot);
+        setAudioState(selectAudioState(snapshot));
         setBridgeError("");
         setDrafts((current) => {
           if (!editingField || current[editingField] === undefined) {
@@ -319,6 +342,23 @@ export function SettingsShell() {
     },
   );
 
+  const applyAudioSnapshot = useEffectEvent((snapshot: AudioBridgeState) => {
+    startTransition(() => {
+      setAudioState((current) => {
+        if (
+          current &&
+          current.audioInputLevel === snapshot.audioInputLevel &&
+          current.audioInputTestActive === snapshot.audioInputTestActive &&
+          current.audioDeviceStatusMessage === snapshot.audioDeviceStatusMessage
+        ) {
+          return current;
+        }
+        return snapshot;
+      });
+      setBridgeError("");
+    });
+  });
+
   const refreshState = useEffectEvent(async () => {
     const bridge = getBridge();
     if (!bridge) {
@@ -332,6 +372,20 @@ export function SettingsShell() {
         bridge.getSystemTheme().catch(() => systemTheme),
       ]);
       applySnapshot(snapshot, nextSystemTheme);
+    } catch (error) {
+      setBridgeError(formatError(error));
+    }
+  });
+
+  const refreshAudioState = useEffectEvent(async () => {
+    const bridge = getBridge();
+    if (!bridge) {
+      setBridgeError("Open Glance from the tray to reconnect.");
+      return;
+    }
+
+    try {
+      applyAudioSnapshot(await bridge.getAudioState());
     } catch (error) {
       setBridgeError(formatError(error));
     }
@@ -409,10 +463,7 @@ export function SettingsShell() {
   }, [liveState.dirty]);
 
   const pollMs =
-    liveState.audioInputTestActive ||
-    liveState.previewActive ||
-    liveState.speakerTestActive ||
-    liveState.saving
+    liveState.previewActive || liveState.speakerTestActive || liveState.saving
       ? 240
       : 1200;
 
@@ -423,6 +474,19 @@ export function SettingsShell() {
 
     return () => window.clearInterval(interval);
   }, [pollMs, refreshState]);
+
+  useEffect(() => {
+    if (!audioInputTestActive) {
+      return;
+    }
+
+    void refreshAudioState();
+    const interval = window.setInterval(() => {
+      void refreshAudioState();
+    }, 150);
+
+    return () => window.clearInterval(interval);
+  }, [audioInputTestActive, refreshAudioState]);
 
   const closeSelectOnOutsideInteraction = useEffectEvent((event: PointerEvent) => {
     if (!openSelect) {
@@ -857,6 +921,7 @@ export function SettingsShell() {
               openSelect={openSelect}
               thresholdValue={thresholdValue}
               audioLevel={deferredAudioLevel}
+              audioInputTestActive={audioInputTestActive}
               revealedFields={revealedFields}
               onChangeProviderTab={setProviderTab}
               onToggleSelect={handleToggleSelect}

@@ -19,6 +19,7 @@ async function request(path, options = {}) {
 
 contextBridge.exposeInMainWorld("glanceBridge", {
   getState: () => request("/api/state", { method: "GET" }),
+  getAudioState: () => request("/api/audio-state", { method: "GET" }),
   setSection: (section) =>
     request("/api/section", {
       method: "POST",

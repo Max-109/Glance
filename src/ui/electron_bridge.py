@@ -74,6 +74,14 @@ def _build_state_snapshot(viewmodel: SettingsViewModel) -> dict[str, Any]:
     }
 
 
+def _build_audio_state_snapshot(viewmodel: SettingsViewModel) -> dict[str, Any]:
+    return {
+        "audioInputLevel": viewmodel.audioInputLevel,
+        "audioInputTestActive": viewmodel.audioInputTestActive,
+        "audioDeviceStatusMessage": viewmodel.audioDeviceStatusMessage,
+    }
+
+
 class SettingsBridgeServer:
     def __init__(self, viewmodel: SettingsViewModel) -> None:
         self._viewmodel = viewmodel
@@ -106,6 +114,9 @@ class SettingsBridgeServer:
             snapshot["runtimeState"] = self._runtime_state
             snapshot["runtimeMessage"] = self._runtime_message
         return snapshot
+
+    def audio_state(self) -> dict[str, Any]:
+        return self._executor.call(_build_audio_state_snapshot, self._viewmodel)
 
     def set_runtime_status(self, state: str, message: str) -> None:
         with self._runtime_lock:
@@ -166,10 +177,13 @@ class SettingsBridgeServer:
                 self.end_headers()
 
             def do_GET(self) -> None:  # noqa: N802
-                if self.path != "/api/state":
-                    self._send_error(HTTPStatus.NOT_FOUND, "Unknown route.")
+                if self.path == "/api/state":
+                    self._send_json({"ok": True, "state": bridge.snapshot()})
                     return
-                self._send_json({"ok": True, "state": bridge.snapshot()})
+                if self.path == "/api/audio-state":
+                    self._send_json({"ok": True, "state": bridge.audio_state()})
+                    return
+                self._send_error(HTTPStatus.NOT_FOUND, "Unknown route.")
 
             def do_POST(self) -> None:  # noqa: N802
                 try:

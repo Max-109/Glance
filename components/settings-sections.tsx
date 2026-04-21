@@ -44,7 +44,7 @@ const PROVIDER_CARDS: Array<{
     id: "transcription",
     label: "Transcription",
     eyebrow: "INPUT",
-    icon: "wave",
+    icon: "mic",
   },
 ];
 
@@ -209,6 +209,7 @@ interface SettingsSectionsProps {
   openSelect: string | null;
   thresholdValue: number;
   audioLevel: number;
+  audioInputTestActive: boolean;
   revealedFields: Record<string, boolean>;
   onChangeProviderTab: (tab: ProviderTab) => void;
   onToggleSelect: (fieldName: string) => void;
@@ -237,6 +238,7 @@ export function SettingsSections({
   openSelect,
   thresholdValue,
   audioLevel,
+  audioInputTestActive,
   revealedFields,
   onChangeProviderTab,
   onToggleSelect,
@@ -303,6 +305,7 @@ export function SettingsSections({
         openSelect={openSelect}
         thresholdValue={thresholdValue}
         audioLevel={audioLevel}
+        audioInputTestActive={audioInputTestActive}
         onToggleSelect={onToggleSelect}
         onSelectValue={onSelectValue}
         onDraftChange={onDraftChange}
@@ -536,7 +539,7 @@ function ApiSection({
             <Input
               fieldName="transcription_model_name"
               label="Model"
-              icon="wave"
+              icon="mic"
               value={getDraftValue("transcription_model_name")}
               errorText={state.errors.transcription_model_name}
               onChange={(value) => onDraftChange("transcription_model_name", value)}
@@ -719,6 +722,7 @@ function AudioSection({
   openSelect,
   thresholdValue,
   audioLevel,
+  audioInputTestActive,
   onToggleSelect,
   onSelectValue,
   onDraftChange,
@@ -734,6 +738,7 @@ function AudioSection({
   | "openSelect"
   | "thresholdValue"
   | "audioLevel"
+  | "audioInputTestActive"
   | "onToggleSelect"
   | "onSelectValue"
   | "onDraftChange"
@@ -805,12 +810,12 @@ function AudioSection({
         footer={
           <div className="card-actions">
             <Button
-              label={state.audioInputTestActive ? "Stop Mic Test" : "Start Mic Test"}
-              icon={state.audioInputTestActive ? "stop" : "mic"}
+              label={audioInputTestActive ? "Stop Mic Test" : "Start Mic Test"}
+              icon={audioInputTestActive ? "stop" : "mic"}
               variant="signal"
               onClick={() =>
                 onRunAction(
-                  state.audioInputTestActive
+                  audioInputTestActive
                     ? "stopAudioInputTest"
                     : "startAudioInputTest",
                 )
@@ -822,7 +827,7 @@ function AudioSection({
         <MicThreshold
           level={audioLevel}
           threshold={thresholdValue}
-          active={state.audioInputTestActive}
+          active={audioInputTestActive}
           onPointerDown={onThresholdPointerDown}
           onNudge={onThresholdNudge}
         />
