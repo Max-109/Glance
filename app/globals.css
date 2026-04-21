@@ -119,6 +119,8 @@ textarea:focus-visible {
   --accent-border: rgba(167, 255, 222, 0.3);
   --accent-glow: rgba(167, 255, 222, 0.38);
   --accent-contrast: #07110d;
+  --mic-gate-line: color-mix(in srgb, var(--accent) 14%, transparent);
+  --mic-gate-ripple: color-mix(in srgb, var(--accent) 65%, transparent);
   --signal: #ffc889;
   --signal-soft: rgba(255, 200, 137, 0.14);
   --signal-border: rgba(255, 200, 137, 0.28);
@@ -1206,11 +1208,6 @@ textarea.control::-webkit-scrollbar-thumb {
 }
 
 .mic-gate {
-  --mic-gate-threshold-zone: color-mix(
-    in srgb,
-    var(--accent) 10%,
-    transparent
-  );
   display: grid;
   gap: 0;
   overflow: hidden;

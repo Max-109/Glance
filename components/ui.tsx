@@ -1201,36 +1201,6 @@ export function MicGateMeter({
   thresholdRef.current = normalizedThreshold;
   activeRef.current = active;
 
-  // Read accent from CSS custom props
-  const readColors = () => {
-    if (typeof window === "undefined") {
-      return {
-        accent: "#a7ffde",
-        accentStrong: "#d3fff0",
-        accentGlow: "rgba(167, 255, 222, 0.38)",
-        muted: "rgba(255, 255, 255, 0.18)",
-        mutedSoft: "rgba(255, 255, 255, 0.09)",
-        threshold: "#a7ffde",
-        thresholdZone: "rgba(167, 255, 222, 0.1)",
-      };
-    }
-    const styles = getComputedStyle(document.documentElement);
-    return {
-        accent: styles.getPropertyValue("--accent").trim() || "#a7ffde",
-        accentStrong:
-          styles.getPropertyValue("--accent-strong").trim() || "#d3fff0",
-        accentGlow:
-          styles.getPropertyValue("--accent-glow").trim() ||
-          "rgba(167, 255, 222, 0.38)",
-        muted: "rgba(255, 255, 255, 0.22)",
-        mutedSoft: "rgba(255, 255, 255, 0.08)",
-        threshold: styles.getPropertyValue("--accent").trim() || "#a7ffde",
-        thresholdZone:
-          styles.getPropertyValue("--mic-gate-threshold-zone").trim() ||
-          "rgba(167, 255, 222, 0.1)",
-      };
-    };
-
   useEffect(() => {
     const canvas = canvasRef.current;
     const host = vizRef.current;
@@ -1243,6 +1213,52 @@ export function MicGateMeter({
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
+    type Colors = {
+      accent: string;
+      accentStrong: string;
+      accentGlow: string;
+      muted: string;
+      line: string;
+      ripple: string;
+    };
+
+    const fallbackColors: Colors = {
+      accent: "#a7ffde",
+      accentStrong: "#d3fff0",
+      accentGlow: "rgba(167, 255, 222, 0.38)",
+      muted: "rgba(255, 255, 255, 0.22)",
+      line: "rgba(167, 255, 222, 0.14)",
+      ripple: "rgba(167, 255, 222, 0.65)",
+    };
+
+    let cachedColors: Colors = fallbackColors;
+
+    const readColors = (): Colors => {
+      if (typeof window === "undefined") return fallbackColors;
+      const styles = getComputedStyle(document.documentElement);
+      const accent = styles.getPropertyValue("--accent").trim() || fallbackColors.accent;
+      const accentStrong =
+        styles.getPropertyValue("--accent-strong").trim() || fallbackColors.accentStrong;
+      const accentGlow =
+        styles.getPropertyValue("--accent-glow").trim() || fallbackColors.accentGlow;
+      const line =
+        styles.getPropertyValue("--mic-gate-line").trim() || fallbackColors.line;
+      const ripple =
+        styles.getPropertyValue("--mic-gate-ripple").trim() || fallbackColors.ripple;
+      return {
+        accent,
+        accentStrong,
+        accentGlow,
+        muted: "rgba(255, 255, 255, 0.22)",
+        line,
+        ripple,
+      };
+    };
+
+    cachedColors = readColors();
+
+    let handleInset = 96; // pixels from right edge reserved for the pill
+
     const resize = () => {
       const rect = host.getBoundingClientRect();
       const dpr = Math.max(1, window.devicePixelRatio || 1);
@@ -1251,6 +1267,13 @@ export function MicGateMeter({
       canvas.style.width = `${rect.width}px`;
       canvas.style.height = `${rect.height}px`;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+      const pill = host.querySelector<HTMLElement>(".mic-gate__handle");
+      if (pill) {
+        const hostRect = host.getBoundingClientRect();
+        const pillRect = pill.getBoundingClientRect();
+        handleInset = Math.max(40, Math.round(hostRect.right - pillRect.left + 10));
+      }
     };
     resize();
 
@@ -1261,6 +1284,7 @@ export function MicGateMeter({
     observer?.observe(host);
 
     const sampleInterval = 1000 / MIC_GATE_SAMPLE_HZ;
+    let colorRefreshAt = 0;
 
     const pushSample = (value: number) => {
       const history = historyRef.current;
@@ -1274,12 +1298,12 @@ export function MicGateMeter({
       headRef.current = (idx + 1) % MIC_GATE_HISTORY_LENGTH;
     };
 
-    const draw = () => {
+    const draw = (_now: number) => {
       const width = host.clientWidth;
       const height = host.clientHeight;
       if (width <= 0 || height <= 0) return;
 
-      const colors = readColors();
+      const colors = cachedColors;
       const history = historyRef.current;
       const peak = peakRef.current;
       const head = headRef.current;
@@ -1287,44 +1311,28 @@ export function MicGateMeter({
 
       ctx.clearRect(0, 0, width, height);
 
-      // Background grid marks at 25/50/75%
+      // Background grid at 25/50/75%.
       ctx.strokeStyle = "rgba(255, 255, 255, 0.04)";
       ctx.lineWidth = 1;
+      ctx.beginPath();
       for (const p of [0.25, 0.5, 0.75]) {
         const y = Math.round((1 - p) * height) + 0.5;
-        ctx.beginPath();
         ctx.moveTo(0, y);
         ctx.lineTo(width, y);
-        ctx.stroke();
       }
-
-      // Threshold zone: keep the floor visible without a harsh full-width beam.
-      const thresholdY = (1 - thr) * height;
-      const thrY = Math.round(thresholdY) + 0.5;
-      ctx.save();
-      ctx.fillStyle = colors.thresholdZone;
-      ctx.fillRect(0, thresholdY, width, Math.max(0, height - thresholdY));
-      ctx.strokeStyle = colors.threshold;
-      ctx.globalAlpha = 0.38;
-      ctx.lineWidth = 1;
-      ctx.setLineDash([4, 5]);
-      ctx.beginPath();
-      ctx.moveTo(0, thrY);
-      ctx.lineTo(width, thrY);
       ctx.stroke();
-      ctx.restore();
 
-      // Dashed segment above threshold (showing headroom zone)
-      ctx.save();
-      ctx.strokeStyle = "rgba(255, 255, 255, 0.06)";
-      ctx.setLineDash([3, 4]);
+      // Headroom hint near the top.
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.05)";
+      ctx.setLineDash([3, 5]);
       ctx.beginPath();
-      ctx.moveTo(0, Math.round(height * 0.05) + 0.5);
-      ctx.lineTo(width, Math.round(height * 0.05) + 0.5);
+      const headroomY = Math.round(height * 0.05) + 0.5;
+      ctx.moveTo(0, headroomY);
+      ctx.lineTo(width, headroomY);
       ctx.stroke();
-      ctx.restore();
+      ctx.setLineDash([]);
 
-      // Bars: oldest on the left, newest on the right, stretched across the full 6s window.
+      // Bars stay neutral; the crossing is communicated by the trace only.
       const visibleCount = MIC_GATE_HISTORY_LENGTH;
       const step = width / visibleCount;
       const gap = Math.min(1.25, step * 0.22);
@@ -1334,49 +1342,112 @@ export function MicGateMeter({
         (head - visibleCount + MIC_GATE_HISTORY_LENGTH) %
         MIC_GATE_HISTORY_LENGTH;
 
-      // Collect visible peaks as we draw so we can render the peak-hold polyline after.
-      const peakPoints: Array<[number, number]> = [];
-
+      ctx.fillStyle = colors.muted;
       for (let i = 0; i < visibleCount; i++) {
         const srcIdx = (startReadIdx + i) % MIC_GATE_HISTORY_LENGTH;
         const v = history[srcIdx];
-        const p = peak[srcIdx];
         const x = i * step + slotOffset;
         const barH = Math.max(1, v * height);
-        const y = height - barH;
-
-        const above = v >= thr && thr > 0;
-        ctx.fillStyle = above ? colors.accent : colors.muted;
-        ctx.globalAlpha = above ? 0.95 : 0.55;
-        ctx.fillRect(x, y, barWidth, barH);
-
-        // Soft glow pass for above-threshold
-        if (above) {
-          ctx.globalCompositeOperation = "lighter";
-          ctx.globalAlpha = 0.18;
-          ctx.fillStyle = colors.accentStrong;
-          ctx.fillRect(x - 1, y - 1, barWidth + 2, barH + 2);
-          ctx.globalCompositeOperation = "source-over";
-        }
-        ctx.globalAlpha = 1;
-
-        peakPoints.push([x + barWidth / 2, height - Math.max(1, p * height)]);
+        ctx.fillRect(x, height - barH, barWidth, barH);
       }
 
-      // Peak-hold polyline
-      if (peakPoints.length > 1) {
-        ctx.strokeStyle = "rgba(255, 255, 255, 0.35)";
-        ctx.lineWidth = 1;
+      // Threshold line — just a quiet baseline.
+      const thresholdY = (1 - thr) * height;
+      const thrY = Math.round(thresholdY) + 0.5;
+      const lineEnd = Math.max(0, width - handleInset);
+      ctx.strokeStyle = colors.line;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(0, thrY);
+      ctx.lineTo(lineEnd, thrY);
+      ctx.stroke();
+
+      // Peak-hold polyline (subtle silver trace).
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.28)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      let moved = false;
+      for (let i = 0; i < visibleCount; i++) {
+        const srcIdx = (startReadIdx + i) % MIC_GATE_HISTORY_LENGTH;
+        const p = peak[srcIdx];
+        const x = i * step + slotOffset + barWidth / 2;
+        const y = height - Math.max(1, p * height);
+        if (!moved) {
+          ctx.moveTo(x, y);
+          moved = true;
+        } else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+
+      // Accent only the trace segments that rise above threshold.
+      if (thr > 0) {
+        ctx.strokeStyle = colors.accent;
+        ctx.lineWidth = 1.6;
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+        ctx.shadowColor = colors.accentGlow;
+        ctx.shadowBlur = 6;
         ctx.beginPath();
-        ctx.moveTo(peakPoints[0][0], peakPoints[0][1]);
-        for (let i = 1; i < peakPoints.length; i++) {
-          ctx.lineTo(peakPoints[i][0], peakPoints[i][1]);
+
+        let hasPrev = false;
+        let prevX = 0;
+        let prevY = 0;
+        let prevAbove = false;
+        let segmentOpen = false;
+
+        for (let i = 0; i < visibleCount; i++) {
+          const srcIdx = (startReadIdx + i) % MIC_GATE_HISTORY_LENGTH;
+          const p = peak[srcIdx];
+          const x = i * step + slotOffset + barWidth / 2;
+          const y = height - Math.max(1, p * height);
+          const above = p >= thr;
+
+          if (!hasPrev) {
+            hasPrev = true;
+            prevX = x;
+            prevY = y;
+            prevAbove = above;
+            continue;
+          }
+
+          if (prevAbove && above) {
+            if (!segmentOpen) {
+              ctx.moveTo(prevX, prevY);
+              segmentOpen = true;
+            }
+            ctx.lineTo(x, y);
+          } else if (prevAbove !== above) {
+            const dy = y - prevY;
+            const t = dy === 0 ? 0 : (thresholdY - prevY) / dy;
+            const clampedT = Math.max(0, Math.min(1, t));
+            const crossX = prevX + (x - prevX) * clampedT;
+
+            if (prevAbove) {
+              if (!segmentOpen) ctx.moveTo(prevX, prevY);
+              ctx.lineTo(crossX, thresholdY);
+              segmentOpen = false;
+            } else {
+              ctx.moveTo(crossX, thresholdY);
+              ctx.lineTo(x, y);
+              segmentOpen = true;
+            }
+          } else {
+            segmentOpen = false;
+          }
+
+          prevX = x;
+          prevY = y;
+          prevAbove = above;
         }
+
         ctx.stroke();
+        ctx.shadowBlur = 0;
+        ctx.lineCap = "butt";
+        ctx.lineJoin = "miter";
       }
 
-      // "Now" indicator on right edge
-      ctx.strokeStyle = "rgba(255, 255, 255, 0.18)";
+      // "Now" edge indicator.
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.14)";
       ctx.lineWidth = 1;
       ctx.beginPath();
       ctx.moveTo(width - 0.5, 0);
@@ -1386,15 +1457,26 @@ export function MicGateMeter({
 
     const tick = (now: number) => {
       if (!lastSampleRef.current) lastSampleRef.current = now;
-      while (now - lastSampleRef.current >= sampleInterval) {
-        pushSample(
-          activeRef.current ? latestLevelRef.current : 0,
-        );
-        lastSampleRef.current += sampleInterval;
-      }
-      draw();
 
-      // Noise floor + status compute every ~200ms
+      // Refresh colors periodically (theme changes) instead of every frame.
+      if (now - colorRefreshAt > 500) {
+        cachedColors = readColors();
+        colorRefreshAt = now;
+      }
+
+      let sampled = false;
+      while (now - lastSampleRef.current >= sampleInterval) {
+        pushSample(activeRef.current ? latestLevelRef.current : 0);
+        lastSampleRef.current += sampleInterval;
+        sampled = true;
+      }
+
+      // Only redraw when something actually changed.
+      if (sampled) {
+        draw(now);
+      }
+
+      // Noise floor + status compute every ~200ms.
       if ((now | 0) % 6 === 0) {
         const arr = Array.from(historyRef.current);
         const nf = percentile(arr, 0.1);
@@ -1423,7 +1505,7 @@ export function MicGateMeter({
 
     if (prefersReducedMotion) {
       // Static draw only; still update on re-render via effect deps
-      draw();
+      draw(performance.now());
     } else {
       rafRef.current = requestAnimationFrame(tick);
     }
