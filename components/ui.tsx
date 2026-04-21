@@ -1268,11 +1268,11 @@ export function MicThreshold({
       canvas.style.height = `${rect.height}px`;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-      const pill = host.querySelector<HTMLElement>(".mic-gate__handle");
+      const pill = host.querySelector<HTMLElement>(".mic-gate__tick");
       if (pill) {
         const hostRect = host.getBoundingClientRect();
         const pillRect = pill.getBoundingClientRect();
-        handleInset = Math.max(40, Math.round(hostRect.right - pillRect.left + 10));
+        handleInset = Math.max(24, Math.round(hostRect.right - pillRect.left + 6));
       }
     };
     resize();
@@ -1554,12 +1554,6 @@ export function MicThreshold({
           ? "Quiet"
           : "Mic test off";
 
-  // Sparkline segments for level chip
-  const sparkSegments = 8;
-  const filledSegments = Math.round(
-    Math.max(0, Math.min(1, normalizedLevel)) * sparkSegments,
-  );
-
   return (
     <div className="mic-gate">
       <div className={`mic-gate__status mic-gate__status--${status}`}>
@@ -1586,12 +1580,12 @@ export function MicThreshold({
         <canvas ref={canvasRef} className="mic-gate__canvas" aria-hidden="true" />
 
         <div
-          className="mic-gate__handle"
+          className="mic-gate__tick"
           style={{ bottom: `${normalizedThreshold * 100}%` }}
           aria-hidden="true"
         >
-          <span className="mic-gate__handle-grip" />
-          <span className="mic-gate__handle-value">{thresholdPct}%</span>
+          <span className="mic-gate__tick-mark" />
+          <span className="mic-gate__tick-value">{thresholdPct}%</span>
         </div>
 
         <div className="mic-gate__now-label" aria-hidden="true">
@@ -1610,21 +1604,20 @@ export function MicThreshold({
         <div className="mic-gate__chip mic-gate__chip--level">
           <span className="mic-gate__chip-label">Live level</span>
           <span className="mic-gate__chip-value">
-            {levelPct}%
-            <span className="mic-gate__spark" aria-hidden="true">
-              {Array.from({ length: sparkSegments }).map((_, i) => (
-                <span
-                  key={i}
-                  className={`mic-gate__spark-seg${
-                    i < filledSegments ? " is-on" : ""
-                  }${
-                    i < filledSegments &&
-                    i / sparkSegments >= normalizedThreshold
-                      ? " is-hot"
-                      : ""
-                  }`}
-                />
-              ))}
+            <span className="mic-gate__level-number">{levelPct}%</span>
+            <span className="mic-gate__level-bar" aria-hidden="true">
+              <span
+                className="mic-gate__level-fill"
+                style={{ width: `${Math.max(0, Math.min(1, normalizedLevel)) * 100}%` }}
+              />
+              <span
+                className={`mic-gate__level-threshold${
+                  normalizedLevel >= normalizedThreshold && normalizedThreshold > 0
+                    ? " is-hot"
+                    : ""
+                }`}
+                style={{ left: `${normalizedThreshold * 100}%` }}
+              />
             </span>
           </span>
         </div>
