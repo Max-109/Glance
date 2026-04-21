@@ -785,7 +785,15 @@ export function SettingsShell() {
   }
 
   function handleThresholdNudge(delta: number) {
-    const nextValue = clamp(Number((thresholdValue + delta).toFixed(3)), 0.001, 1);
+    // Sentinels for Home/End: -1 → set to min, +1 → set to max
+    let nextValue: number;
+    if (delta === -1) {
+      nextValue = 0.001;
+    } else if (delta === 1) {
+      nextValue = 1;
+    } else {
+      nextValue = clamp(Number((thresholdValue + delta).toFixed(3)), 0.001, 1);
+    }
     void commitThreshold(nextValue);
   }
 

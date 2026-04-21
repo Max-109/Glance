@@ -1145,6 +1145,23 @@ export function ShortcutCaptureList({
   );
 }
 
+const MIC_GATE_HISTORY_SECONDS = 6;
+const MIC_GATE_SAMPLE_HZ = 30;
+const MIC_GATE_HISTORY_LENGTH = MIC_GATE_HISTORY_SECONDS * MIC_GATE_SAMPLE_HZ;
+const MIC_GATE_PEAK_DECAY = 0.94;
+
+type MicGateStatus = "idle" | "quiet" | "speech" | "noisy";
+
+function percentile(values: number[], p: number) {
+  if (values.length === 0) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const idx = Math.max(
+    0,
+    Math.min(sorted.length - 1, Math.floor((sorted.length - 1) * p)),
+  );
+  return sorted[idx];
+}
+
 export function MicGateMeter({
   level,
   threshold,
@@ -1159,61 +1176,310 @@ export function MicGateMeter({
   onNudge: (delta: number) => void;
 }) {
   const vizRef = useRef<HTMLDivElement | null>(null);
-  const [barCount, setBarCount] = useState(24);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const historyRef = useRef<Float32Array>(
+    new Float32Array(MIC_GATE_HISTORY_LENGTH),
+  );
+  const peakRef = useRef<Float32Array>(
+    new Float32Array(MIC_GATE_HISTORY_LENGTH),
+  );
+  const headRef = useRef(0);
+  const latestLevelRef = useRef(0);
+  const thresholdRef = useRef(0);
+  const activeRef = useRef(false);
+  const rafRef = useRef<number | null>(null);
+  const lastSampleRef = useRef(0);
+  const aboveSinceRef = useRef<number | null>(null);
+
+  const [noiseFloor, setNoiseFloor] = useState(0);
+  const [status, setStatus] = useState<MicGateStatus>("idle");
+
   const normalizedLevel = Math.max(0, Math.min(1, level || 0));
   const normalizedThreshold = Math.max(0, Math.min(1, threshold || 0));
 
-  useEffect(() => {
-    const element = vizRef.current;
-    if (!element || typeof ResizeObserver === "undefined") {
-      return;
-    }
+  latestLevelRef.current = normalizedLevel;
+  thresholdRef.current = normalizedThreshold;
+  activeRef.current = active;
 
-    const updateBarCount = () => {
-      const nextCount = clamp(
-        Math.round((element.clientWidth - 56) / 26),
-        18,
-        56,
-      );
-      setBarCount(nextCount);
+  // Read accent from CSS custom props
+  const readColors = () => {
+    if (typeof window === "undefined") {
+      return {
+        accent: "#a7ffde",
+        accentStrong: "#d3fff0",
+        accentGlow: "rgba(167, 255, 222, 0.38)",
+        muted: "rgba(255, 255, 255, 0.18)",
+        mutedSoft: "rgba(255, 255, 255, 0.09)",
+        threshold: "#a7ffde",
+      };
+    }
+    const styles = getComputedStyle(document.documentElement);
+    return {
+      accent: styles.getPropertyValue("--accent").trim() || "#a7ffde",
+      accentStrong:
+        styles.getPropertyValue("--accent-strong").trim() || "#d3fff0",
+      accentGlow:
+        styles.getPropertyValue("--accent-glow").trim() ||
+        "rgba(167, 255, 222, 0.38)",
+      muted: "rgba(255, 255, 255, 0.22)",
+      mutedSoft: "rgba(255, 255, 255, 0.08)",
+      threshold: styles.getPropertyValue("--accent").trim() || "#a7ffde",
+    };
+  };
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const host = vizRef.current;
+    if (!canvas || !host) return;
+
+    const prefersReducedMotion =
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const resize = () => {
+      const rect = host.getBoundingClientRect();
+      const dpr = Math.max(1, window.devicePixelRatio || 1);
+      canvas.width = Math.max(1, Math.round(rect.width * dpr));
+      canvas.height = Math.max(1, Math.round(rect.height * dpr));
+      canvas.style.width = `${rect.width}px`;
+      canvas.style.height = `${rect.height}px`;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    };
+    resize();
+
+    const observer =
+      typeof ResizeObserver !== "undefined"
+        ? new ResizeObserver(resize)
+        : null;
+    observer?.observe(host);
+
+    const sampleInterval = 1000 / MIC_GATE_SAMPLE_HZ;
+
+    const pushSample = (value: number) => {
+      const history = historyRef.current;
+      const peak = peakRef.current;
+      const idx = headRef.current;
+      history[idx] = value;
+      const prevPeakIdx =
+        (idx - 1 + MIC_GATE_HISTORY_LENGTH) % MIC_GATE_HISTORY_LENGTH;
+      const prevPeak = peak[prevPeakIdx] * MIC_GATE_PEAK_DECAY;
+      peak[idx] = Math.max(value, prevPeak);
+      headRef.current = (idx + 1) % MIC_GATE_HISTORY_LENGTH;
     };
 
-    updateBarCount();
-    const observer = new ResizeObserver(updateBarCount);
-    observer.observe(element);
-    return () => observer.disconnect();
+    const draw = () => {
+      const width = host.clientWidth;
+      const height = host.clientHeight;
+      if (width <= 0 || height <= 0) return;
+
+      const colors = readColors();
+      const history = historyRef.current;
+      const peak = peakRef.current;
+      const head = headRef.current;
+      const thr = thresholdRef.current;
+
+      ctx.clearRect(0, 0, width, height);
+
+      // Background grid marks at 25/50/75%
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.04)";
+      ctx.lineWidth = 1;
+      for (const p of [0.25, 0.5, 0.75]) {
+        const y = Math.round((1 - p) * height) + 0.5;
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(width, y);
+        ctx.stroke();
+      }
+
+      // Threshold line (drawn under bars so peaks can glow over it)
+      const thrY = Math.round((1 - thr) * height) + 0.5;
+      ctx.strokeStyle = colors.threshold;
+      ctx.shadowColor = colors.accentGlow;
+      ctx.shadowBlur = 14;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(0, thrY);
+      ctx.lineTo(width, thrY);
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+
+      // Dashed segment above threshold (showing headroom zone)
+      ctx.save();
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.06)";
+      ctx.setLineDash([3, 4]);
+      ctx.beginPath();
+      ctx.moveTo(0, Math.round(height * 0.05) + 0.5);
+      ctx.lineTo(width, Math.round(height * 0.05) + 0.5);
+      ctx.stroke();
+      ctx.restore();
+
+      // Bars: oldest on the left, newest on the right.
+      const barWidth = 2;
+      const gap = 1;
+      const step = barWidth + gap;
+      const visibleCount = Math.min(
+        MIC_GATE_HISTORY_LENGTH,
+        Math.floor(width / step),
+      );
+      const startReadIdx =
+        (head - visibleCount + MIC_GATE_HISTORY_LENGTH) %
+        MIC_GATE_HISTORY_LENGTH;
+
+      // Collect visible peaks as we draw so we can render the peak-hold polyline after.
+      const peakPoints: Array<[number, number]> = [];
+
+      for (let i = 0; i < visibleCount; i++) {
+        const srcIdx = (startReadIdx + i) % MIC_GATE_HISTORY_LENGTH;
+        const v = history[srcIdx];
+        const p = peak[srcIdx];
+        // Anchor to the right edge so newest samples hug the "now" line
+        const x = width - (visibleCount - i) * step;
+        const barH = Math.max(1, v * height);
+        const y = height - barH;
+
+        const above = v >= thr && thr > 0;
+        ctx.fillStyle = above ? colors.accent : colors.muted;
+        ctx.globalAlpha = above ? 0.95 : 0.55;
+        ctx.fillRect(x, y, barWidth, barH);
+
+        // Soft glow pass for above-threshold
+        if (above) {
+          ctx.globalCompositeOperation = "lighter";
+          ctx.globalAlpha = 0.18;
+          ctx.fillStyle = colors.accentStrong;
+          ctx.fillRect(x - 1, y - 1, barWidth + 2, barH + 2);
+          ctx.globalCompositeOperation = "source-over";
+        }
+        ctx.globalAlpha = 1;
+
+        peakPoints.push([x + barWidth / 2, height - Math.max(1, p * height)]);
+      }
+
+      // Peak-hold polyline
+      if (peakPoints.length > 1) {
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.35)";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(peakPoints[0][0], peakPoints[0][1]);
+        for (let i = 1; i < peakPoints.length; i++) {
+          ctx.lineTo(peakPoints[i][0], peakPoints[i][1]);
+        }
+        ctx.stroke();
+      }
+
+      // "Now" indicator on right edge
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.18)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(width - 0.5, 0);
+      ctx.lineTo(width - 0.5, height);
+      ctx.stroke();
+    };
+
+    const tick = (now: number) => {
+      if (!lastSampleRef.current) lastSampleRef.current = now;
+      while (now - lastSampleRef.current >= sampleInterval) {
+        pushSample(
+          activeRef.current ? latestLevelRef.current : 0,
+        );
+        lastSampleRef.current += sampleInterval;
+      }
+      draw();
+
+      // Noise floor + status compute every ~200ms
+      if ((now | 0) % 6 === 0) {
+        const arr = Array.from(historyRef.current);
+        const nf = percentile(arr, 0.1);
+        setNoiseFloor(nf);
+        const thr = thresholdRef.current;
+        const lvl = latestLevelRef.current;
+        let next: MicGateStatus = "idle";
+        if (!activeRef.current) {
+          next = "idle";
+          aboveSinceRef.current = null;
+        } else if (nf > thr) {
+          next = "noisy";
+        } else if (lvl >= thr) {
+          if (aboveSinceRef.current == null) aboveSinceRef.current = now;
+          if (now - aboveSinceRef.current > 100) next = "speech";
+          else next = "quiet";
+        } else {
+          aboveSinceRef.current = null;
+          next = "quiet";
+        }
+        setStatus((prev) => (prev === next ? prev : next));
+      }
+
+      rafRef.current = requestAnimationFrame(tick);
+    };
+
+    if (prefersReducedMotion) {
+      // Static draw only; still update on re-render via effect deps
+      draw();
+    } else {
+      rafRef.current = requestAnimationFrame(tick);
+    }
+
+    return () => {
+      observer?.disconnect();
+      if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+      lastSampleRef.current = 0;
+    };
   }, []);
 
-  const bars = Array.from({ length: barCount }, (_, index) => {
-    const progress = index / Math.max(1, barCount - 1);
-    const baseWave = 0.12 + Math.abs(Math.sin(progress * 13 + normalizedLevel * 8)) * 0.18;
-    const primaryPeak =
-      Math.max(0, 1 - Math.abs(progress - 0.44) * 3.2) * normalizedLevel * 0.82;
-    const secondaryPeak =
-      Math.max(0, 1 - Math.abs(progress - 0.72) * 6.1) * normalizedLevel * 0.24;
-    const idleWave = active ? baseWave : baseWave * 0.55;
-    const height = Math.min(1, idleWave + primaryPeak + secondaryPeak);
-    return {
-      key: `bar-${index}`,
-      height,
-      live: active && height >= normalizedThreshold,
-    };
-  });
-
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (event.key === "ArrowUp" || event.key === "ArrowRight") {
+    let delta = 0;
+    const step = event.shiftKey ? 0.05 : 0.01;
+    if (event.key === "ArrowUp" || event.key === "ArrowRight") delta = step;
+    else if (event.key === "ArrowDown" || event.key === "ArrowLeft")
+      delta = -step;
+    else if (event.key === "PageUp") delta = 0.1;
+    else if (event.key === "PageDown") delta = -0.1;
+    else if (event.key === "Home") {
       event.preventDefault();
-      onNudge(0.01);
+      onNudge(-1);
+      return;
+    } else if (event.key === "End") {
+      event.preventDefault();
+      onNudge(1);
       return;
     }
-    if (event.key === "ArrowDown" || event.key === "ArrowLeft") {
+    if (delta !== 0) {
       event.preventDefault();
-      onNudge(-0.01);
+      onNudge(delta);
     }
   };
 
+  const thresholdPct = Math.round(normalizedThreshold * 100);
+  const levelPct = Math.round(normalizedLevel * 100);
+  const noisePct = Math.round(noiseFloor * 100);
+
+  const statusLabel =
+    status === "speech"
+      ? "Speech detected"
+      : status === "noisy"
+        ? "Noise crossing line — raise threshold"
+        : status === "quiet"
+          ? "Quiet"
+          : "Mic test off";
+
+  // Sparkline segments for level chip
+  const sparkSegments = 8;
+  const filledSegments = Math.round(
+    Math.max(0, Math.min(1, normalizedLevel)) * sparkSegments,
+  );
+
   return (
     <div className="mic-gate">
+      <div className={`mic-gate__status mic-gate__status--${status}`}>
+        <span className="mic-gate__status-dot" aria-hidden="true" />
+        <span>{statusLabel}</span>
+      </div>
+
       <div
         ref={vizRef}
         className={`mic-gate__viz${active ? " is-active" : ""}`}
@@ -1225,33 +1491,80 @@ export function MicGateMeter({
         aria-valuemin={0}
         aria-valuemax={1}
         aria-valuenow={Number(normalizedThreshold.toFixed(3))}
-        aria-valuetext={`Trigger ${normalizedThreshold.toFixed(3)}`}
-        title={`Trigger ${normalizedThreshold.toFixed(3)}`}
+        aria-valuetext={`Threshold ${thresholdPct}%`}
+        title={`Threshold ${thresholdPct}% · drag to adjust`}
         onPointerDown={onPointerDown}
         onKeyDown={handleKeyDown}
       >
-        <div
-          className="mic-gate__threshold"
-          style={{ bottom: `${normalizedThreshold * 100}%` }}
-        />
+        <canvas ref={canvasRef} className="mic-gate__canvas" aria-hidden="true" />
 
-        <div className="mic-gate__bars" aria-label="Live microphone level meter">
-          {bars.map((bar) => (
-            <span
-              key={bar.key}
-              className={`mic-gate__bar${bar.live ? " is-live" : ""}`}
-              style={{ height: `${Math.max(12, bar.height * 100)}%` }}
-            />
-          ))}
+        <div
+          className="mic-gate__handle"
+          style={{ bottom: `${normalizedThreshold * 100}%` }}
+          aria-hidden="true"
+        >
+          <span className="mic-gate__handle-grip" />
+          <span className="mic-gate__handle-value">{thresholdPct}%</span>
+        </div>
+
+        <div className="mic-gate__now-label" aria-hidden="true">
+          now
+        </div>
+        <div className="mic-gate__past-label" aria-hidden="true">
+          −{MIC_GATE_HISTORY_SECONDS}s
         </div>
       </div>
 
-      <div className="mic-gate__footer">
-        <span>More Sensitive</span>
-        <span className="mic-gate__metric">
-          Level {normalizedLevel.toFixed(3)} / Trigger {normalizedThreshold.toFixed(3)}
-        </span>
-        <span>More Selective</span>
+      <div className="mic-gate__chips">
+        <div className="mic-gate__chip">
+          <span className="mic-gate__chip-label">Noise floor</span>
+          <span className="mic-gate__chip-value">{noisePct}%</span>
+        </div>
+        <div className="mic-gate__chip mic-gate__chip--level">
+          <span className="mic-gate__chip-label">Live level</span>
+          <span className="mic-gate__chip-value">
+            {levelPct}%
+            <span className="mic-gate__spark" aria-hidden="true">
+              {Array.from({ length: sparkSegments }).map((_, i) => (
+                <span
+                  key={i}
+                  className={`mic-gate__spark-seg${
+                    i < filledSegments ? " is-on" : ""
+                  }${
+                    i < filledSegments &&
+                    i / sparkSegments >= normalizedThreshold
+                      ? " is-hot"
+                      : ""
+                  }`}
+                />
+              ))}
+            </span>
+          </span>
+        </div>
+        <div className="mic-gate__chip mic-gate__chip--threshold">
+          <span className="mic-gate__chip-label">Threshold</span>
+          <span className="mic-gate__chip-controls">
+            <button
+              type="button"
+              className="mic-gate__chip-btn"
+              aria-label="Lower threshold by 1%"
+              onClick={() => onNudge(-0.01)}
+            >
+              −
+            </button>
+            <span className="mic-gate__chip-value mic-gate__chip-value--lg">
+              {thresholdPct}%
+            </span>
+            <button
+              type="button"
+              className="mic-gate__chip-btn"
+              aria-label="Raise threshold by 1%"
+              onClick={() => onNudge(0.01)}
+            >
+              +
+            </button>
+          </span>
+        </div>
       </div>
     </div>
   );

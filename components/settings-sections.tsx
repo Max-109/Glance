@@ -812,21 +812,13 @@ function AudioSection({
 
       <GlassCard
         title="Mic Gate"
-        description="Speech should cross the line. Room noise should stay under it."
+        description="Speech crosses the line. Room noise stays under it. Drag the handle on the right to set the trigger."
         footer={
-          <div className="card-actions">
-            <div className="metric-chip">
-              <span>Trigger</span>
-              <strong>{thresholdValue.toFixed(3)}</strong>
-            </div>
-            <div className="metric-chip metric-chip--quiet">
-              <span>Live Level</span>
-              <strong>{audioLevel.toFixed(3)}</strong>
-            </div>
+          <div className="card-actions card-actions--end">
             <Button
               label={state.audioInputTestActive ? "Stop Mic Test" : "Start Mic Test"}
               icon={state.audioInputTestActive ? "close" : "mic"}
-              variant={state.audioInputTestActive ? "signal" : "signal"}
+              variant="signal"
               onClick={() =>
                 onRunAction(
                   state.audioInputTestActive
@@ -845,17 +837,6 @@ function AudioSection({
           onPointerDown={onThresholdPointerDown}
           onNudge={onThresholdNudge}
         />
-
-        <div className="inline-stats">
-          <span>
-            {state.audioInputTestActive
-              ? "The meter stays live while the test is running."
-              : "Start a mic test to tune this against your room."}
-          </span>
-          <span>
-            Lower is more sensitive. Higher is stricter.
-          </span>
-        </div>
       </GlassCard>
 
       <GlassCard
