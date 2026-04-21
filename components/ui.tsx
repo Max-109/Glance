@@ -254,7 +254,7 @@ export function Button({
   );
 }
 
-export function ActivityMark({
+export function Indicator({
   state,
   message,
   size = "compact",
@@ -378,7 +378,7 @@ export function ActivityMark({
   );
 }
 
-export function StatusBanner({ state }: { state: BridgeState }) {
+export function Notice({ state }: { state: BridgeState }) {
   if (!state.statusMessage) {
     return null;
   }
@@ -404,7 +404,7 @@ export function StatusBanner({ state }: { state: BridgeState }) {
   );
 }
 
-export function GlassCard({
+export function Card({
   title,
   description,
   children,
@@ -443,7 +443,7 @@ export function Sidebar({
   return (
     <aside className="sidebar-shell">
       <div className="sidebar-brand">
-        <ActivityMark
+        <Indicator
           state={state.runtimeState}
           message={state.runtimeMessage}
           size="large"
@@ -489,7 +489,7 @@ export function Sidebar({
   );
 }
 
-export function TextField({
+export function Input({
   fieldName,
   label,
   value,
@@ -612,7 +612,7 @@ export function TextField({
   );
 }
 
-export function StepperField({
+export function NumberInput({
   fieldName,
   label,
   value,
@@ -745,7 +745,7 @@ export function StepperField({
   );
 }
 
-export function SelectField({
+export function SelectInput({
   fieldName,
   label,
   value,
@@ -894,7 +894,7 @@ export function ToggleField({
   );
 }
 
-export function AccentPicker({
+export function ColorPicker({
   value,
   presets,
   onChange,
@@ -1119,7 +1119,7 @@ export function AccentPicker({
   );
 }
 
-export function ShortcutCaptureList({
+export function Keybinds({
   rows,
   onActivate,
 }: {
@@ -1162,7 +1162,7 @@ function percentile(values: number[], p: number) {
   return sorted[idx];
 }
 
-export function MicGateMeter({
+export function MicThreshold({
   level,
   threshold,
   active,

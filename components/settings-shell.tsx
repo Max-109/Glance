@@ -17,7 +17,7 @@ import type {
 import { sectionMeta, type BridgeState, type SectionId } from "@/lib/glance-bridge";
 import { eventToKeybind } from "@/lib/keybinds";
 
-import { Button, Sidebar, StatusBanner } from "./ui";
+import { Button, Notice, Sidebar } from "./ui";
 import { SettingsSections } from "./settings-sections";
 
 type ProviderTab = "llm" | "speech" | "transcription";
@@ -842,7 +842,7 @@ export function SettingsShell() {
             </div>
           ) : null}
 
-          <StatusBanner state={liveState} />
+          <Notice state={liveState} />
 
           <div
             className="workspace-shell__scroll"

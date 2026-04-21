@@ -9,14 +9,14 @@ import type { BridgeState } from "@/lib/glance-bridge";
 
 import { Icon } from "./icons";
 import {
-  AccentPicker,
+  ColorPicker,
   Button,
-  GlassCard,
-  MicGateMeter,
-  SelectField,
-  ShortcutCaptureList,
-  StepperField,
-  TextField,
+  Card,
+  Input,
+  Keybinds,
+  MicThreshold,
+  NumberInput,
+  SelectInput,
   ToggleField,
 } from "./ui";
 
@@ -376,7 +376,7 @@ function ApiSection({
   | "getDraftValue"
 >) {
   return (
-    <GlassCard
+    <Card
       title="Providers"
       description="Set up replies, speech, and transcription."
       className="glass-card--spacious"
@@ -413,7 +413,7 @@ function ApiSection({
       {providerTab === "llm" ? (
         <div className="stack">
           <div className="field-grid field-grid--two-column field-grid--wide-bias">
-            <TextField
+            <Input
               fieldName="llm_base_url"
               label="Base URL"
               icon="api"
@@ -426,7 +426,7 @@ function ApiSection({
               onFocus={() => onDraftFocus("llm_base_url")}
             />
 
-            <TextField
+            <Input
               fieldName="llm_model_name"
               label="Model"
               icon="bot"
@@ -439,7 +439,7 @@ function ApiSection({
             />
           </div>
 
-          <TextField
+          <Input
             fieldName="llm_api_key"
             label="API Key"
             icon="key"
@@ -461,7 +461,7 @@ function ApiSection({
             />
 
             {Boolean(state.settings.llm_reasoning_enabled) ? (
-              <SelectField
+              <SelectInput
                 fieldName="llm_reasoning"
                 label="Reasoning Effort"
                 icon="brain"
@@ -481,7 +481,7 @@ function ApiSection({
 
       {providerTab === "speech" ? (
         <div className="stack">
-          <TextField
+          <Input
             fieldName="tts_base_url"
             label="Base URL"
             icon="api"
@@ -495,7 +495,7 @@ function ApiSection({
           />
 
           <div className="field-grid field-grid--two-column">
-            <TextField
+            <Input
               fieldName="tts_api_key"
               label="API Key"
               icon="key"
@@ -509,7 +509,7 @@ function ApiSection({
               onToggleReveal={() => onToggleReveal("tts_api_key")}
             />
 
-            <SelectField
+            <SelectInput
               fieldName="tts_model"
               label="Model"
               icon="speech"
@@ -527,7 +527,7 @@ function ApiSection({
       {providerTab === "transcription" ? (
         <div className="stack">
           <div className="field-grid field-grid--two-column field-grid--wide-bias">
-            <TextField
+            <Input
               fieldName="transcription_base_url"
               label="Base URL"
               icon="api"
@@ -540,7 +540,7 @@ function ApiSection({
               onFocus={() => onDraftFocus("transcription_base_url")}
             />
 
-            <TextField
+            <Input
               fieldName="transcription_model_name"
               label="Model"
               icon="wave"
@@ -553,7 +553,7 @@ function ApiSection({
             />
           </div>
 
-          <TextField
+          <Input
             fieldName="transcription_api_key"
             label="API Key"
             icon="key"
@@ -577,7 +577,7 @@ function ApiSection({
             />
 
             {Boolean(state.settings.transcription_reasoning_enabled) ? (
-              <SelectField
+              <SelectInput
                 fieldName="transcription_reasoning"
                 label="Reasoning Effort"
                 icon="zap"
@@ -594,7 +594,7 @@ function ApiSection({
           </div>
         </div>
       ) : null}
-    </GlassCard>
+    </Card>
   );
 }
 
@@ -613,11 +613,11 @@ function VoiceSection({
     state.previewActive && state.previewingVoice === selectedVoice;
 
   return (
-    <GlassCard
+    <Card
       title="Speech"
       description="Pick a voice and a fallback language."
     >
-      <SelectField
+      <SelectInput
         fieldName="tts_voice_id"
         label="Voice"
         icon="mic"
@@ -640,7 +640,7 @@ function VoiceSection({
         }
       />
 
-      <SelectField
+      <SelectInput
         fieldName="fallback_language"
         label="Fallback Language"
         icon="languages"
@@ -652,7 +652,7 @@ function VoiceSection({
         onToggle={() => onToggleSelect("fallback_language")}
         onSelect={(value) => onSelectValue("fallback_language", value)}
       />
-    </GlassCard>
+    </Card>
   );
 }
 
@@ -667,12 +667,12 @@ function CaptureSection({
   "state" | "onDraftChange" | "onDraftCommit" | "onDraftFocus" | "getDraftValue"
 >) {
   return (
-    <GlassCard
+    <Card
       title="Capture"
       description="Choose how often Glance screenshots and how long it batches changes before replying."
     >
       <div className="field-grid field-grid--two-column">
-        <StepperField
+        <NumberInput
           fieldName="screenshot_interval"
           label="Capture Interval"
           icon="clock"
@@ -688,7 +688,7 @@ function CaptureSection({
           onFocus={() => onDraftFocus("screenshot_interval")}
         />
 
-        <StepperField
+        <NumberInput
           fieldName="batch_window_duration"
           label="Batch Window"
           icon="history"
@@ -705,7 +705,7 @@ function CaptureSection({
         />
       </div>
 
-      <StepperField
+      <NumberInput
         fieldName="screen_change_threshold"
         label="Change Threshold"
         icon="gauge"
@@ -720,7 +720,7 @@ function CaptureSection({
         onCommit={(value) => onDraftCommit("screen_change_threshold", value)}
         onFocus={() => onDraftFocus("screen_change_threshold")}
       />
-    </GlassCard>
+    </Card>
   );
 }
 
@@ -756,7 +756,7 @@ function AudioSection({
 >) {
   return (
     <div className="stack">
-      <GlassCard
+      <Card
         title="Audio Routing"
         description="Pick the devices Glance uses for listening and playback."
         footer={
@@ -782,7 +782,7 @@ function AudioSection({
         }
       >
         <div className="field-grid field-grid--two-column">
-          <SelectField
+          <SelectInput
             fieldName="audio_input_device"
             label="Input Device"
             icon="mic"
@@ -795,7 +795,7 @@ function AudioSection({
             onSelect={(value) => onSelectValue("audio_input_device", value)}
           />
 
-          <SelectField
+          <SelectInput
             fieldName="audio_output_device"
             label="Output Device"
             icon="headphones"
@@ -808,9 +808,9 @@ function AudioSection({
             onSelect={(value) => onSelectValue("audio_output_device", value)}
           />
         </div>
-      </GlassCard>
+      </Card>
 
-      <GlassCard
+      <Card
         title="Mic Gate"
         description="Speech crosses the line. Room noise stays under it. Drag the handle on the right to set the trigger."
         footer={
@@ -830,16 +830,16 @@ function AudioSection({
           </div>
         }
       >
-        <MicGateMeter
+        <MicThreshold
           level={audioLevel}
           threshold={thresholdValue}
           active={state.audioInputTestActive}
           onPointerDown={onThresholdPointerDown}
           onNudge={onThresholdNudge}
         />
-      </GlassCard>
+      </Card>
 
-      <GlassCard
+      <Card
         title="Turn Timing"
         description="Set how long Glance waits, listens, and keeps pre-roll."
         footer={
@@ -854,7 +854,7 @@ function AudioSection({
         }
       >
         <div className="field-grid field-grid--two-column">
-          <StepperField
+          <NumberInput
             fieldName="audio_silence_seconds"
             label="Silence Timeout"
             icon="history"
@@ -870,7 +870,7 @@ function AudioSection({
             onFocus={() => onDraftFocus("audio_silence_seconds")}
           />
 
-          <StepperField
+          <NumberInput
             fieldName="audio_max_wait_seconds"
             label="Wait For Speech"
             icon="clock"
@@ -886,7 +886,7 @@ function AudioSection({
             onFocus={() => onDraftFocus("audio_max_wait_seconds")}
           />
 
-          <StepperField
+          <NumberInput
             fieldName="audio_max_record_seconds"
             label="Max Turn Length"
             icon="wave"
@@ -902,7 +902,7 @@ function AudioSection({
             onFocus={() => onDraftFocus("audio_max_record_seconds")}
           />
 
-          <StepperField
+          <NumberInput
             fieldName="audio_preroll_seconds"
             label="Pre-Roll"
             icon="mic"
@@ -918,7 +918,7 @@ function AudioSection({
             onFocus={() => onDraftFocus("audio_preroll_seconds")}
           />
         </div>
-      </GlassCard>
+      </Card>
     </div>
   );
 }
@@ -940,7 +940,7 @@ function HistorySection({
   | "getDraftValue"
 >) {
   return (
-    <GlassCard
+    <Card
       title="History"
       description="Choose how much local history to keep and skim recent sessions."
       footer={
@@ -962,7 +962,7 @@ function HistorySection({
         </div>
       }
     >
-      <StepperField
+      <NumberInput
         fieldName="history_length"
         label="History Length"
         icon="history"
@@ -989,7 +989,7 @@ function HistorySection({
           <span>Recent sessions will show up here once Glance has something to keep.</span>
         </div>
       )}
-    </GlassCard>
+    </Card>
   );
 }
 
@@ -1040,11 +1040,11 @@ function MiscSection({
 
   return (
     <div className="stack">
-      <GlassCard
+      <Card
         title="Appearance"
         description="Theme and accent color live here."
       >
-        <SelectField
+        <SelectInput
           fieldName="theme_preference"
           label="Theme"
           icon={settingValue(state, "theme_preference") === "light" ? "sun" : "moon"}
@@ -1059,7 +1059,7 @@ function MiscSection({
 
         <div className="field">
           <span className="field__label">Accent Color</span>
-          <AccentPicker
+          <ColorPicker
             value={settingValue(state, "accent_color") || "#a7ffde"}
             presets={ACCENT_PRESETS}
             onChange={(nextValue) => onSetField("accent_color", nextValue)}
@@ -1068,13 +1068,13 @@ function MiscSection({
             Drives the active accent, notifications, icons, and the mic-gate visuals.
           </span>
         </div>
-      </GlassCard>
+      </Card>
 
-      <GlassCard
+      <Card
         title="Prompt & Shortcuts"
         description="Prompt override and shortcuts."
       >
-        <TextField
+        <Input
           fieldName="system_prompt_override"
           label="System Prompt Override"
           multiline
@@ -1086,11 +1086,11 @@ function MiscSection({
           onFocus={() => onDraftFocus("system_prompt_override")}
         />
 
-        <ShortcutCaptureList
+        <Keybinds
           rows={shortcutRows}
           onActivate={onStartKeybindCapture}
         />
-      </GlassCard>
+      </Card>
     </div>
   );
 }
