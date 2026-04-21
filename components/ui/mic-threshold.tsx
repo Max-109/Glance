@@ -152,7 +152,7 @@ export function MicThreshold({
 
     const readColors = (): Colors => {
       if (typeof window === "undefined") return fallbackColors;
-      const styles = getComputedStyle(document.documentElement);
+      const styles = getComputedStyle(host);
       const accent = styles.getPropertyValue("--accent").trim() || fallbackColors.accent;
       const accentStrong =
         styles.getPropertyValue("--accent-strong").trim() || fallbackColors.accentStrong;
