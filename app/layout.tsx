@@ -5,7 +5,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Glance Settings",
-  description: "Electron + Next.js settings shell for Glance.",
+  description: "Electron + Next.js settings window for Glance.",
 };
 
 export default function RootLayout({

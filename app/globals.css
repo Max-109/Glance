@@ -1316,6 +1316,11 @@ textarea.control::-webkit-scrollbar-thumb {
   height: 100%;
   display: block;
   pointer-events: none;
+  z-index: 0;
+}
+
+.mic-gate__canvas--glow {
+  z-index: 1;
 }
 
 .mic-gate__tick {
@@ -1334,6 +1339,7 @@ textarea.control::-webkit-scrollbar-thumb {
   font-variant-numeric: tabular-nums;
   text-shadow: 0 0 6px rgba(0, 0, 0, 0.7);
   transition: color 160ms ease, transform 160ms ease;
+  z-index: 2;
 }
 
 .mic-gate__tick-mark {

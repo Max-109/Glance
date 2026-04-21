@@ -1,5 +1,5 @@
-import { SettingsShell } from "@/components/settings-shell";
+import { SettingsPage } from "@/components/settings-page";
 
 export default function Page() {
-  return <SettingsShell />;
+  return <SettingsPage />;
 }

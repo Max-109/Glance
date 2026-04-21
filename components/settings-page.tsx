@@ -18,12 +18,23 @@ import {
   type BridgeState,
   type SectionId,
 } from "@/lib/glance-bridge";
+import {
+  clamp,
+  hexToRgb,
+  hslToHex,
+  normalizeHexColor,
+  relativeLuminance,
+  rgbToHsl,
+  toRgba,
+} from "@/lib/color-utils";
 import { eventToKeybind } from "@/lib/keybinds";
 
-import { Button, Notice, Sidebar } from "./ui";
-import { SettingsSections } from "./settings-sections";
+import { SettingsTab } from "./settings-tab";
+import { type ProviderTab } from "./settings-tabs/shared";
+import { Button } from "./ui/button";
+import { Notice } from "./ui/notice";
+import { Sidebar } from "./ui/sidebar";
 
-type ProviderTab = "llm" | "speech" | "transcription";
 type SystemTheme = "dark" | "light";
 
 const EMPTY_STATE: BridgeState = {
@@ -107,115 +118,6 @@ function formatError(error: unknown): string {
   return "Glance isn't connected right now.";
 }
 
-function clamp(value: number, min: number, max: number) {
-  return Math.min(max, Math.max(min, value));
-}
-
-function normalizeHexColor(value: string) {
-  const trimmedValue = value.trim().toLowerCase();
-  if (!trimmedValue) {
-    return "#a7ffde";
-  }
-  const withHash = trimmedValue.startsWith("#") ? trimmedValue : `#${trimmedValue}`;
-  if (!/^#[0-9a-f]{6}$/.test(withHash)) {
-    return "#a7ffde";
-  }
-  return withHash;
-}
-
-function hexToRgb(hex: string) {
-  const normalizedHex = normalizeHexColor(hex).slice(1);
-  return {
-    r: Number.parseInt(normalizedHex.slice(0, 2), 16),
-    g: Number.parseInt(normalizedHex.slice(2, 4), 16),
-    b: Number.parseInt(normalizedHex.slice(4, 6), 16),
-  };
-}
-
-function rgbToHex({ r, g, b }: { r: number; g: number; b: number }) {
-  return `#${[r, g, b]
-    .map((channel) => clamp(Math.round(channel), 0, 255).toString(16).padStart(2, "0"))
-    .join("")}`;
-}
-
-function rgbToHsl({ r, g, b }: { r: number; g: number; b: number }) {
-  const red = r / 255;
-  const green = g / 255;
-  const blue = b / 255;
-  const max = Math.max(red, green, blue);
-  const min = Math.min(red, green, blue);
-  const lightness = (max + min) / 2;
-  const delta = max - min;
-
-  if (delta === 0) {
-    return { h: 0, s: 0, l: lightness * 100 };
-  }
-
-  const saturation = delta / (1 - Math.abs(2 * lightness - 1));
-
-  let hue = 0;
-  if (max === red) {
-    hue = ((green - blue) / delta) % 6;
-  } else if (max === green) {
-    hue = (blue - red) / delta + 2;
-  } else {
-    hue = (red - green) / delta + 4;
-  }
-
-  return {
-    h: Math.round(((hue * 60) + 360) % 360),
-    s: saturation * 100,
-    l: lightness * 100,
-  };
-}
-
-function hslToRgb(h: number, s: number, l: number) {
-  const normalizedS = clamp(s, 0, 100) / 100;
-  const normalizedL = clamp(l, 0, 100) / 100;
-  const chroma = (1 - Math.abs(2 * normalizedL - 1)) * normalizedS;
-  const segment = h / 60;
-  const second = chroma * (1 - Math.abs((segment % 2) - 1));
-  const match = normalizedL - chroma / 2;
-
-  let red = 0;
-  let green = 0;
-  let blue = 0;
-  if (segment >= 0 && segment < 1) {
-    red = chroma;
-    green = second;
-  } else if (segment < 2) {
-    red = second;
-    green = chroma;
-  } else if (segment < 3) {
-    green = chroma;
-    blue = second;
-  } else if (segment < 4) {
-    green = second;
-    blue = chroma;
-  } else if (segment < 5) {
-    red = second;
-    blue = chroma;
-  } else {
-    red = chroma;
-    blue = second;
-  }
-
-  return {
-    r: (red + match) * 255,
-    g: (green + match) * 255,
-    b: (blue + match) * 255,
-  };
-}
-
-function hslToHex(h: number, s: number, l: number) {
-  return rgbToHex(hslToRgb(h, s, l));
-}
-
-function toRgba(hex: string, alpha: number) {
-  const { r, g, b } = hexToRgb(hex);
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-}
-
 function isMacDesktopPlatform() {
   if (typeof navigator === "undefined") {
     return false;
@@ -224,25 +126,11 @@ function isMacDesktopPlatform() {
   return /mac/i.test(`${navigator.platform} ${navigator.userAgent}`);
 }
 
-function relativeLuminance({ r, g, b }: { r: number; g: number; b: number }) {
-  const transform = (channel: number) => {
-    const value = channel / 255;
-    return value <= 0.03928
-      ? value / 12.92
-      : ((value + 0.055) / 1.055) ** 2.4;
-  };
-  return (
-    0.2126 * transform(r) +
-    0.7152 * transform(g) +
-    0.0722 * transform(b)
-  );
-}
-
 function buildThemeStyle(
   accentColor: string,
   resolvedTheme: SystemTheme,
 ): CSSProperties {
-  const accentHex = normalizeHexColor(accentColor);
+  const accentHex = normalizeHexColor(accentColor, "#a7ffde");
   const accentRgb = hexToRgb(accentHex);
   const accentHsl = rgbToHsl(accentRgb);
   const accentStrong = hslToHex(
@@ -274,7 +162,7 @@ function buildThemeStyle(
   } as CSSProperties;
 }
 
-export function SettingsShell() {
+export function SettingsPage() {
   const [state, setState] = useState<BridgeState | null>(null);
   const [systemTheme, setSystemTheme] = useState<SystemTheme>("dark");
   const [isMacOs, setIsMacOs] = useState(false);
@@ -850,7 +738,7 @@ export function SettingsShell() {
             tabIndex={-1}
             data-scroll-host="true"
           >
-            <SettingsSections
+            <SettingsTab
               state={liveState}
               providerTab={providerTab}
               openSelect={openSelect}
