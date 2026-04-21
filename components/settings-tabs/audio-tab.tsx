@@ -54,12 +54,6 @@ function computeTimingStatus(values: {
   return null;
 }
 
-function formatSeconds(value: number, decimals = 1): string {
-  if (!Number.isFinite(value)) return "—";
-  if (decimals === 0) return `${Math.round(value)}s`;
-  return `${value.toFixed(decimals).replace(/\.0+$/, "").replace(/(\.\d*?)0+$/, "$1")}s`;
-}
-
 export function AudioTab({
   state,
   openSelect,
@@ -91,8 +85,6 @@ export function AudioTab({
   | "getDraftValue"
 >) {
   const deviceStatus = computeDeviceStatus(state);
-  const inputCount = state.audioInputDeviceOptions?.length ?? 0;
-  const outputCount = state.audioOutputDeviceOptions?.length ?? 0;
 
   const silence = parseTiming(getDraftValue("audio_silence_seconds"));
   const wait = parseTiming(getDraftValue("audio_max_wait_seconds"));
@@ -108,17 +100,10 @@ export function AudioTab({
           <span>{deviceStatus.label}</span>
         </div>
 
-        <div className="audio-panel__toolbar">
+        <div className="audio-panel__toolbar audio-panel__toolbar--solo">
           <div className="audio-panel__toolbar-heading">
             <span className="audio-panel__toolbar-title">Devices</span>
             <p className="audio-panel__toolbar-copy">Choose input and output devices.</p>
-          </div>
-          <div className="audio-panel__toolbar-summary">
-            <span>{inputCount}</span>
-            <span>IN</span>
-            <span className="audio-panel__toolbar-sep">·</span>
-            <span>{outputCount}</span>
-            <span>OUT</span>
           </div>
         </div>
 
@@ -197,19 +182,12 @@ export function AudioTab({
           </div>
         ) : null}
 
-        <div className="audio-panel__toolbar">
+        <div className="audio-panel__toolbar audio-panel__toolbar--solo">
           <div className="audio-panel__toolbar-heading">
             <span className="audio-panel__toolbar-title">Timing</span>
             <p className="audio-panel__toolbar-copy">
               Set how long Glance waits, listens, and keeps pre-roll.
             </p>
-          </div>
-          <div className="audio-panel__toolbar-summary">
-            <span>{formatSeconds(silence, 1)}</span>
-            <span className="audio-panel__toolbar-sep">→</span>
-            <span>{formatSeconds(wait, 0)}</span>
-            <span className="audio-panel__toolbar-sep">·</span>
-            <span>preroll {formatSeconds(preroll, 2)}</span>
           </div>
         </div>
 

@@ -440,12 +440,14 @@ class SettingsViewModel(QObject):
             "Saved output device unavailable",
         )
 
-        discovered_inputs = max(0, len(input_options) - 1)
-        discovered_outputs = max(0, len(output_options) - 1)
-        if discovered_inputs == 0 and discovered_outputs == 0:
+        total_inputs = len(input_options)
+        total_outputs = len(output_options)
+        if total_inputs <= 1 and total_outputs <= 1:
             self._audio_device_status = "Using system default audio devices."
         else:
-            self._audio_device_status = f"{discovered_inputs} input device(s) and {discovered_outputs} output device(s) available."
+            self._audio_device_status = (
+                f"{total_inputs} input · {total_outputs} output devices available."
+            )
         self.audioDevicesChanged.emit()
 
     @Slot()

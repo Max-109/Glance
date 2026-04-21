@@ -33,40 +33,40 @@ export function Sidebar({
         />
         <div className="sidebar-brand__copy">
           <p className="sidebar-brand__title">Glance</p>
-          <p className="sidebar-brand__status">{runtimeLabel}</p>
+          <span className="sidebar-brand__pill">
+            <span className="sidebar-brand__pill-dot" />
+            <span>{runtimeLabel}</span>
+          </span>
         </div>
       </div>
 
-      {SECTION_GROUPS.map((group) => (
-        <section className="sidebar-group" key={group.items[0]?.id ?? "group"}>
-          {group.label ? <p className="sidebar-group__label">{group.label}</p> : null}
-          <div className="sidebar-group__items">
-            {group.items.map((item) => {
-              const selected = state.currentSection === item.id;
-              return (
-                <button
-                  type="button"
-                  key={item.id}
-                  className={`sidebar-item${selected ? " is-selected" : ""}`}
-                  aria-current={selected ? "page" : undefined}
-                  onClick={() => onSelectSection(item.id)}
-                >
-                  <span className="sidebar-item__icon">
-                    <Icon name={item.icon} />
-                  </span>
-                  <span>{item.title}</span>
-                </button>
-              );
-            })}
-          </div>
-        </section>
-      ))}
-
-      <section className="runtime-card" aria-label="Live status">
-        <div className="runtime-card__label">Live</div>
-        <div className="runtime-card__value">{runtimeLabel}</div>
-        <p className="runtime-card__message">{state.runtimeMessage}</p>
-      </section>
+      <nav className="sidebar-nav" aria-label="Sections">
+        {SECTION_GROUPS.map((group, groupIndex) => (
+          <section className="sidebar-group" key={group.items[0]?.id ?? `group-${groupIndex}`}>
+            {group.label ? <p className="sidebar-group__label">{group.label}</p> : null}
+            <div className="sidebar-group__items">
+              {group.items.map((item) => {
+                const selected = state.currentSection === item.id;
+                return (
+                  <button
+                    type="button"
+                    key={item.id}
+                    className={`sidebar-item${selected ? " is-selected" : ""}`}
+                    aria-current={selected ? "page" : undefined}
+                    onClick={() => onSelectSection(item.id)}
+                  >
+                    <span className="sidebar-item__rail" aria-hidden="true" />
+                    <span className="sidebar-item__icon">
+                      <Icon name={item.icon} />
+                    </span>
+                    <span className="sidebar-item__label">{item.title}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+        ))}
+      </nav>
     </aside>
   );
 }
