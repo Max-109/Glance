@@ -726,12 +726,16 @@ class SettingsViewModel(QObject):
         self._audio_input_test_thread = None
         self._audio_input_level = 0.0
         self.audioTestChanged.emit()
+        if self._status_message == "Listening to the mic.":
+            self._set_transient_status("Mic test stopped.", "neutral")
 
     @Slot()
     def _handle_speaker_test_finished(self) -> None:
         self._speaker_test_stop_event = None
         self._speaker_test_thread = None
         self.audioTestChanged.emit()
+        if self._status_message == "Playing test sound.":
+            self._set_transient_status("Speaker test stopped.", "neutral")
 
     def _find_keybind_conflict(self, current_field: str, value: str) -> str | None:
         for field_name in ("live_keybind", "quick_keybind", "ocr_keybind"):

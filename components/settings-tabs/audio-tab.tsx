@@ -6,7 +6,7 @@ import { SelectInput } from "../ui/select-input";
 import { type SettingsTabProps, settingValue } from "./shared";
 
 type DeviceTone = "ready" | "fallback" | "missing" | "testing";
-type TimingTone = "responsive" | "balanced" | "patient" | "custom";
+type TimingTone = "responsive" | "patient" | "custom";
 
 function computeDeviceStatus(state: SettingsTabProps["state"]): {
   tone: DeviceTone;
@@ -40,7 +40,7 @@ function computeTimingStatus(values: {
   wait: number;
   maxRecord: number;
   preroll: number;
-}): { tone: TimingTone; label: string } {
+}): { tone: TimingTone; label: string } | null {
   const { silence, wait, maxRecord, preroll } = values;
   if (silence <= 1 && wait <= 20 && maxRecord <= 60 && preroll <= 0.6) {
     return { tone: "responsive", label: "Tuned for fast turns" };
@@ -51,7 +51,7 @@ function computeTimingStatus(values: {
   if (preroll >= 1.2 || maxRecord >= 120) {
     return { tone: "custom", label: "Custom profile" };
   }
-  return { tone: "balanced", label: "Balanced timing" };
+  return null;
 }
 
 function formatSeconds(value: number, decimals = 1): string {
@@ -190,10 +190,12 @@ export function AudioTab({
       />
 
       <section className={`audio-panel audio-panel--timing`}>
-        <div className={`audio-panel__status audio-panel__status--${timingStatus.tone}`}>
-          <span className="audio-panel__status-dot" />
-          <span>{timingStatus.label}</span>
-        </div>
+        {timingStatus ? (
+          <div className={`audio-panel__status audio-panel__status--${timingStatus.tone}`}>
+            <span className="audio-panel__status-dot" />
+            <span>{timingStatus.label}</span>
+          </div>
+        ) : null}
 
         <div className="audio-panel__toolbar">
           <div className="audio-panel__toolbar-heading">

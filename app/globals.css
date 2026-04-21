@@ -475,41 +475,109 @@ textarea:focus-visible {
 
 .bridge-banner,
 .status-banner {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 10px;
-  min-height: 44px;
+  gap: 12px;
+  min-height: 52px;
   margin: 0 8px 12px;
-  padding: 0 14px;
+  padding: 10px 14px 10px 12px;
   border: 1px solid var(--panel-border);
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.03);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.012)),
+    rgba(0, 0, 0, 0.18);
+  color: var(--text-base);
+  overflow: hidden;
+  isolation: isolate;
+  animation: status-banner-in 220ms var(--ease-out-quint) both;
+}
+
+.status-banner::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 10%;
+  bottom: 10%;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--text-muted);
+  opacity: 0.55;
+}
+
+.status-banner__icon {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   color: var(--text-base);
 }
 
-.bridge-banner span,
+.status-banner__icon svg {
+  width: 15px;
+  height: 15px;
+}
+
 .status-banner__text {
-  font-size: 0.84rem;
+  font-size: 0.86rem;
+  line-height: 1.35;
+  letter-spacing: -0.005em;
+  color: var(--text-strong);
 }
 
+.status-banner--error::before {
+  background: var(--danger);
+  opacity: 1;
+  box-shadow: 0 0 14px color-mix(in srgb, var(--danger) 50%, transparent);
+}
 .status-banner--error {
-  border-color: rgba(255, 125, 114, 0.22);
-  background: var(--danger-soft);
+  border-color: color-mix(in srgb, var(--danger) 32%, var(--panel-border));
+}
+.status-banner--error .status-banner__icon {
+  background: color-mix(in srgb, var(--danger) 18%, transparent);
+  border-color: color-mix(in srgb, var(--danger) 38%, transparent);
+  color: var(--danger);
 }
 
+.status-banner--neutral::before {
+  background: var(--accent);
+  opacity: 0.85;
+  box-shadow: 0 0 12px var(--accent-glow);
+}
 .status-banner--neutral {
-  border-color: var(--accent-border);
-  background: color-mix(in srgb, var(--accent-soft) 74%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 22%, var(--panel-border));
 }
-
-.status-banner--success {
-  border-color: var(--accent-border);
-  background: var(--success-soft);
-}
-
-.status-banner--neutral .status-banner__icon,
-.status-banner--success .status-banner__icon {
+.status-banner--neutral .status-banner__icon {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 32%, transparent);
   color: var(--accent-strong);
+}
+
+.status-banner--success::before {
+  background: var(--accent);
+  opacity: 1;
+  box-shadow: 0 0 14px var(--accent-glow);
+}
+.status-banner--success {
+  border-color: color-mix(in srgb, var(--accent) 32%, var(--panel-border));
+}
+.status-banner--success .status-banner__icon {
+  background: linear-gradient(180deg, var(--accent), var(--accent-strong));
+  border-color: transparent;
+  color: var(--accent-contrast);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 50%, transparent),
+    0 6px 14px -6px var(--accent-glow);
+}
+
+@keyframes status-banner-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: none; }
 }
 
 .workspace-shell__scroll {
@@ -782,10 +850,10 @@ textarea.control::-webkit-scrollbar-thumb {
   top: calc(100% + 8px);
   left: 0;
   right: 0;
-  z-index: 20;
+  z-index: 40;
   display: grid;
   gap: 4px;
-  max-height: min(240px, 42vh);
+  max-height: min(320px, 56vh);
   padding: 6px;
   overflow-x: hidden;
   overflow-y: auto;
@@ -1668,12 +1736,6 @@ textarea.control::-webkit-scrollbar-thumb {
   cursor: default;
 }
 
-.app-button--primary {
-  background: linear-gradient(180deg, var(--accent), var(--accent-strong));
-  border-color: var(--accent-border);
-  color: var(--accent-contrast);
-}
-
 .app-button--secondary {
   background: rgba(255, 255, 255, 0.04);
   border-color: var(--control-border);
@@ -1682,18 +1744,6 @@ textarea.control::-webkit-scrollbar-thumb {
 .app-button--ghost {
   background: transparent;
   border-color: var(--control-border);
-}
-
-.app-button--danger {
-  background: var(--danger-soft);
-  border-color: rgba(255, 125, 114, 0.24);
-  color: var(--danger);
-}
-
-.app-button--signal {
-  background: linear-gradient(180deg, var(--signal), color-mix(in srgb, var(--signal) 72%, #ffffff));
-  border-color: var(--signal-border);
-  color: var(--signal-contrast);
 }
 
 .action-dock {
@@ -1809,9 +1859,9 @@ textarea.control::-webkit-scrollbar-thumb {
 /* ----------------------------------------------------------------------- */
 
 .audio-panel {
+  position: relative;
   display: grid;
   gap: 0;
-  overflow: hidden;
   border: 1px solid var(--panel-border);
   border-radius: 18px;
   background: rgba(0, 0, 0, 0.16);
@@ -1819,6 +1869,20 @@ textarea.control::-webkit-scrollbar-thumb {
     border-color 220ms var(--ease-out-quint),
     box-shadow 220ms var(--ease-out-quint),
     transform 220ms var(--ease-out-quint);
+}
+
+.audio-panel:has(.select-menu) {
+  z-index: 5;
+}
+
+.audio-panel > :first-child {
+  border-top-left-radius: 17px;
+  border-top-right-radius: 17px;
+}
+
+.audio-panel > :last-child {
+  border-bottom-left-radius: 17px;
+  border-bottom-right-radius: 17px;
 }
 
 .audio-panel:hover {
@@ -1957,6 +2021,15 @@ textarea.control::-webkit-scrollbar-thumb {
 
 .audio-panel__body {
   padding: 16px 16px 14px;
+  position: relative;
+}
+
+.audio-panel__body .select-shell {
+  position: relative;
+}
+
+.audio-panel__body .select-menu {
+  z-index: 30;
 }
 
 .audio-panel__chips {
@@ -2060,6 +2133,8 @@ textarea.control::-webkit-scrollbar-thumb {
 .app-button {
   position: relative;
   overflow: hidden;
+  gap: 10px;
+  padding: 0 14px 0 10px;
   transition:
     border-color 150ms var(--ease-out-quint),
     background-color 150ms var(--ease-out-quint),
@@ -2068,9 +2143,33 @@ textarea.control::-webkit-scrollbar-thumb {
     transform 160ms var(--ease-out-quint);
 }
 
+.app-button__icon {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: inherit;
+  transition: background-color 180ms var(--ease-out-quint),
+    border-color 180ms var(--ease-out-quint),
+    color 180ms var(--ease-out-quint),
+    transform 180ms var(--ease-out-quint);
+}
+
+.app-button__icon svg {
+  width: 14px;
+  height: 14px;
+}
+
 .app-button:hover:not(:disabled) {
   transform: translateY(-1px);
   box-shadow: 0 10px 28px -20px color-mix(in srgb, var(--accent-glow) 70%, transparent);
+}
+
+.app-button:hover:not(:disabled) .app-button__icon {
+  background: rgba(255, 255, 255, 0.09);
+  border-color: rgba(255, 255, 255, 0.14);
 }
 
 .app-button:active:not(:disabled) {
@@ -2078,43 +2177,113 @@ textarea.control::-webkit-scrollbar-thumb {
   transition-duration: 80ms;
 }
 
+.app-button:active:not(:disabled) .app-button__icon {
+  transform: scale(0.92);
+}
+
 .app-button:focus-visible {
   outline: 2px solid color-mix(in srgb, var(--accent) 72%, transparent);
   outline-offset: 2px;
 }
 
-.app-button--signal[data-active="true"]::before,
-.app-button--primary[data-active="true"]::before {
+/* Primary — neutral dark surface with accent icon chip */
+.app-button--primary {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.012)),
+    #141416;
+  border-color: var(--control-border);
+  color: var(--text-strong);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.app-button--primary .app-button__icon {
+  background: linear-gradient(180deg, var(--accent), var(--accent-strong));
+  border-color: transparent;
+  color: var(--accent-contrast);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 60%, transparent),
+    0 6px 14px -6px var(--accent-glow);
+}
+
+.app-button--primary:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--control-border));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.07),
+    0 12px 30px -18px var(--accent-glow);
+}
+
+/* Signal — neutral dark surface with warm icon chip */
+.app-button--signal {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.012)),
+    #141416;
+  border-color: var(--control-border);
+  color: var(--text-strong);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.app-button--signal .app-button__icon {
+  background: linear-gradient(180deg, var(--signal), color-mix(in srgb, var(--signal) 75%, #fff));
+  border-color: transparent;
+  color: var(--signal-contrast);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--signal) 60%, transparent),
+    0 6px 14px -6px var(--signal-glow);
+}
+
+.app-button--signal:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--signal) 42%, var(--control-border));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.07),
+    0 12px 30px -18px var(--signal-glow);
+}
+
+/* Secondary/ghost/danger keep their icon chip but neutral surface */
+.app-button--secondary .app-button__icon,
+.app-button--ghost .app-button__icon {
+  color: var(--accent-strong);
+}
+
+.app-button--danger {
+  color: var(--danger);
+}
+.app-button--danger .app-button__icon {
+  background: color-mix(in srgb, var(--danger) 16%, transparent);
+  border-color: color-mix(in srgb, var(--danger) 32%, transparent);
+  color: var(--danger);
+}
+
+.app-button--primary[data-active="true"]::before,
+.app-button--signal[data-active="true"]::before {
   content: "";
   position: absolute;
   inset: -30%;
   border-radius: inherit;
   background: radial-gradient(
     60% 60% at 50% 40%,
-    color-mix(in srgb, #fff 35%, transparent),
+    color-mix(in srgb, #fff 20%, transparent),
     transparent 70%
   );
   opacity: 0;
   pointer-events: none;
   animation: btn-breathe 3.8s var(--ease-out-quint) infinite;
+  z-index: 0;
+}
+
+.app-button--primary[data-active="true"] > *,
+.app-button--signal[data-active="true"] > * {
+  position: relative;
+  z-index: 1;
 }
 
 @keyframes btn-breathe {
-  0%, 100% { opacity: 0.08; transform: scale(0.95); }
-  50%      { opacity: 0.22; transform: scale(1.05); }
+  0%, 100% { opacity: 0.06; transform: scale(0.95); }
+  50%      { opacity: 0.18; transform: scale(1.05); }
 }
 
-.app-button__icon,
 .icon--toggle {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition: transform 220ms var(--ease-out-quint), opacity 160ms var(--ease-out-quint);
   will-change: transform, opacity;
-}
-
-.app-button:active:not(:disabled) .app-button__icon {
-  transform: translateY(1px);
 }
 
 .icon--toggle[data-enter="true"] {
