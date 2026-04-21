@@ -169,15 +169,18 @@ class LiveCueController:
             audio_dir / "live-cues"
         )
         self._previous_state: str | None = None
+        self._enabled = True
 
     def set_output_device(self, output_device_id: str) -> None:
         self._playback_service.set_output_device_id(output_device_id)
 
     def stop(self) -> None:
+        self._enabled = False
         self._playback_service.stop()
 
     def handle_status(self, state: str, message: str) -> None:
-        del message
+        if not self._enabled:
+            return
         normalized_state = _normalize_tray_state(state)
         previous_state = self._previous_state
         self._previous_state = normalized_state
@@ -189,6 +192,8 @@ class LiveCueController:
             cue_key = "start"
         elif previous_state == "processing" and normalized_state == "speaking":
             cue_key = "reply_ready"
+        elif normalized_state == "idle" and message == "Live session stopped.":
+            cue_key = "cancel"
         if not cue_key:
             return
 
@@ -346,9 +351,9 @@ def run_settings_app() -> int:
     controller.bindingChanged.connect(handle_binding_change)
     settings_window.visibleChanged.connect(restore_hotkeys_if_pending)
     app.aboutToQuit.connect(hotkey_manager.stop)
-    app.aboutToQuit.connect(live_controller.stop)
     if live_cue_controller is not None:
         app.aboutToQuit.connect(live_cue_controller.stop)
+    app.aboutToQuit.connect(live_controller.stop)
     app.aboutToQuit.connect(controller.stopVoicePreview)
     app.aboutToQuit.connect(controller.stopAudioInputTest)
     app.aboutToQuit.connect(controller.stopSpeakerTest)

@@ -48,6 +48,14 @@ class AudioTestSignalService:
                     (1174.66, 0.075, 0.24),
                 ],
             ),
+            "cancel": self._write_tone_sequence(
+                output_dir / "live-cancel.wav",
+                [
+                    (698.46, 0.034, 0.13),
+                    (None, 0.014, 0.0),
+                    (523.25, 0.082, 0.18),
+                ],
+            ),
         }
 
     def _write_tone_sequence(
