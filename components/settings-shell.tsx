@@ -886,7 +886,7 @@ export function SettingsShell() {
               />
               <Button
                 label="Discard changes"
-                icon="refresh"
+                icon="undo"
                 variant="ghost"
                 disabled={!liveState.dirty}
                 onClick={() => handleRunAction("reset")}

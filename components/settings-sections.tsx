@@ -38,7 +38,7 @@ const PROVIDER_CARDS: Array<{
     id: "speech",
     label: "Voice",
     eyebrow: "VOICE",
-    icon: "speech",
+    icon: "speaker",
   },
   {
     id: "transcription",
@@ -56,10 +56,10 @@ const REASONING_LABELS: Record<string, string> = {
 };
 
 const REASONING_ICONS: Record<string, string> = {
-  minimal: "clock",
-  low: "zap",
-  medium: "brain",
-  high: "brain-circuit",
+  minimal: "level-1",
+  low: "level-2",
+  medium: "level-3",
+  high: "level-4",
 };
 
 const LANGUAGE_LABELS: Record<string, string> = {
@@ -461,7 +461,7 @@ function ApiSection({
               <SelectInput
                 fieldName="llm_reasoning"
                 label="Reasoning Level"
-                icon="brain"
+                icon="level-3"
                 value={settingValue(state, "llm_reasoning") || "medium"}
                 options={state.reasoningOptions}
                 labels={REASONING_LABELS}
@@ -507,7 +507,7 @@ function ApiSection({
             <SelectInput
               fieldName="tts_model"
               label="Model"
-              icon="speech"
+              icon="speaker"
               value={settingValue(state, "tts_model") || "eleven-v3"}
               options={state.ttsModelOptions}
               open={openSelect === "tts_model"}
@@ -571,7 +571,7 @@ function ApiSection({
               <SelectInput
                 fieldName="transcription_reasoning"
                 label="Reasoning Level"
-                icon="zap"
+                icon="level-3"
                 value={settingValue(state, "transcription_reasoning") || "medium"}
                 options={state.transcriptionReasoningOptions}
                 labels={REASONING_LABELS}
@@ -611,7 +611,7 @@ function VoiceSection({
       <SelectInput
         fieldName="tts_voice_id"
         label="Voice"
-        icon="mic"
+        icon="speaker"
         value={selectedVoice}
         options={state.voiceOptions}
         labels={state.voiceOptionLabels}
@@ -622,7 +622,7 @@ function VoiceSection({
         actionSlot={
           <Button
             label={previewActiveForVoice ? "Stop" : "Preview"}
-            icon={previewActiveForVoice ? "close" : "play"}
+            icon={previewActiveForVoice ? "stop" : "play"}
             variant={previewActiveForVoice ? "ghost" : "secondary"}
             disabled={selectedVoice === "auto"}
             ariaLabel="Preview current voice"
@@ -666,7 +666,7 @@ function CaptureSection({
         <NumberInput
           fieldName="screenshot_interval"
           label="Capture Interval"
-          icon="clock"
+          icon="timer"
           suffix="s"
           inputMode="decimal"
           step={0.1}
@@ -681,7 +681,7 @@ function CaptureSection({
         <NumberInput
           fieldName="batch_window_duration"
           label="Batch Window"
-          icon="history"
+          icon="timer"
           suffix="s"
           inputMode="decimal"
           step={0.5}
@@ -759,7 +759,7 @@ function AudioSection({
             />
             <Button
               label={state.speakerTestActive ? "Stop Speaker Test" : "Test Speakers"}
-              icon={state.speakerTestActive ? "close" : "play"}
+              icon={state.speakerTestActive ? "stop" : "play"}
               variant={state.speakerTestActive ? "signal" : "secondary"}
               onClick={() =>
                 onRunAction(
@@ -806,7 +806,7 @@ function AudioSection({
           <div className="card-actions">
             <Button
               label={state.audioInputTestActive ? "Stop Mic Test" : "Start Mic Test"}
-              icon={state.audioInputTestActive ? "close" : "mic"}
+              icon={state.audioInputTestActive ? "stop" : "mic"}
               variant="signal"
               onClick={() =>
                 onRunAction(
@@ -835,7 +835,7 @@ function AudioSection({
           <div className="card-actions card-actions--end">
             <Button
               label="Reset audio settings"
-              icon="refresh"
+              icon="undo"
               variant="ghost"
               onClick={() => onRunAction("resetAudioDefaults")}
             />
@@ -846,7 +846,7 @@ function AudioSection({
           <NumberInput
             fieldName="audio_silence_seconds"
             label="Silence Timeout"
-            icon="history"
+            icon="timer"
             suffix="s"
             inputMode="decimal"
             step={0.1}
@@ -862,7 +862,7 @@ function AudioSection({
           <NumberInput
             fieldName="audio_max_wait_seconds"
             label="Wait for Speech"
-            icon="clock"
+            icon="timer"
             suffix="s"
             inputMode="decimal"
             step={0.5}
@@ -878,7 +878,7 @@ function AudioSection({
           <NumberInput
             fieldName="audio_max_record_seconds"
             label="Max Turn Length"
-            icon="wave"
+            icon="timer"
             suffix="s"
             inputMode="decimal"
             step={1}
@@ -894,7 +894,7 @@ function AudioSection({
           <NumberInput
             fieldName="audio_preroll_seconds"
             label="Pre-Roll"
-            icon="mic"
+            icon="rewind"
             suffix="s"
             inputMode="decimal"
             step={0.05}
@@ -1032,7 +1032,13 @@ function MiscSection({
         <SelectInput
           fieldName="theme_preference"
           label="Theme"
-          icon={settingValue(state, "theme_preference") === "light" ? "sun" : "moon"}
+          icon={
+            settingValue(state, "theme_preference") === "light"
+              ? "sun"
+              : settingValue(state, "theme_preference") === "system"
+                ? "monitor"
+                : "moon"
+          }
           value={settingValue(state, "theme_preference") || "dark"}
           options={state.themeOptions}
           labels={THEME_LABELS}
@@ -1062,6 +1068,7 @@ function MiscSection({
         <Input
           fieldName="system_prompt_override"
           label="Extra Instructions"
+          icon="quote"
           multiline
           value={getDraftValue("system_prompt_override")}
           helperText="Optional instructions added to each reply."

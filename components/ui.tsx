@@ -383,12 +383,25 @@ export function Notice({ state }: { state: BridgeState }) {
     return null;
   }
 
+  const normalizedMessage = state.statusMessage.trim().toLowerCase();
+
   const iconName =
     state.statusKind === "error"
-      ? "close"
+      ? "alert-circle"
       : state.statusKind === "success"
         ? "check"
-        : "settings";
+        : normalizedMessage.includes("mic") || normalizedMessage.includes("listening")
+          ? "mic"
+          : normalizedMessage.includes("speaker") ||
+              normalizedMessage.includes("voice") ||
+              normalizedMessage.includes("playing") ||
+              normalizedMessage.includes("preview")
+            ? "speaker"
+            : normalizedMessage.includes("audio")
+              ? "audio"
+              : normalizedMessage.includes("keybind") || normalizedMessage.includes("press")
+                ? "key"
+                : "info";
 
   return (
     <div
