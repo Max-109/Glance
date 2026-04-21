@@ -1448,21 +1448,36 @@ textarea.control::-webkit-scrollbar-thumb {
 }
 
 .mic-gate__level-meter {
+  position: relative;
   display: grid;
   grid-template-columns: repeat(18, minmax(0, 1fr));
   gap: 3px;
   width: 212px;
   max-width: 100%;
   flex: 0 0 auto;
+  isolation: isolate;
 }
 
 .mic-gate__level-seg {
   position: relative;
+  z-index: 1;
   height: 24px;
   border-radius: 5px;
   background: rgba(255, 255, 255, 0.08);
   border: 1px solid transparent;
-  transition: background 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+.mic-gate__level-glow {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  border-radius: 5px;
+  background: linear-gradient(180deg, var(--accent-strong), var(--accent));
+  box-shadow: 0 0 12px color-mix(in srgb, var(--accent-glow) 85%, transparent);
+  opacity: 0.85;
+  pointer-events: none;
+  z-index: 0;
 }
 
 .mic-gate__level-seg.is-on {
@@ -1475,7 +1490,6 @@ textarea.control::-webkit-scrollbar-thumb {
 
 .mic-gate__level-seg.is-hot {
   background: linear-gradient(180deg, var(--accent-strong), var(--accent));
-  box-shadow: 0 0 10px color-mix(in srgb, var(--accent-glow) 85%, transparent);
 }
 
 @media (prefers-reduced-motion: reduce) {

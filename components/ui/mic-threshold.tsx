@@ -481,6 +481,7 @@ export function MicThreshold({
     levelSegments - 1,
     Math.max(0, Math.round(normalizedThreshold * (levelSegments - 1))),
   );
+  const hotLevelWidth = Math.max(0, normalizedLevel - normalizedThreshold);
 
   return (
     <div className="mic-gate">
@@ -553,6 +554,15 @@ export function MicThreshold({
           <span className="mic-gate__chip-value">
             <span className="mic-gate__level-number">{levelPct}%</span>
             <span className="mic-gate__level-meter" aria-hidden="true">
+              {hotLevelWidth > 0 ? (
+                <span
+                  className="mic-gate__level-glow"
+                  style={{
+                    left: `${normalizedThreshold * 100}%`,
+                    width: `${hotLevelWidth * 100}%`,
+                  }}
+                />
+              ) : null}
               {Array.from({ length: levelSegments }).map((_, i) => (
                 <span
                   key={i}
