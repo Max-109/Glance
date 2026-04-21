@@ -209,7 +209,6 @@ interface SettingsSectionsProps {
   openSelect: string | null;
   thresholdValue: number;
   audioLevel: number;
-  audioInputTestActive: boolean;
   revealedFields: Record<string, boolean>;
   onChangeProviderTab: (tab: ProviderTab) => void;
   onToggleSelect: (fieldName: string) => void;
@@ -238,7 +237,6 @@ export function SettingsSections({
   openSelect,
   thresholdValue,
   audioLevel,
-  audioInputTestActive,
   revealedFields,
   onChangeProviderTab,
   onToggleSelect,
@@ -305,7 +303,6 @@ export function SettingsSections({
         openSelect={openSelect}
         thresholdValue={thresholdValue}
         audioLevel={audioLevel}
-        audioInputTestActive={audioInputTestActive}
         onToggleSelect={onToggleSelect}
         onSelectValue={onSelectValue}
         onDraftChange={onDraftChange}
@@ -722,7 +719,6 @@ function AudioSection({
   openSelect,
   thresholdValue,
   audioLevel,
-  audioInputTestActive,
   onToggleSelect,
   onSelectValue,
   onDraftChange,
@@ -738,7 +734,6 @@ function AudioSection({
   | "openSelect"
   | "thresholdValue"
   | "audioLevel"
-  | "audioInputTestActive"
   | "onToggleSelect"
   | "onSelectValue"
   | "onDraftChange"
@@ -810,12 +805,12 @@ function AudioSection({
         footer={
           <div className="card-actions">
             <Button
-              label={audioInputTestActive ? "Stop Mic Test" : "Start Mic Test"}
-              icon={audioInputTestActive ? "stop" : "mic"}
+              label={state.audioInputTestActive ? "Stop Mic Test" : "Start Mic Test"}
+              icon={state.audioInputTestActive ? "stop" : "mic"}
               variant="signal"
               onClick={() =>
                 onRunAction(
-                  audioInputTestActive
+                  state.audioInputTestActive
                     ? "stopAudioInputTest"
                     : "startAudioInputTest",
                 )
@@ -824,13 +819,13 @@ function AudioSection({
           </div>
         }
       >
-        <MicThreshold
-          level={audioLevel}
-          threshold={thresholdValue}
-          active={audioInputTestActive}
-          onPointerDown={onThresholdPointerDown}
-          onNudge={onThresholdNudge}
-        />
+          <MicThreshold
+            level={audioLevel}
+            threshold={thresholdValue}
+            active={state.audioInputTestActive}
+            onPointerDown={onThresholdPointerDown}
+            onNudge={onThresholdNudge}
+          />
       </Card>
 
       <Card

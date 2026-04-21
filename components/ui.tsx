@@ -1217,13 +1217,58 @@ export function MicThreshold({
   );
 
   const [status, setStatus] = useState<MicGateStatus>("idle");
+  const [liveLevel, setLiveLevel] = useState(level);
 
-  const normalizedLevel = Math.max(0, Math.min(1, level || 0));
+  const effectiveLevel = active ? liveLevel : level;
+  const normalizedLevel = Math.max(0, Math.min(1, effectiveLevel || 0));
   const normalizedThreshold = Math.max(0, Math.min(1, threshold || 0));
 
   latestLevelRef.current = normalizedLevel;
   thresholdRef.current = normalizedThreshold;
   activeRef.current = active;
+
+  useEffect(() => {
+    if (!active) {
+      setLiveLevel(level);
+      return;
+    }
+
+    let cancelled = false;
+
+    const refreshAudioLevel = async () => {
+      if (typeof window === "undefined") {
+        return;
+      }
+      const bridge = window.glanceBridge ?? null;
+      if (!bridge?.getAudioState) {
+        return;
+      }
+
+      try {
+        const snapshot = await bridge.getAudioState();
+        if (cancelled) {
+          return;
+        }
+        setLiveLevel((current) =>
+          Math.abs(current - snapshot.audioInputLevel) < 0.001
+            ? current
+            : snapshot.audioInputLevel,
+        );
+      } catch {
+        // The canvas meter should fail quietly if the bridge is unavailable.
+      }
+    };
+
+    void refreshAudioLevel();
+    const interval = window.setInterval(() => {
+      void refreshAudioLevel();
+    }, 150);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [active, level]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -1280,49 +1325,6 @@ export function MicThreshold({
     };
 
     cachedColors = readColors();
-
-    let warmupHandle: number | null = null;
-
-    const warmAccentTrace = () => {
-      if (typeof document === "undefined") {
-        return;
-      }
-      const warmCanvas = document.createElement("canvas");
-      warmCanvas.width = 96;
-      warmCanvas.height = 48;
-      const warmCtx = warmCanvas.getContext("2d");
-      if (!warmCtx) {
-        return;
-      }
-
-      warmCtx.strokeStyle = cachedColors.accent;
-      warmCtx.lineWidth = 1.6;
-      warmCtx.lineCap = "round";
-      warmCtx.lineJoin = "round";
-      warmCtx.shadowColor = cachedColors.accentGlow;
-      warmCtx.shadowBlur = 6;
-      warmCtx.beginPath();
-      warmCtx.moveTo(8, 34);
-      warmCtx.lineTo(28, 12);
-      warmCtx.lineTo(50, 24);
-      warmCtx.lineTo(72, 10);
-      warmCtx.stroke();
-
-      warmCtx.shadowBlur = 0;
-      warmCtx.clearRect(0, 0, warmCanvas.width, warmCanvas.height);
-    };
-
-    if (typeof window !== "undefined") {
-      const browserWindow = window as Window & {
-        requestIdleCallback?: (callback: () => void) => number;
-        cancelIdleCallback?: (handle: number) => void;
-      };
-      if (browserWindow.requestIdleCallback) {
-        warmupHandle = browserWindow.requestIdleCallback(() => warmAccentTrace());
-      } else {
-        warmupHandle = window.setTimeout(() => warmAccentTrace(), 0);
-      }
-    }
 
     let handleInset = 96; // pixels from right edge reserved for the pill
 
@@ -1575,16 +1577,6 @@ export function MicThreshold({
 
     return () => {
       observer?.disconnect();
-      if (typeof window !== "undefined" && warmupHandle != null) {
-        const browserWindow = window as Window & {
-          cancelIdleCallback?: (handle: number) => void;
-        };
-        if (browserWindow.cancelIdleCallback) {
-          browserWindow.cancelIdleCallback(warmupHandle);
-        } else {
-          window.clearTimeout(warmupHandle);
-        }
-      }
       if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
       rafRef.current = null;
       lastSampleRef.current = 0;
