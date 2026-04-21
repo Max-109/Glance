@@ -72,13 +72,13 @@ class LiveSessionController:
         if self._orchestrator is None:
             self._set_status(
                 "idle",
-                "Live mode is unavailable until the saved provider settings are complete.",
+                "Finish setting up your providers to use Live.",
             )
             return
         if self._recorder is None:
             self._set_status(
                 "idle",
-                "Live mode recorder is unavailable with the current audio settings.",
+                "Live can't start with the current audio settings.",
             )
             return
         self._stop_event.clear()
@@ -97,14 +97,14 @@ class LiveSessionController:
         if thread and thread.is_alive() and thread is not current_thread():
             thread.join(timeout=1.5)
         self._session = None
-        self._set_status("idle", "Live session stopped.")
+        self._set_status("idle", "Live stopped.")
 
     def _run_loop(self) -> None:
         try:
             while not self._stop_event.is_set():
                 recording_path = self._audio_dir / f"live-input-{uuid4().hex}.wav"
                 turn_started_at = perf_counter()
-                self._set_status("listening", "Listening for your next spoken turn.")
+                self._set_status("listening", "Listening...")
                 capture_started_at = perf_counter()
                 try:
                     self._recorder.capture_turn(
@@ -125,7 +125,7 @@ class LiveSessionController:
                 if self._stop_event.is_set():
                     break
 
-                self._set_status("processing", "Transcribing and preparing a reply.")
+                self._set_status("processing", "Preparing a reply...")
                 pipeline_started_at = perf_counter()
                 try:
                     interaction = self._orchestrator.run_mode(
@@ -135,7 +135,7 @@ class LiveSessionController:
                     )
                 except GlanceError as exc:
                     logger.exception("Live mode failed")
-                    self._set_status("idle", f"Live mode failed: {exc}")
+                    self._set_status("idle", f"Live failed: {exc}")
                     break
 
                 pipeline_elapsed_ms = _elapsed_ms(pipeline_started_at)
@@ -146,7 +146,7 @@ class LiveSessionController:
                 if self._stop_event.is_set():
                     break
 
-                self._set_status("speaking", "Speaking the reply.")
+                self._set_status("speaking", "Speaking...")
                 playback_started_at = perf_counter()
                 try:
                     self._playback_service.play_blocking(
@@ -172,13 +172,13 @@ class LiveSessionController:
                 )
         except Exception as exc:  # pragma: no cover - defensive runtime logging.
             logger.exception("Unexpected live session failure")
-            self._set_status("idle", f"Live mode failed: {exc}")
+            self._set_status("idle", f"Live failed: {exc}")
         finally:
             self._stop_event.set()
             self._thread = None
             self._session = None
             if self._state != "idle":
-                self._set_status("idle", "Live session idle.")
+                self._set_status("idle", "Live is idle.")
 
     def _set_status(self, state: str, message: str) -> None:
         self._state = state

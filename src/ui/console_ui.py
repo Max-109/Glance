@@ -9,9 +9,9 @@ class ConsoleUI:
 
     def run(self) -> None:
         print("Glance console shell")
-        print("1. Quick mode")
-        print("2. OCR mode")
-        print("3. Live mode")
+        print("1. Quick Ask")
+        print("2. Read Screen")
+        print("3. Live")
         print("4. View history")
         print("5. Exit")
 
@@ -41,7 +41,7 @@ class ConsoleUI:
                 question=question,
             )
         except GlanceError as exc:
-            print(f"Quick mode failed: {exc}")
+            print(f"Quick Ask failed: {exc}")
             return
         print(interaction.answer)
 
@@ -50,7 +50,7 @@ class ConsoleUI:
         try:
             interaction = self._orchestrator.run_mode("ocr", image_path=image_path)
         except GlanceError as exc:
-            print(f"OCR mode failed: {exc}")
+            print(f"Read Screen failed: {exc}")
             return
         print(interaction.extracted_text)
 
@@ -62,7 +62,7 @@ class ConsoleUI:
                 recording_path=recording_path,
             )
         except GlanceError as exc:
-            print(f"Live mode failed: {exc}")
+            print(f"Live failed: {exc}")
             return
         print(interaction.response)
 

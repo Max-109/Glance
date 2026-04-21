@@ -22,7 +22,7 @@ const RUNTIME_LABELS: Record<string, string> = {
   processing: "Processing",
   speaking: "Speaking",
   ready: "Ready",
-  error: "Attention",
+  error: "Error",
 };
 
 type ActivityMarkState =
@@ -412,7 +412,7 @@ export function Card({
   footer,
 }: {
   title: string;
-  description: string;
+  description?: string;
   children: ReactNode;
   className?: string;
   footer?: ReactNode;
@@ -422,7 +422,9 @@ export function Card({
       <header className="glass-card__header">
         <div>
           <h3 className="glass-card__title">{title}</h3>
-          <p className="glass-card__description">{description}</p>
+          {description ? (
+            <p className="glass-card__description">{description}</p>
+          ) : null}
         </div>
       </header>
       <div className="glass-card__body">{children}</div>
@@ -456,8 +458,8 @@ export function Sidebar({
       </div>
 
       {SECTION_GROUPS.map((group) => (
-        <section className="sidebar-group" key={group.label}>
-          <p className="sidebar-group__label">{group.label}</p>
+        <section className="sidebar-group" key={group.items[0]?.id ?? "group"}>
+          {group.label ? <p className="sidebar-group__label">{group.label}</p> : null}
           <div className="sidebar-group__items">
             {group.items.map((item) => {
               const selected = state.currentSection === item.id;
@@ -480,8 +482,8 @@ export function Sidebar({
         </section>
       ))}
 
-      <section className="runtime-card" aria-label="Live runtime status">
-        <div className="runtime-card__label">Live Session</div>
+      <section className="runtime-card" aria-label="Live status">
+        <div className="runtime-card__label">Live</div>
         <div className="runtime-card__value">{runtimeLabel}</div>
         <p className="runtime-card__message">{state.runtimeMessage}</p>
       </section>
@@ -1127,7 +1129,7 @@ export function Keybinds({
   onActivate: (fieldName: string) => void;
 }) {
   return (
-    <div className="shortcut-list" aria-label="Keyboard shortcuts">
+    <div className="shortcut-list" aria-label="Keybinds">
       {rows.map((row) => (
         <button
           key={row.id}
@@ -1137,7 +1139,7 @@ export function Keybinds({
         >
           <span className="shortcut-row__label">{row.title}</span>
           <span className="shortcut-row__value" translate="no">
-            {row.active ? "PRESS SHORTCUT" : row.value}
+            {row.active ? "PRESS KEYS" : row.value}
           </span>
         </button>
       ))}
@@ -1191,7 +1193,6 @@ export function MicThreshold({
   const lastSampleRef = useRef(0);
   const aboveSinceRef = useRef<number | null>(null);
 
-  const [noiseFloor, setNoiseFloor] = useState(0);
   const [status, setStatus] = useState<MicGateStatus>("idle");
 
   const normalizedLevel = Math.max(0, Math.min(1, level || 0));
@@ -1480,7 +1481,6 @@ export function MicThreshold({
       if ((now | 0) % 6 === 0) {
         const arr = Array.from(historyRef.current);
         const nf = percentile(arr, 0.1);
-        setNoiseFloor(nf);
         const thr = thresholdRef.current;
         const lvl = latestLevelRef.current;
         let next: MicGateStatus = "idle";
@@ -1543,8 +1543,6 @@ export function MicThreshold({
 
   const thresholdPct = Math.round(normalizedThreshold * 100);
   const levelPct = Math.round(normalizedLevel * 100);
-  const noisePct = Math.round(noiseFloor * 100);
-
   const statusLabel =
     status === "speech"
       ? "Speech detected"
@@ -1554,11 +1552,43 @@ export function MicThreshold({
           ? "Quiet"
           : "Mic test off";
 
+  const levelSegments = 18;
+  const filledLevelSegments = Math.round(normalizedLevel * levelSegments);
+  const thresholdSegment = Math.min(
+    levelSegments - 1,
+    Math.max(0, Math.round(normalizedThreshold * (levelSegments - 1))),
+  );
+
   return (
     <div className="mic-gate">
       <div className={`mic-gate__status mic-gate__status--${status}`}>
         <span className="mic-gate__status-dot" aria-hidden="true" />
         <span>{statusLabel}</span>
+      </div>
+
+      <div className="mic-gate__toolbar">
+        <p className="mic-gate__toolbar-copy">
+          Set the mic threshold so speech triggers Glance, not room noise.
+        </p>
+        <div className="mic-gate__toolbar-controls">
+          <button
+            type="button"
+            className="mic-gate__chip-btn"
+            aria-label="Lower threshold by 1%"
+            onClick={() => onNudge(-0.01)}
+          >
+            −
+          </button>
+          <span className="mic-gate__toolbar-value">{thresholdPct}%</span>
+          <button
+            type="button"
+            className="mic-gate__chip-btn"
+            aria-label="Raise threshold by 1%"
+            onClick={() => onNudge(0.01)}
+          >
+            +
+          </button>
+        </div>
       </div>
 
       <div
@@ -1588,61 +1618,29 @@ export function MicThreshold({
           <span className="mic-gate__tick-value">{thresholdPct}%</span>
         </div>
 
-        <div className="mic-gate__now-label" aria-hidden="true">
-          now
-        </div>
-        <div className="mic-gate__past-label" aria-hidden="true">
-          −{MIC_GATE_HISTORY_SECONDS}s
-        </div>
       </div>
 
       <div className="mic-gate__chips">
-        <div className="mic-gate__chip">
-          <span className="mic-gate__chip-label">Noise floor</span>
-          <span className="mic-gate__chip-value">{noisePct}%</span>
-        </div>
         <div className="mic-gate__chip mic-gate__chip--level">
           <span className="mic-gate__chip-label">Live level</span>
           <span className="mic-gate__chip-value">
             <span className="mic-gate__level-number">{levelPct}%</span>
-            <span className="mic-gate__level-bar" aria-hidden="true">
-              <span
-                className="mic-gate__level-fill"
-                style={{ width: `${Math.max(0, Math.min(1, normalizedLevel)) * 100}%` }}
-              />
-              <span
-                className={`mic-gate__level-threshold${
-                  normalizedLevel >= normalizedThreshold && normalizedThreshold > 0
-                    ? " is-hot"
-                    : ""
-                }`}
-                style={{ left: `${normalizedThreshold * 100}%` }}
-              />
+            <span className="mic-gate__level-meter" aria-hidden="true">
+              {Array.from({ length: levelSegments }).map((_, i) => (
+                <span
+                  key={i}
+                  className={`mic-gate__level-seg${
+                    i < filledLevelSegments ? " is-on" : ""
+                  }${
+                    i === thresholdSegment ? " is-threshold" : ""
+                  }${
+                    i < filledLevelSegments && i >= thresholdSegment
+                      ? " is-hot"
+                      : ""
+                  }`}
+                />
+              ))}
             </span>
-          </span>
-        </div>
-        <div className="mic-gate__chip mic-gate__chip--threshold">
-          <span className="mic-gate__chip-label">Threshold</span>
-          <span className="mic-gate__chip-controls">
-            <button
-              type="button"
-              className="mic-gate__chip-btn"
-              aria-label="Lower threshold by 1%"
-              onClick={() => onNudge(-0.01)}
-            >
-              −
-            </button>
-            <span className="mic-gate__chip-value mic-gate__chip-value--lg">
-              {thresholdPct}%
-            </span>
-            <button
-              type="button"
-              className="mic-gate__chip-btn"
-              aria-label="Raise threshold by 1%"
-              onClick={() => onNudge(0.01)}
-            >
-              +
-            </button>
           </span>
         </div>
       </div>

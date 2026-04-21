@@ -281,7 +281,7 @@ class SettingsViewModel(QObject):
         self._settings_map = deepcopy(self._baseline_map)
         self._errors = {}
         self._dirty = False
-        self._set_status("Changes cleared.", "neutral")
+        self._set_status("Changes discarded.", "neutral")
         self.settingsChanged.emit()
         self.errorsChanged.emit()
         self.dirtyChanged.emit()
@@ -292,7 +292,7 @@ class SettingsViewModel(QObject):
         if settings is None:
             return
         del settings
-        self._set_status("Everything looks valid.", "success")
+        self._set_status("Everything looks good.", "success")
 
     @Slot()
     def clearHistory(self) -> None:
@@ -305,7 +305,7 @@ class SettingsViewModel(QObject):
             return
         self._binding_field = field_name
         self.bindingChanged.emit()
-        self._set_status("Press a new shortcut. Escape cancels.", "neutral")
+        self._set_status("Press a new keybind. Press Escape to cancel.", "neutral")
 
     @Slot()
     def cancelKeybindCapture(self) -> None:
@@ -313,7 +313,7 @@ class SettingsViewModel(QObject):
             return
         self._binding_field = ""
         self.bindingChanged.emit()
-        self._set_status("Shortcut capture canceled.", "neutral")
+        self._set_status("Keybind capture canceled.", "neutral")
 
     @Slot(int, int, str)
     def captureKeybind(self, key: int, modifiers: int, text: str) -> None:
@@ -331,14 +331,14 @@ class SettingsViewModel(QObject):
             self._errors[field_name] = f"Already used by {conflicts_with}."
             self.errorsChanged.emit()
             self._set_status(
-                "Pick a different shortcut so they stay unique.", "error"
+                "Each keybind must be unique.", "error"
             )
             return
         self._binding_field = ""
         self.bindingChanged.emit()
         self.setField(field_name, keybind)
         self._set_status(
-            f"{self._binding_label(field_name)} shortcut ready to save.", "success"
+            f"{self._binding_label(field_name)} keybind ready to save.", "success"
         )
 
     @Slot(str, str)
@@ -358,7 +358,7 @@ class SettingsViewModel(QObject):
             self._errors[field_name] = f"Already used by {conflicts_with}."
             self.errorsChanged.emit()
             self._set_status(
-                "Pick a different shortcut so they stay unique.", "error"
+                "Each keybind must be unique.", "error"
             )
             return
 
@@ -367,7 +367,7 @@ class SettingsViewModel(QObject):
             self.bindingChanged.emit()
         self.setField(field_name, normalized_keybind)
         self._set_status(
-            f"{self._binding_label(field_name)} shortcut ready to save.",
+            f"{self._binding_label(field_name)} keybind ready to save.",
             "success",
         )
 
@@ -468,7 +468,7 @@ class SettingsViewModel(QObject):
         )
         self._audio_input_test_thread = thread
         self.audioTestChanged.emit()
-        self._set_status("Monitoring microphone input.", "neutral")
+        self._set_status("Listening to the mic.", "neutral")
         thread.start()
 
     @Slot()
@@ -502,7 +502,7 @@ class SettingsViewModel(QObject):
         )
         self._speaker_test_thread = thread
         self.audioTestChanged.emit()
-        self._set_status("Playing speaker test.", "neutral")
+        self._set_status("Playing test sound.", "neutral")
         thread.start()
 
     @Slot()
@@ -535,7 +535,7 @@ class SettingsViewModel(QObject):
             self._errors.pop(field_name, None)
         if not updated:
             self._set_transient_status(
-                "Audio settings are already at their defaults.", "neutral"
+                "Audio settings are already using defaults.", "neutral"
             )
             return
         self.stopAudioInputTest()
@@ -544,7 +544,7 @@ class SettingsViewModel(QObject):
         self._recompute_dirty()
         self.settingsChanged.emit()
         self.errorsChanged.emit()
-        self._set_status("Audio settings reset.", "success")
+        self._set_status("Audio settings reset to defaults.", "success")
 
     def _validate_current_settings(
         self, *, show_status: bool = True
@@ -591,7 +591,7 @@ class SettingsViewModel(QObject):
                 payload["ocr_keybind"],
             ]
         ):
-            duplicate_message = "Each shortcut must be unique."
+            duplicate_message = "Each keybind must be unique."
             errors["live_keybind"] = duplicate_message
             errors["quick_keybind"] = duplicate_message
             errors["ocr_keybind"] = duplicate_message
@@ -745,17 +745,17 @@ class SettingsViewModel(QObject):
     def _binding_label(field_name: str) -> str:
         labels = {
             "live_keybind": "Live",
-            "quick_keybind": "Quick",
-            "ocr_keybind": "OCR",
+            "quick_keybind": "Quick Ask",
+            "ocr_keybind": "Read Screen",
         }
         return labels.get(field_name, field_name)
 
     def _build_preview_settings(self, voice_name: str) -> AppSettings | None:
         if voice_name == AUTO_TTS_VOICE_ID:
-            self._set_status("Choose a fixed voice to preview.", "error")
+            self._set_status("Choose a specific voice to preview.", "error")
             return None
         if get_tts_voice(voice_name) is None:
-            self._set_status("Choose a valid voice to preview.", "error")
+            self._set_status("Choose a valid voice.", "error")
             return None
 
         settings = self._build_runtime_settings("Voice preview failed")
@@ -766,9 +766,9 @@ class SettingsViewModel(QObject):
         payload["tts_voice_id"] = voice_name
         missing_fields: list[str] = []
         for field_name, label in (
-            ("tts_base_url", "speech base URL"),
-            ("tts_api_key", "speech API key"),
-            ("tts_model", "speech model"),
+            ("tts_base_url", "voice base URL"),
+            ("tts_api_key", "voice API key"),
+            ("tts_model", "voice model"),
         ):
             if not str(payload.get(field_name, "")).strip():
                 missing_fields.append(label)

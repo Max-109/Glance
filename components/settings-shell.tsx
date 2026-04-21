@@ -64,12 +64,12 @@ const EMPTY_STATE: BridgeState = {
   statusMessage: "",
   statusKind: "neutral",
   runtimeState: "idle",
-  runtimeMessage: "Live session idle.",
+  runtimeMessage: "Live is idle.",
   audioInputDeviceOptions: ["default"],
   audioInputDeviceLabels: { default: "System Default Input" },
   audioOutputDeviceOptions: ["default"],
   audioOutputDeviceLabels: { default: "System Default Output" },
-  audioDeviceStatusMessage: "Connect the Python bridge to read live device state.",
+  audioDeviceStatusMessage: "Reconnect Glance to load current audio devices.",
   audioInputLevel: 0,
   audioInputTestActive: false,
   speakerTestActive: false,
@@ -84,7 +84,7 @@ const EMPTY_STATE: BridgeState = {
   ttsModelOptions: ["eleven-v3"],
   voiceOptions: ["auto"],
   voiceOptionLabels: {
-    auto: "Auto - Pick the best curated Eleven v3 voice for each reply",
+    auto: "Auto",
   },
   languageOptions: ["en", "lt", "fr", "de", "es"],
   historyPreview: [],
@@ -101,7 +101,7 @@ function formatError(error: unknown): string {
   if (error instanceof Error && error.message) {
     return error.message;
   }
-  return "The Electron bridge is unavailable right now.";
+  return "Glance isn't connected right now.";
 }
 
 function clamp(value: number, min: number, max: number) {
@@ -322,7 +322,7 @@ export function SettingsShell() {
   const refreshState = useEffectEvent(async () => {
     const bridge = getBridge();
     if (!bridge) {
-      setBridgeError("Open Glance from the tray to reconnect the desktop bridge.");
+      setBridgeError("Open Glance from the tray to reconnect.");
       return;
     }
 
@@ -798,9 +798,9 @@ export function SettingsShell() {
   }
 
   const footerStatus = bridgeError
-    ? "Bridge unavailable"
+    ? "Not connected"
     : liveState.saving
-      ? "Applying changes"
+      ? "Saving changes"
       : liveState.dirty
         ? "Unsaved changes"
         : "All changes saved";
@@ -818,7 +818,7 @@ export function SettingsShell() {
           className="skip-link"
           href="#workspace-content"
         >
-          Skip to Content
+          Skip to content
         </a>
       ) : null}
 
@@ -885,7 +885,7 @@ export function SettingsShell() {
                 onClick={() => handleRunAction("save")}
               />
               <Button
-                label="Reset"
+                label="Discard changes"
                 icon="refresh"
                 variant="ghost"
                 disabled={!liveState.dirty}

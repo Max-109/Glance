@@ -73,7 +73,7 @@ ELEVEN_V3_VOICE_NAME_TO_ID = {
     voice.name.lower(): voice.id for voice in ELEVEN_V3_VOICES
 }
 ELEVEN_V3_VOICE_LABELS = {
-    AUTO_TTS_VOICE_ID: "Auto - Pick the best curated Eleven v3 voice for each reply",
+    AUTO_TTS_VOICE_ID: "Auto",
     **{voice.id: f"{voice.name} - {voice.title}" for voice in ELEVEN_V3_VOICES},
 }
 DEFAULT_FIXED_TTS_VOICE = "UgBBYS2sOqTuMpoF3BR0"
@@ -126,7 +126,7 @@ class AppSettings:
         if not keybinds_are_unique(
             [self.live_keybind, self.quick_keybind, self.ocr_keybind]
         ):
-            raise ValidationError("Each shortcut must be unique.")
+            raise ValidationError("Each keybind must be unique.")
         if not self.llm_base_url.strip():
             raise ValidationError("llm_base_url cannot be empty.")
         if not self.llm_model_name.strip():

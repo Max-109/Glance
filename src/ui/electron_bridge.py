@@ -80,7 +80,7 @@ class SettingsBridgeServer:
         self._executor = _UiThreadExecutor()
         self._runtime_lock = Lock()
         self._runtime_state = "idle"
-        self._runtime_message = "Live session idle."
+        self._runtime_message = "Live is idle."
         server = ThreadingHTTPServer(("127.0.0.1", 0), self._build_handler())
         server.bridge = self  # type: ignore[attr-defined]
         self._server = server
@@ -110,7 +110,7 @@ class SettingsBridgeServer:
     def set_runtime_status(self, state: str, message: str) -> None:
         with self._runtime_lock:
             self._runtime_state = str(state).strip() or "idle"
-            self._runtime_message = str(message).strip() or "Live session idle."
+            self._runtime_message = str(message).strip() or "Live is idle."
 
     def set_section(self, section: str) -> dict[str, Any]:
         self._executor.call(self._viewmodel.setCurrentSection, section)

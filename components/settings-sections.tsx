@@ -30,13 +30,13 @@ const PROVIDER_CARDS: Array<{
 }> = [
   {
     id: "llm",
-    label: "Response",
-    eyebrow: "LLM",
+    label: "Replies",
+    eyebrow: "TEXT",
     icon: "bot",
   },
   {
     id: "speech",
-    label: "Speech",
+    label: "Voice",
     eyebrow: "VOICE",
     icon: "speech",
   },
@@ -64,10 +64,10 @@ const REASONING_ICONS: Record<string, string> = {
 
 const LANGUAGE_LABELS: Record<string, string> = {
   en: "English · EN",
-  lt: "Lietuviu · LT",
-  fr: "Francais · FR",
+  lt: "Lietuvių · LT",
+  fr: "Français · FR",
   de: "Deutsch · DE",
-  es: "Espanol · ES",
+  es: "Español · ES",
 };
 
 const THEME_LABELS: Record<string, string> = {
@@ -378,7 +378,7 @@ function ApiSection({
   return (
     <Card
       title="Providers"
-      description="Set up replies, speech, and transcription."
+      description="Set up replies, voice, and transcription."
       className="glass-card--spacious"
     >
       <div className="provider-grid">
@@ -420,7 +420,6 @@ function ApiSection({
               inputMode="url"
               value={getDraftValue("llm_base_url")}
               errorText={state.errors.llm_base_url}
-              helperText="Endpoint for replies."
               onChange={(value) => onDraftChange("llm_base_url", value)}
               onCommit={(value) => onDraftCommit("llm_base_url", value)}
               onFocus={() => onDraftFocus("llm_base_url")}
@@ -432,7 +431,6 @@ function ApiSection({
               icon="bot"
               value={getDraftValue("llm_model_name")}
               errorText={state.errors.llm_model_name}
-              helperText="Model used for replies."
               onChange={(value) => onDraftChange("llm_model_name", value)}
               onCommit={(value) => onDraftCommit("llm_model_name", value)}
               onFocus={() => onDraftFocus("llm_model_name")}
@@ -444,7 +442,6 @@ function ApiSection({
             label="API Key"
             icon="key"
             value={getDraftValue("llm_api_key")}
-            helperText="Stored on this device."
             secret
             revealed={Boolean(revealedFields.llm_api_key)}
             onChange={(value) => onDraftChange("llm_api_key", value)}
@@ -463,13 +460,13 @@ function ApiSection({
             {Boolean(state.settings.llm_reasoning_enabled) ? (
               <SelectInput
                 fieldName="llm_reasoning"
-                label="Reasoning Effort"
+                label="Reasoning Level"
                 icon="brain"
                 value={settingValue(state, "llm_reasoning") || "medium"}
                 options={state.reasoningOptions}
                 labels={REASONING_LABELS}
                 optionIcons={REASONING_ICONS}
-                helperText="Default effort for replies."
+                helperText="Default level for replies."
                 open={openSelect === "llm_reasoning"}
                 onToggle={() => onToggleSelect("llm_reasoning")}
                 onSelect={(value) => onSelectValue("llm_reasoning", value)}
@@ -488,7 +485,6 @@ function ApiSection({
             inputMode="url"
             value={getDraftValue("tts_base_url")}
             errorText={state.errors.tts_base_url}
-            helperText="Endpoint for speech output."
             onChange={(value) => onDraftChange("tts_base_url", value)}
             onCommit={(value) => onDraftCommit("tts_base_url", value)}
             onFocus={() => onDraftFocus("tts_base_url")}
@@ -500,7 +496,6 @@ function ApiSection({
               label="API Key"
               icon="key"
               value={getDraftValue("tts_api_key")}
-              helperText="Stored on this device."
               secret
               revealed={Boolean(revealedFields.tts_api_key)}
               onChange={(value) => onDraftChange("tts_api_key", value)}
@@ -515,7 +510,6 @@ function ApiSection({
               icon="speech"
               value={settingValue(state, "tts_model") || "eleven-v3"}
               options={state.ttsModelOptions}
-              helperText="Model used for speech."
               open={openSelect === "tts_model"}
               onToggle={() => onToggleSelect("tts_model")}
               onSelect={(value) => onSelectValue("tts_model", value)}
@@ -534,7 +528,6 @@ function ApiSection({
               inputMode="url"
               value={getDraftValue("transcription_base_url")}
               errorText={state.errors.transcription_base_url}
-              helperText="Endpoint for transcription."
               onChange={(value) => onDraftChange("transcription_base_url", value)}
               onCommit={(value) => onDraftCommit("transcription_base_url", value)}
               onFocus={() => onDraftFocus("transcription_base_url")}
@@ -546,7 +539,6 @@ function ApiSection({
               icon="wave"
               value={getDraftValue("transcription_model_name")}
               errorText={state.errors.transcription_model_name}
-              helperText="Model used for speech-to-text."
               onChange={(value) => onDraftChange("transcription_model_name", value)}
               onCommit={(value) => onDraftCommit("transcription_model_name", value)}
               onFocus={() => onDraftFocus("transcription_model_name")}
@@ -558,7 +550,6 @@ function ApiSection({
             label="API Key"
             icon="key"
             value={getDraftValue("transcription_api_key")}
-            helperText="Stored on this device."
             secret
             revealed={Boolean(revealedFields.transcription_api_key)}
             onChange={(value) => onDraftChange("transcription_api_key", value)}
@@ -579,13 +570,13 @@ function ApiSection({
             {Boolean(state.settings.transcription_reasoning_enabled) ? (
               <SelectInput
                 fieldName="transcription_reasoning"
-                label="Reasoning Effort"
+                label="Reasoning Level"
                 icon="zap"
                 value={settingValue(state, "transcription_reasoning") || "medium"}
                 options={state.transcriptionReasoningOptions}
                 labels={REASONING_LABELS}
                 optionIcons={REASONING_ICONS}
-                helperText="Default effort for transcription."
+                helperText="Default level for transcription."
                 open={openSelect === "transcription_reasoning"}
                 onToggle={() => onToggleSelect("transcription_reasoning")}
                 onSelect={(value) => onSelectValue("transcription_reasoning", value)}
@@ -614,8 +605,8 @@ function VoiceSection({
 
   return (
     <Card
-      title="Speech"
-      description="Pick a voice and a fallback language."
+      title="Voice"
+      description="Choose a voice and set a default language."
     >
       <SelectInput
         fieldName="tts_voice_id"
@@ -624,7 +615,7 @@ function VoiceSection({
         value={selectedVoice}
         options={state.voiceOptions}
         labels={state.voiceOptionLabels}
-        helperText="Auto picks a curated Eleven v3 voice. Preview works for fixed voices only."
+        helperText="Auto chooses a voice for each reply. Preview only works for fixed voices."
         open={openSelect === "tts_voice_id"}
         onToggle={() => onToggleSelect("tts_voice_id")}
         onSelect={(value) => onSelectValue("tts_voice_id", value)}
@@ -642,12 +633,12 @@ function VoiceSection({
 
       <SelectInput
         fieldName="fallback_language"
-        label="Fallback Language"
+        label="Default Language"
         icon="languages"
         value={settingValue(state, "fallback_language") || "en"}
         options={state.languageOptions}
         labels={LANGUAGE_LABELS}
-        helperText="Used when Glance needs a default speaking language."
+        helperText="Used when Glance needs a default language."
         open={openSelect === "fallback_language"}
         onToggle={() => onToggleSelect("fallback_language")}
         onSelect={(value) => onSelectValue("fallback_language", value)}
@@ -669,7 +660,7 @@ function CaptureSection({
   return (
     <Card
       title="Capture"
-      description="Choose how often Glance screenshots and how long it batches changes before replying."
+      description="Set how often Glance captures the screen and how long it waits before grouping changes."
     >
       <div className="field-grid field-grid--two-column">
         <NumberInput
@@ -682,7 +673,6 @@ function CaptureSection({
           min={0.1}
           value={getDraftValue("screenshot_interval")}
           errorText={state.errors.screenshot_interval}
-          helperText="How often Glance takes a screenshot."
           onChange={(value) => onDraftChange("screenshot_interval", value)}
           onCommit={(value) => onDraftCommit("screenshot_interval", value)}
           onFocus={() => onDraftFocus("screenshot_interval")}
@@ -698,7 +688,7 @@ function CaptureSection({
           min={0.5}
           value={getDraftValue("batch_window_duration")}
           errorText={state.errors.batch_window_duration}
-          helperText="How long Glance waits before it bundles changes together."
+          helperText="How long Glance waits before grouping changes."
           onChange={(value) => onDraftChange("batch_window_duration", value)}
           onCommit={(value) => onDraftCommit("batch_window_duration", value)}
           onFocus={() => onDraftFocus("batch_window_duration")}
@@ -715,7 +705,7 @@ function CaptureSection({
         max={1}
         value={getDraftValue("screen_change_threshold")}
         errorText={state.errors.screen_change_threshold}
-        helperText="How much the screen has to change before Glance reacts."
+        helperText="How much the screen must change before Glance reacts."
         onChange={(value) => onDraftChange("screen_change_threshold", value)}
         onCommit={(value) => onDraftCommit("screen_change_threshold", value)}
         onFocus={() => onDraftFocus("screen_change_threshold")}
@@ -757,8 +747,8 @@ function AudioSection({
   return (
     <div className="stack">
       <Card
-        title="Audio Routing"
-        description="Pick the devices Glance uses for listening and playback."
+        title="Devices"
+        description="Choose input and output devices."
         footer={
           <div className="card-actions">
             <Button
@@ -768,7 +758,7 @@ function AudioSection({
               onClick={() => onRunAction("refreshAudioDevices")}
             />
             <Button
-              label={state.speakerTestActive ? "Stop Speaker Test" : "Speaker Test"}
+              label={state.speakerTestActive ? "Stop Speaker Test" : "Test Speakers"}
               icon={state.speakerTestActive ? "close" : "play"}
               variant={state.speakerTestActive ? "signal" : "secondary"}
               onClick={() =>
@@ -789,7 +779,7 @@ function AudioSection({
             value={settingValue(state, "audio_input_device") || "default"}
             options={state.audioInputDeviceOptions}
             labels={state.audioInputDeviceLabels}
-            helperText="Mic used for live mode and mic test."
+            helperText="Used for Live and mic test."
             open={openSelect === "audio_input_device"}
             onToggle={() => onToggleSelect("audio_input_device")}
             onSelect={(value) => onSelectValue("audio_input_device", value)}
@@ -802,7 +792,7 @@ function AudioSection({
             value={settingValue(state, "audio_output_device") || "default"}
             options={state.audioOutputDeviceOptions}
             labels={state.audioOutputDeviceLabels}
-            helperText="Speakers or headphones used for replies and previews."
+            helperText="Used for replies and previews."
             open={openSelect === "audio_output_device"}
             onToggle={() => onToggleSelect("audio_output_device")}
             onSelect={(value) => onSelectValue("audio_output_device", value)}
@@ -811,10 +801,9 @@ function AudioSection({
       </Card>
 
       <Card
-        title="Mic Gate"
-        description="Speech crosses the line. Room noise stays under it. Drag the handle on the right to set the trigger."
+        title="Mic Threshold"
         footer={
-          <div className="card-actions card-actions--end">
+          <div className="card-actions">
             <Button
               label={state.audioInputTestActive ? "Stop Mic Test" : "Start Mic Test"}
               icon={state.audioInputTestActive ? "close" : "mic"}
@@ -840,12 +829,12 @@ function AudioSection({
       </Card>
 
       <Card
-        title="Turn Timing"
+        title="Timing"
         description="Set how long Glance waits, listens, and keeps pre-roll."
         footer={
           <div className="card-actions card-actions--end">
             <Button
-              label="Reset Audio Defaults"
+              label="Reset audio settings"
               icon="refresh"
               variant="ghost"
               onClick={() => onRunAction("resetAudioDefaults")}
@@ -872,7 +861,7 @@ function AudioSection({
 
           <NumberInput
             fieldName="audio_max_wait_seconds"
-            label="Wait For Speech"
+            label="Wait for Speech"
             icon="clock"
             suffix="s"
             inputMode="decimal"
@@ -942,18 +931,18 @@ function HistorySection({
   return (
     <Card
       title="History"
-      description="Choose how much local history to keep and skim recent sessions."
+      description="Choose how much history to keep."
       footer={
         <div className="card-actions card-actions--stack">
           <div className="section-callout">
-            <strong>Delete saved history</strong>
+            <strong>Delete history</strong>
           </div>
           <Button
-            label="Delete History"
+            label="Delete history"
             icon="trash"
             variant="danger"
             onClick={() => {
-              if (!window.confirm("Delete all saved Glance history on this device?")) {
+              if (!window.confirm("Delete all saved history on this device?")) {
                 return;
               }
               onRunAction("clearHistory");
@@ -964,14 +953,13 @@ function HistorySection({
     >
       <NumberInput
         fieldName="history_length"
-        label="History Length"
+        label="History Limit"
         icon="history"
         inputMode="numeric"
         step={1}
         min={1}
         value={getDraftValue("history_length")}
         errorText={state.errors.history_length}
-        helperText="How many sessions to keep."
         onChange={(value) => onDraftChange("history_length", value)}
         onCommit={(value) => onDraftCommit("history_length", value)}
         onFocus={() => onDraftFocus("history_length")}
@@ -986,7 +974,7 @@ function HistorySection({
       ) : (
         <div className="history-empty">
           <strong>No saved sessions yet</strong>
-          <span>Recent sessions will show up here once Glance has something to keep.</span>
+          <span>Recent sessions will appear here after you use Glance.</span>
         </div>
       )}
     </Card>
@@ -1020,7 +1008,7 @@ function MiscSection({
   const shortcutRows = [
     {
       id: "live_keybind",
-      title: "Live Mode",
+      title: "Live",
       value: String(state.settings.live_keybind || "-"),
       active: state.bindingField === "live_keybind",
     },
@@ -1040,10 +1028,7 @@ function MiscSection({
 
   return (
     <div className="stack">
-      <Card
-        title="Appearance"
-        description="Theme and accent color live here."
-      >
+      <Card title="Appearance" description="Choose a theme and accent color.">
         <SelectInput
           fieldName="theme_preference"
           label="Theme"
@@ -1065,22 +1050,22 @@ function MiscSection({
             onChange={(nextValue) => onSetField("accent_color", nextValue)}
           />
           <span className="field__meta">
-            Drives the active accent, notifications, icons, and the mic-gate visuals.
+            Used for highlights, notices, icons, and the mic threshold.
           </span>
         </div>
       </Card>
 
       <Card
-        title="Prompt & Shortcuts"
-        description="Prompt override and shortcuts."
+        title="Prompt & Keybinds"
+        description="Prompt override and keybinds."
       >
         <Input
           fieldName="system_prompt_override"
-          label="System Prompt Override"
+          label="Extra Instructions"
           multiline
           value={getDraftValue("system_prompt_override")}
-          helperText="Optional instruction added to every reply."
-          placeholder="Keep Glance concise, context-aware, and proactive..."
+          helperText="Optional instructions added to each reply."
+          placeholder="Keep replies short and useful."
           onChange={(value) => onDraftChange("system_prompt_override", value)}
           onCommit={(value) => onDraftCommit("system_prompt_override", value)}
           onFocus={() => onDraftFocus("system_prompt_override")}

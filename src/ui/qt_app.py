@@ -192,7 +192,7 @@ class LiveCueController:
             cue_key = "start"
         elif previous_state == "processing" and normalized_state == "speaking":
             cue_key = "reply_ready"
-        elif normalized_state == "idle" and message == "Live session stopped.":
+        elif normalized_state == "idle" and message == "Live stopped.":
             cue_key = "cancel"
         if not cue_key:
             return
@@ -276,11 +276,11 @@ def run_settings_app() -> int:
             "live": live_controller.toggle,
             "quick": lambda: tray.showMessage(
                 "Glance",
-                "Quick mode hotkey is saved, but Quick mode is not wired into the tray runtime yet.",
+                "Quick Ask keybind is saved, but Quick Ask isn't available yet.",
             ),
             "ocr": lambda: tray.showMessage(
                 "Glance",
-                "OCR mode hotkey is saved, but OCR mode is not wired into the tray runtime yet.",
+                "Read Screen keybind is saved, but Read Screen isn't available yet.",
             ),
         }
     )
@@ -310,7 +310,7 @@ def run_settings_app() -> int:
             live_controller.set_orchestrator(None)
             live_controller.set_recorder(None)
             logger.exception("Live runtime unavailable during refresh")
-            tray.showMessage("Glance", f"Live mode unavailable: {exc}")
+            tray.showMessage("Glance", f"Live unavailable: {exc}")
         try:
             hotkey_manager.update_bindings(persisted_settings)
             hotkey_manager.set_enabled(True)
@@ -453,7 +453,7 @@ def _build_tray_icon(
     status_bridge = LiveStatusBridge(tray)
     status_bridge.statusChanged.connect(update_live_status)
     live_controller.set_status_callback(status_bridge.statusChanged.emit)
-    update_live_status(live_controller.state, "Live session idle.")
+    update_live_status(live_controller.state, "Live is idle.")
 
     menu.addSeparator()
 
