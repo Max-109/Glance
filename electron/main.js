@@ -276,7 +276,10 @@ function handleCommand(payload) {
   }
 
   if (command === "hide") {
-    const window = ensureWindow();
+    const window = mainWindow;
+    if (!window || window.isDestroyed()) {
+      return;
+    }
     window.hide();
     return;
   }
@@ -357,7 +360,6 @@ app.on("before-quit", () => {
 
 app.whenReady().then(() => {
   appReady = true;
-  ensureWindow();
   emit({ type: "ready" });
   while (pendingCommands.length > 0) {
     handleCommand(pendingCommands.shift());

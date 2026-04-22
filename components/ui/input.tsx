@@ -57,7 +57,10 @@ export function Input({
     <label className="field">
       {label ? <span className="field__label">{label}</span> : null}
       {multiline ? (
-        <div className="field__control-shell field__control-shell--textarea">
+        <div
+          className="field__control-shell field__control-shell--textarea"
+          data-field-name={fieldName}
+        >
           {icon ? (
             <span className="field__icon">
               <Icon name={icon} />
@@ -79,7 +82,10 @@ export function Input({
           />
         </div>
       ) : (
-        <span className={`field__control-shell${errorText ? " has-error" : ""}`}>
+        <span
+          className={`field__control-shell${errorText ? " has-error" : ""}`}
+          data-field-name={fieldName}
+        >
           {icon ? (
             <span className="field__icon">
               <Icon name={icon} />

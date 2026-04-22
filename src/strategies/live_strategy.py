@@ -4,6 +4,7 @@ from pathlib import Path
 
 from src.agents.llm_agent import LLMAgent
 from src.models.interactions import LiveInteraction, SessionRecord
+from src.models.settings import AppSettings
 from src.agents.tts_agent import TTSAgent
 from src.agents.transcription_agent import TranscriptionAgent
 from src.strategies.mode_strategy import ModeStrategy, force_pause_at_end_for_tts
@@ -16,24 +17,41 @@ class LiveStrategy(ModeStrategy):
         llm_agent: LLMAgent,
         tts_agent: TTSAgent,
         audio_dir: Path,
+        settings: AppSettings | None = None,
     ) -> None:
         self._transcription_agent = transcription_agent
         self._llm_agent = llm_agent
         self._tts_agent = tts_agent
         self._audio_dir = audio_dir
+        self._settings = settings
 
     def execute(self, context: dict) -> LiveInteraction:
         status_callback = context.get("status_callback")
         recording_path = str(context["recording_path"])
-        _emit_stage_status(status_callback, "transcribing", "Transcribing...")
-        transcript = self._transcription_agent.run(audio_path=recording_path)
-        _emit_stage_status(status_callback, "generating", "Writing a reply...")
-        live_reply = self._llm_agent.generate_live_speech_reply(
-            transcript=transcript,
-            conversation_history=self._build_conversation_history(
-                context.get("session")
-            ),
+        conversation_history = self._build_conversation_history(
+            context.get("session")
         )
+        multimodal = bool(
+            self._settings is not None
+            and getattr(self._settings, "multimodal_live_enabled", False)
+        )
+        if multimodal:
+            _emit_stage_status(
+                status_callback, "generating", "Listening and writing a reply..."
+            )
+            live_reply = self._llm_agent.generate_live_speech_reply_from_audio(
+                audio_path=recording_path,
+                conversation_history=conversation_history,
+            )
+            transcript = ""
+        else:
+            _emit_stage_status(status_callback, "transcribing", "Transcribing...")
+            transcript = self._transcription_agent.run(audio_path=recording_path)
+            _emit_stage_status(status_callback, "generating", "Writing a reply...")
+            live_reply = self._llm_agent.generate_live_speech_reply(
+                transcript=transcript,
+                conversation_history=conversation_history,
+            )
         speech_path = self._audio_dir / f"live-{Path(recording_path).stem}.wav"
         _emit_stage_status(status_callback, "speaking", "Preparing speech...")
         generated_speech_path = self._tts_agent.run(

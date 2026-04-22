@@ -40,22 +40,22 @@ export const PROVIDER_CARDS: Array<{
   icon: string;
 }> = [
   {
-    id: "llm",
-    label: "Replies",
-    eyebrow: "TEXT",
-    icon: "bot",
-  },
-  {
-    id: "speech",
-    label: "Voice",
-    eyebrow: "VOICE",
-    icon: "speaker",
-  },
-  {
     id: "transcription",
     label: "Transcription",
     eyebrow: "INPUT",
     icon: "mic",
+  },
+  {
+    id: "llm",
+    label: "Reply",
+    eyebrow: "ANSWER",
+    icon: "replies",
+  },
+  {
+    id: "speech",
+    label: "Voice",
+    eyebrow: "OUTPUT",
+    icon: "speaker",
   },
 ];
 

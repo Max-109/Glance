@@ -77,6 +77,7 @@ class Orchestrator:
             tts_agent=self._tts_agent,
             clipboard_service=self._clipboard_service,
             audio_dir=self._audio_dir,
+            settings=self._settings,
         )
         active_session = session or self._history_manager.start_session(mode)
         execution_context = dict(context)
@@ -125,7 +126,7 @@ def build_orchestrator_with_dependencies(
         screen_diff_agent=ScreenDiffAgent(),
         audio_capture_agent=AudioCaptureAgent(),
         transcription_agent=TranscriptionAgent(transcription_provider),
-        llm_agent=LLMAgent(llm_provider),
+        llm_agent=LLMAgent(llm_provider, transcription_provider),
         ocr_agent=OCRAgent(llm_provider),
         tts_agent=TTSAgent(tts_provider),
         clipboard_service=ClipboardService(),

@@ -55,6 +55,7 @@ export function MicThreshold({
   const thresholdRef = useRef(0);
   const activeRef = useRef(false);
   const rafRef = useRef<number | null>(null);
+  const drawStaticFrameRef = useRef<(() => void) | null>(null);
   const lastSampleRef = useRef(0);
   const lastStatsAtRef = useRef(0);
   const aboveSinceRef = useRef<number | null>(null);
@@ -82,6 +83,7 @@ export function MicThreshold({
   useEffect(() => {
     if (!active) {
       setLiveLevel(level);
+      setStatus("idle");
       return;
     }
 
@@ -199,7 +201,7 @@ export function MicThreshold({
 
     const resize = () => {
       const rect = host.getBoundingClientRect();
-      const dpr = Math.max(1, window.devicePixelRatio || 1);
+      const dpr = Math.min(1.5, Math.max(1, window.devicePixelRatio || 1));
       resizeCanvas(canvas, ctx, rect, dpr);
       resizeCanvas(glowCanvas, glowCtx, rect, dpr, MIC_GATE_GLOW_LAYER_SCALE);
 
@@ -438,20 +440,34 @@ export function MicThreshold({
       rafRef.current = requestAnimationFrame(tick);
     };
 
-    if (prefersReducedMotion) {
+    drawStaticFrameRef.current = () => {
+      cachedColors = readColors();
+      draw(performance.now());
+    };
+
+    if (!active || prefersReducedMotion) {
       draw(performance.now());
     } else {
       rafRef.current = requestAnimationFrame(tick);
     }
 
     return () => {
+      drawStaticFrameRef.current = null;
       observer?.disconnect();
       if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
       rafRef.current = null;
       lastSampleRef.current = 0;
       lastStatsAtRef.current = 0;
     };
-  }, []);
+  }, [active]);
+
+  useEffect(() => {
+    if (rafRef.current !== null) {
+      return;
+    }
+
+    drawStaticFrameRef.current?.();
+  });
 
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     let delta = 0;

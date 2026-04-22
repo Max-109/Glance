@@ -18,7 +18,16 @@ function providerStatus(
   state: SettingsTabProps["state"],
   providerTab: ProviderTab,
 ): { tone: StatusPillTone; label: string; detail: string } {
+  const multimodalLive = Boolean(state.settings.multimodal_live_enabled);
+
   if (providerTab === "llm") {
+    if (multimodalLive) {
+      return {
+        tone: "warm",
+        label: "Disabled",
+        detail: "Transcription model handles replies.",
+      };
+    }
     const configured =
       Boolean(settingValue(state, "llm_base_url")) &&
       Boolean(settingValue(state, "llm_model_name")) &&
@@ -105,25 +114,36 @@ export function ProvidersTab({
   const transcriptionReasoning = Boolean(
     state.settings.transcription_reasoning_enabled,
   );
+  const multimodalLive = Boolean(state.settings.multimodal_live_enabled);
+  const replyDisabled = multimodalLive;
 
   return (
     <div className="stack">
       <Panel
         title="Providers"
-        description="Choose where replies, voice, and transcription come from."
+        description="Choose where transcription, replies, and voice come from."
       >
         <div className="provider-tabs" role="tablist" aria-label="Provider">
           {PROVIDER_CARDS.map((provider) => {
             const selected = providerTab === provider.id;
             const status = providerStatus(state, provider.id);
+            const isReplyBypassed = provider.id === "llm" && replyDisabled;
+            const tooltip = isReplyBypassed
+              ? "Disabled because Transcription is set to multimodal. Turn it off to use a separate reply model."
+              : undefined;
             return (
               <button
                 key={provider.id}
                 type="button"
                 role="tab"
                 aria-selected={selected}
-                className={`provider-tab${selected ? " is-active" : ""}`}
-                onClick={() => onChangeProviderTab(provider.id)}
+                aria-disabled={isReplyBypassed || undefined}
+                title={tooltip}
+                className={`provider-tab provider-tab--${provider.id}${selected ? " is-active" : ""}${isReplyBypassed ? " is-bypassed" : ""}`}
+                onClick={() => {
+                  if (isReplyBypassed) return;
+                  onChangeProviderTab(provider.id);
+                }}
               >
                 <span className="provider-tab__icon">
                   <Icon name={provider.icon} />
@@ -159,7 +179,7 @@ export function ProvidersTab({
               <Input
                 fieldName="llm_model_name"
                 label="Model"
-                icon="bot"
+                icon="model"
                 value={getDraftValue("llm_model_name")}
                 errorText={state.errors.llm_model_name}
                 onChange={(value) => onDraftChange("llm_model_name", value)}
@@ -324,6 +344,16 @@ export function ProvidersTab({
                 />
               </div>
             </div>
+
+            <ToggleField
+              label="Multimodal model"
+              helperText="Have this model also write the reply, skipping a separate text model."
+              icon="bot"
+              checked={multimodalLive}
+              onChange={(nextValue) =>
+                onSetField("multimodal_live_enabled", nextValue)
+              }
+            />
           </div>
         ) : null}
       </Panel>

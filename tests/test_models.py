@@ -45,6 +45,9 @@ class AppSettingsTests(unittest.TestCase):
         self.assertEqual(settings.transcription_base_url, "https://api.naga.ac/v1")
         self.assertEqual(settings.transcription_api_key, "")
 
+    def test_default_audio_silence_timeout_is_half_second(self) -> None:
+        self.assertEqual(AppSettings().audio_silence_seconds, 0.5)
+
     def test_from_mapping_normalizes_keybinds_to_uppercase(self) -> None:
         settings = AppSettings.from_mapping(
             {

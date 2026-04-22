@@ -600,6 +600,7 @@ class SettingsViewModel(QObject):
         self._require_text(payload, "transcription_model_name", errors)
         self._coerce_bool(payload, "llm_reasoning_enabled")
         self._coerce_bool(payload, "transcription_reasoning_enabled")
+        self._coerce_bool(payload, "multimodal_live_enabled")
         self._coerce_positive_int(payload, "history_length", errors)
         self._coerce_positive_float(payload, "screenshot_interval", errors)
         self._coerce_positive_float(payload, "batch_window_duration", errors)

@@ -83,7 +83,6 @@ class LiveInteraction(BaseInteraction):
     def __post_init__(self) -> None:
         super().__post_init__()
         self.recording_path = self.require_text(self.recording_path, "recording_path")
-        self.transcript = self.require_text(self.transcript, "transcript")
         self.response = self.require_text(self.response, "response")
 
     def summary(self) -> str:

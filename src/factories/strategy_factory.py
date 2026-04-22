@@ -10,6 +10,7 @@ from src.agents.screen_diff_agent import ScreenDiffAgent
 from src.agents.tts_agent import TTSAgent
 from src.agents.transcription_agent import TranscriptionAgent
 from src.exceptions.app_exceptions import ValidationError
+from src.models.settings import AppSettings
 from src.services.clipboard import ClipboardService
 from src.strategies.live_strategy import LiveStrategy
 from src.strategies.mode_strategy import ModeStrategy
@@ -31,6 +32,7 @@ class ModeStrategyFactory:
         tts_agent: TTSAgent,
         clipboard_service: ClipboardService,
         audio_dir: Path,
+        settings: AppSettings | None = None,
     ) -> ModeStrategy:
         normalized_mode = mode.strip().lower()
         if normalized_mode == "quick":
@@ -52,5 +54,6 @@ class ModeStrategyFactory:
                 llm_agent=llm_agent,
                 tts_agent=tts_agent,
                 audio_dir=audio_dir,
+                settings=settings,
             )
         raise ValidationError(f"Unsupported mode: {mode!r}")

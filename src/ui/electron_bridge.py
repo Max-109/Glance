@@ -89,8 +89,11 @@ class SettingsBridgeServer:
     def __init__(self, viewmodel: SettingsViewModel) -> None:
         self._viewmodel = viewmodel
         self._executor = _UiThreadExecutor()
+        self._state_lock = Lock()
+        self._state_revision = 0
         self._runtime_lock = Lock()
         self._runtime_status = default_runtime_status()
+        self._register_state_change_signals()
         server = ThreadingHTTPServer(("127.0.0.1", 0), self._build_handler())
         server.bridge = self  # type: ignore[attr-defined]
         self._server = server
@@ -112,6 +115,8 @@ class SettingsBridgeServer:
 
     def snapshot(self) -> dict[str, Any]:
         snapshot = self._executor.call(_build_state_snapshot, self._viewmodel)
+        with self._state_lock:
+            snapshot["stateRevision"] = self._state_revision
         with self._runtime_lock:
             snapshot.update(self._runtime_status)
         return snapshot
@@ -120,8 +125,12 @@ class SettingsBridgeServer:
         return self._executor.call(_build_audio_state_snapshot, self._viewmodel)
 
     def set_runtime_status(self, status: dict[str, Any]) -> None:
+        next_status = coerce_runtime_status(status)
         with self._runtime_lock:
-            self._runtime_status = coerce_runtime_status(status)
+            if self._runtime_status == next_status:
+                return
+            self._runtime_status = next_status
+        self._bump_state_revision()
 
     def set_section(self, section: str) -> dict[str, Any]:
         self._executor.call(self._viewmodel.setCurrentSection, section)
@@ -167,13 +176,36 @@ class SettingsBridgeServer:
         self._executor.call(handler)
         return self.snapshot()
 
+    def _register_state_change_signals(self) -> None:
+        for signal in (
+            self._viewmodel.settingsChanged,
+            self._viewmodel.savedSettingsChanged,
+            self._viewmodel.errorsChanged,
+            self._viewmodel.dirtyChanged,
+            self._viewmodel.savingChanged,
+            self._viewmodel.statusChanged,
+            self._viewmodel.audioDevicesChanged,
+            self._viewmodel.audioTestChanged,
+            self._viewmodel.currentSectionChanged,
+            self._viewmodel.bindingChanged,
+            self._viewmodel.previewChanged,
+        ):
+            signal.connect(self._bump_state_revision)
+
+    def _bump_state_revision(self) -> None:
+        with self._state_lock:
+            self._state_revision += 1
+
     def _build_handler(self) -> type[BaseHTTPRequestHandler]:
         bridge = self
 
         class Handler(BaseHTTPRequestHandler):
+            protocol_version = "HTTP/1.1"
+
             def do_OPTIONS(self) -> None:  # noqa: N802
                 self.send_response(HTTPStatus.NO_CONTENT)
                 self._send_common_headers()
+                self.send_header("Content-Length", "0")
                 self.end_headers()
 
             def do_GET(self) -> None:  # noqa: N802
@@ -236,6 +268,7 @@ class SettingsBridgeServer:
                 self.send_header("Access-Control-Allow-Origin", "*")
                 self.send_header("Access-Control-Allow-Headers", "Content-Type")
                 self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+                self.send_header("Cache-Control", "no-store")
 
             def _send_json(self, payload: dict[str, Any]) -> None:
                 response = json.dumps(payload).encode("utf-8")

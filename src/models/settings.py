@@ -105,6 +105,7 @@ class AppSettings:
     transcription_model_name: str = "whisper-large-v3-turbo"
     transcription_reasoning_enabled: bool = True
     transcription_reasoning: str = "medium"
+    multimodal_live_enabled: bool = False
     tts_base_url: str = "https://api.naga.ac/v1"
     tts_api_key: str = ""
     tts_model: str = "eleven-v3"
@@ -117,7 +118,7 @@ class AppSettings:
     audio_input_device: str = "default"
     audio_output_device: str = "default"
     audio_activation_threshold: float = 0.02
-    audio_silence_seconds: float = 0.85
+    audio_silence_seconds: float = 0.5
     audio_max_wait_seconds: float = 15.0
     audio_max_record_seconds: float = 30.0
     audio_preroll_seconds: float = 0.25
@@ -219,6 +220,9 @@ class AppSettings:
             ),
             transcription_reasoning=normalize_llm_reasoning(
                 data.get("transcription_reasoning", cls.transcription_reasoning)
+            ),
+            multimodal_live_enabled=coerce_bool(
+                data.get("multimodal_live_enabled", cls.multimodal_live_enabled)
             ),
             tts_base_url=data.get("tts_base_url", cls.tts_base_url),
             tts_api_key=data.get("tts_api_key", cls.tts_api_key),

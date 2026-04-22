@@ -1,12 +1,17 @@
 from __future__ import annotations
 
 from src.agents.base_agent import BaseAgent
-from src.services.providers import OpenAICompatibleProvider
+from src.services.providers import NagaTranscriptionProvider, OpenAICompatibleProvider
 
 
 class LLMAgent(BaseAgent):
-    def __init__(self, provider: OpenAICompatibleProvider) -> None:
+    def __init__(
+        self,
+        provider: OpenAICompatibleProvider,
+        transcription_provider: NagaTranscriptionProvider | None = None,
+    ) -> None:
         self._provider = provider
+        self._transcription_provider = transcription_provider
 
     def run(
         self,
@@ -34,5 +39,25 @@ class LLMAgent(BaseAgent):
     ):
         return self._provider.generate_live_speech_reply(
             transcript=transcript,
+            conversation_history=conversation_history,
+        )
+
+    def generate_live_speech_reply_from_audio(
+        self,
+        *,
+        audio_path: str,
+        conversation_history: list[dict[str, str]] | None = None,
+    ):
+        if self._transcription_provider is not None:
+            return self._provider.generate_live_speech_reply_from_audio(
+                audio_path=audio_path,
+                conversation_history=conversation_history,
+                client=self._transcription_provider.client,
+                model_name=self._transcription_provider.model_name,
+                reasoning_kwargs=self._transcription_provider.reasoning_kwargs(),
+                reasoning_label=self._transcription_provider.reasoning_label(),
+            )
+        return self._provider.generate_live_speech_reply_from_audio(
+            audio_path=audio_path,
             conversation_history=conversation_history,
         )

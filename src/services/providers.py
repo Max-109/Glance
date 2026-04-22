@@ -6,6 +6,8 @@ import mimetypes
 import re
 import shutil
 import subprocess
+import tempfile
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from time import perf_counter
@@ -177,6 +179,107 @@ class OpenAICompatibleProvider:
             _format_usage(response),
             get_tts_voice_label(live_reply.voice_id),
             _preview_text(live_reply.text),
+        )
+        return live_reply
+
+    def generate_live_speech_reply_from_audio(
+        self,
+        *,
+        audio_path: str,
+        conversation_history: list[dict[str, str]] | None = None,
+        client=None,
+        model_name: str | None = None,
+        reasoning_kwargs: dict[str, str] | None = None,
+        reasoning_label: str | None = None,
+    ) -> LiveSpeechReply:
+        path = Path(audio_path)
+        if not path.exists():
+            raise ProviderError(f"Audio file does not exist: {audio_path}")
+        audio_bytes = path.read_bytes()
+        if not audio_bytes:
+            raise ProviderError("Audio file was empty.")
+        upload_path, cleanup_upload = _prepare_audio_upload_path(path)
+
+        active_client = client if client is not None else self._client
+        active_model = model_name or self._settings.llm_model_name
+        active_reasoning_kwargs = (
+            reasoning_kwargs
+            if reasoning_kwargs is not None
+            else self._llm_reasoning_kwargs()
+        )
+        active_reasoning_label = (
+            reasoning_label
+            if reasoning_label is not None
+            else self._llm_reasoning_label()
+        )
+
+        started_at = perf_counter()
+        try:
+            if upload_path != path:
+                audio_bytes = upload_path.read_bytes()
+                if not audio_bytes:
+                    raise ProviderError("Audio file was empty.")
+            audio_format = upload_path.suffix.lower().lstrip(".") or "wav"
+
+            messages: list[dict] = [
+                {
+                    "role": "system",
+                    "content": self._build_live_speech_system_prompt(),
+                }
+            ]
+            messages.extend(_normalize_chat_messages(conversation_history))
+            messages.append(
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": (
+                                "Listen to the user's spoken audio below and reply with the "
+                                "final spoken text following all the system instructions."
+                            ),
+                        },
+                        {
+                            "type": "input_audio",
+                            "input_audio": {
+                                "data": base64.b64encode(audio_bytes).decode("ascii"),
+                                "format": audio_format,
+                            },
+                        },
+                    ],
+                }
+            )
+
+            response = active_client.chat.completions.create(
+                model=active_model,
+                **active_reasoning_kwargs,
+                messages=messages,
+            )
+        except Exception as exc:  # pragma: no cover - depends on external service.
+            logger.exception(
+                "Multimodal live reply request failed after %.1f ms [model=%s reasoning=%s]",
+                _elapsed_ms(started_at),
+                active_model,
+                active_reasoning_label,
+            )
+            raise ProviderError(
+                f"Multimodal live reply request failed: {exc}"
+            ) from exc
+        finally:
+            cleanup_upload()
+
+        text = _extract_text_content(response.choices[0].message.content)
+        if not text:
+            raise ProviderError("Multimodal live reply response was empty.")
+        live_reply = self._parse_live_speech_reply(text)
+        logger.info(
+            "llm multimodal reply completed\nmodel      %s\nreasoning  %s\nvoice      %s\ntime       %.1f ms\nusage      %s\nreply      %s",
+            active_model,
+            active_reasoning_label,
+            get_tts_voice_label(live_reply.voice_id),
+            _elapsed_ms(started_at),
+            _format_usage_summary(response),
+            _preview_text(live_reply.text, limit=140),
         )
         return live_reply
 
@@ -387,6 +490,20 @@ class NagaTranscriptionProvider:
             api_key=settings.transcription_api_key,
         )
 
+    @property
+    def client(self):
+        return self._client
+
+    @property
+    def model_name(self) -> str:
+        return self._settings.transcription_model_name
+
+    def reasoning_kwargs(self) -> dict[str, str]:
+        return self._transcription_reasoning_kwargs()
+
+    def reasoning_label(self) -> str:
+        return self._transcription_reasoning_label()
+
     @staticmethod
     def _build_client(base_url: str, api_key: str):
         if OpenAI is None:
@@ -410,9 +527,10 @@ class NagaTranscriptionProvider:
             raise ProviderError("Audio file was empty.")
 
         started_at = perf_counter()
+        upload_path, cleanup_upload = _prepare_audio_upload_path(path)
         try:
             if self._uses_transcriptions_api():
-                with path.open("rb") as audio_file:
+                with upload_path.open("rb") as audio_file:
                     response = self._client.audio.transcriptions.create(
                         model=self._settings.transcription_model_name,
                         file=audio_file,
@@ -420,7 +538,11 @@ class NagaTranscriptionProvider:
                         language=None,
                     )
             else:
-                audio_format = path.suffix.lower().lstrip(".") or "wav"
+                if upload_path != path:
+                    audio_bytes = upload_path.read_bytes()
+                    if not audio_bytes:
+                        raise ProviderError("Audio file was empty.")
+                audio_format = upload_path.suffix.lower().lstrip(".") or "wav"
                 response = self._client.chat.completions.create(
                     model=self._settings.transcription_model_name,
                     **self._transcription_reasoning_kwargs(),
@@ -457,6 +579,8 @@ class NagaTranscriptionProvider:
                 self._transcription_reasoning_label(),
             )
             raise ProviderError(f"Transcription request failed: {exc}") from exc
+        finally:
+            cleanup_upload()
 
         if self._uses_transcriptions_api():
             text = getattr(response, "text", "")
@@ -726,6 +850,76 @@ def _convert_audio_to_wav(output_path: Path) -> Path | None:
     output_path.unlink(missing_ok=True)
     converted_path.replace(output_path)
     return output_path
+
+
+def _prepare_audio_upload_path(source_path: Path) -> tuple[Path, Callable[[], None]]:
+    if source_path.suffix.lower() == ".mp3":
+        return source_path, _noop_cleanup
+
+    converted_path = _convert_audio_to_mp3(source_path)
+    if converted_path is None:
+        return source_path, _noop_cleanup
+    return converted_path, lambda: _cleanup_temp_audio_file(converted_path)
+
+
+def _convert_audio_to_mp3(source_path: Path) -> Path | None:
+    ffmpeg_path = shutil.which("ffmpeg")
+    if ffmpeg_path is None:
+        logger.warning(
+            "ffmpeg is unavailable, uploading original audio format for %s.",
+            source_path.name,
+        )
+        return None
+
+    temp_file = tempfile.NamedTemporaryFile(
+        suffix=".mp3",
+        prefix=f"{source_path.stem}-upload-",
+        delete=False,
+    )
+    temp_file.close()
+    converted_path = Path(temp_file.name)
+    try:
+        subprocess.run(
+            [
+                ffmpeg_path,
+                "-y",
+                "-hide_banner",
+                "-loglevel",
+                "error",
+                "-i",
+                str(source_path),
+                "-vn",
+                "-acodec",
+                "libmp3lame",
+                "-b:a",
+                "32k",
+                "-ac",
+                "1",
+                "-ar",
+                "16000",
+                str(converted_path),
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except (OSError, subprocess.CalledProcessError) as exc:
+        logger.warning("ffmpeg MP3 conversion failed for %s: %s", source_path.name, exc)
+        _cleanup_temp_audio_file(converted_path)
+        return None
+
+    return converted_path
+
+
+def _cleanup_temp_audio_file(path: Path) -> None:
+    try:
+        path.unlink(missing_ok=True)
+    except OSError:
+        pass
+
+
+def _noop_cleanup() -> None:
+    return None
 
 
 def _file_to_data_url(file_path: Path) -> str:

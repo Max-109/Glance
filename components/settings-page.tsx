@@ -62,6 +62,7 @@ const EMPTY_STATE: BridgeState = {
     transcription_model_name: "gemini-3.1-flash-lite-preview",
     transcription_reasoning_enabled: true,
     transcription_reasoning: "minimal",
+    multimodal_live_enabled: false,
     tts_base_url: "https://api.naga.ac/v1",
     tts_api_key: "",
     tts_model: "eleven-v3",
@@ -74,7 +75,7 @@ const EMPTY_STATE: BridgeState = {
     audio_input_device: "default",
     audio_output_device: "default",
     audio_activation_threshold: 0.026,
-    audio_silence_seconds: 2,
+    audio_silence_seconds: 0.5,
     audio_max_wait_seconds: 30,
     audio_max_record_seconds: 100,
     audio_preroll_seconds: 0.25,
@@ -90,6 +91,7 @@ const EMPTY_STATE: BridgeState = {
   dirty: false,
   manualSaveDirty: false,
   saving: false,
+  stateRevision: 0,
   statusMessage: "",
   statusKind: "neutral",
   ...EMPTY_RUNTIME_STATUS,
@@ -135,6 +137,22 @@ function mergeRuntimeSnapshot(current: BridgeState | null, snapshot: BridgeState
     return snapshot;
   }
   return { ...snapshot, ...pickRuntimeStatus(current) };
+}
+
+function shouldReuseSnapshot(current: BridgeState | null, next: BridgeState): boolean {
+  if (current === null) {
+    return false;
+  }
+
+  return (
+    current.stateRevision === next.stateRevision &&
+    current.runtimeRevision === next.runtimeRevision &&
+    current.runtimeState === next.runtimeState &&
+    current.runtimeMessage === next.runtimeMessage &&
+    current.runtimePhaseStartedAtMs === next.runtimePhaseStartedAtMs &&
+    current.runtimeBlinkIntervalMs === next.runtimeBlinkIntervalMs &&
+    current.runtimeErrorFlashUntilMs === next.runtimeErrorFlashUntilMs
+  );
 }
 
 function getBridge() {
@@ -199,7 +217,7 @@ export function SettingsPage() {
   const [state, setState] = useState<BridgeState | null>(null);
   const [systemTheme, setSystemTheme] = useState<SystemTheme>("dark");
   const [isMacOs, setIsMacOs] = useState(false);
-  const [providerTab, setProviderTab] = useState<ProviderTab>("llm");
+  const [providerTab, setProviderTab] = useState<ProviderTab>("transcription");
   const [openSelect, setOpenSelect] = useState<string | null>(null);
   const [skipLinkEnabled, setSkipLinkEnabled] = useState(false);
   const [editingField, setEditingField] = useState<string | null>(null);
@@ -208,11 +226,19 @@ export function SettingsPage() {
   const [bridgeError, setBridgeError] = useState("");
   const [thresholdDraft, setThresholdDraft] = useState<number | null>(null);
   const thresholdCommitRef = useRef(0);
+  const refreshInFlightRef = useRef(false);
   const skipLinkRef = useRef<HTMLAnchorElement | null>(null);
   const workspaceRef = useRef<HTMLElement | null>(null);
   const scrollViewportRef = useRef<HTMLDivElement | null>(null);
 
   const liveState = state ?? EMPTY_STATE;
+  const multimodalLive = Boolean(liveState.settings.multimodal_live_enabled);
+
+  useEffect(() => {
+    if (multimodalLive && providerTab === "llm") {
+      setProviderTab("transcription");
+    }
+  }, [multimodalLive, providerTab]);
   const thresholdValue = thresholdDraft ?? Number(liveState.settings.audio_activation_threshold || 0.026);
   const themePreference = String(liveState.settings.theme_preference || "dark");
   const resolvedTheme =
@@ -227,7 +253,10 @@ export function SettingsPage() {
   const applySnapshot = useEffectEvent(
     (snapshot: BridgeState, nextSystemTheme?: SystemTheme) => {
       startTransition(() => {
-        setState((current) => mergeRuntimeSnapshot(current, snapshot));
+        setState((current) => {
+          const nextState = mergeRuntimeSnapshot(current, snapshot);
+          return shouldReuseSnapshot(current, nextState) ? current : nextState;
+        });
         setBridgeError("");
         setDrafts((current) => {
           if (!editingField || current[editingField] === undefined) {
@@ -255,27 +284,48 @@ export function SettingsPage() {
     });
   });
 
-  const refreshState = useEffectEvent(async () => {
+  const refreshState = useEffectEvent(async ({
+    includeSystemTheme = false,
+  }: {
+    includeSystemTheme?: boolean;
+  } = {}) => {
     const bridge = getBridge();
     if (!bridge) {
       setBridgeError("Open Glance from the tray to reconnect.");
       return;
     }
 
+    if (refreshInFlightRef.current) {
+      return;
+    }
+
+    refreshInFlightRef.current = true;
+
     try {
       const [snapshot, nextSystemTheme] = await Promise.all([
         bridge.getState(),
-        bridge.getSystemTheme().catch(() => systemTheme),
+        includeSystemTheme
+          ? bridge.getSystemTheme().catch(() => systemTheme)
+          : Promise.resolve(undefined),
       ]);
       applySnapshot(snapshot, nextSystemTheme);
     } catch (error) {
       setBridgeError(formatError(error));
+    } finally {
+      refreshInFlightRef.current = false;
     }
   });
 
   useEffect(() => {
-    void refreshState();
+    void refreshState({ includeSystemTheme: true });
   }, [refreshState]);
+
+  const refreshVisibleState = useEffectEvent(() => {
+    if (document.visibilityState !== "visible") {
+      return;
+    }
+    void refreshState({ includeSystemTheme: true });
+  });
 
   useEffect(() => {
     const bridge = getBridge();
@@ -299,6 +349,15 @@ export function SettingsPage() {
   useEffect(() => {
     setIsMacOs(isMacDesktopPlatform());
   }, []);
+
+  useEffect(() => {
+    window.addEventListener("focus", refreshVisibleState);
+    document.addEventListener("visibilitychange", refreshVisibleState);
+    return () => {
+      window.removeEventListener("focus", refreshVisibleState);
+      document.removeEventListener("visibilitychange", refreshVisibleState);
+    };
+  }, [refreshVisibleState]);
 
   const enableSkipLinkOnTab = useEffectEvent((event: KeyboardEvent) => {
     if (event.key !== "Tab" || event.ctrlKey || event.metaKey || event.altKey) {
@@ -363,16 +422,27 @@ export function SettingsPage() {
     return () => window.removeEventListener("beforeunload", warnBeforeUnload);
   }, [liveState.dirty]);
 
-  const pollMs =
-    liveState.previewActive || liveState.speakerTestActive || liveState.saving ? 240 : 1200;
+  const transientRefreshActive =
+    liveState.audioInputTestActive ||
+    liveState.previewActive ||
+    liveState.speakerTestActive ||
+    liveState.saving;
+  const transientRefreshMs = liveState.audioInputTestActive ? 500 : 700;
 
   useEffect(() => {
+    if (!transientRefreshActive) {
+      return;
+    }
+
     const interval = window.setInterval(() => {
+      if (document.visibilityState !== "visible") {
+        return;
+      }
       void refreshState();
-    }, pollMs);
+    }, transientRefreshMs);
 
     return () => window.clearInterval(interval);
-  }, [pollMs, refreshState]);
+  }, [refreshState, transientRefreshActive, transientRefreshMs]);
 
   const closeSelectOnOutsideInteraction = useEffectEvent((event: PointerEvent) => {
     if (!openSelect) {
