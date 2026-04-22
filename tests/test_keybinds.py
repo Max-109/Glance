@@ -6,7 +6,7 @@ try:
     from PySide6.QtCore import QCoreApplication, Qt
     from src.services.history_manager import HistoryManager
     from src.services.settings_manager import SettingsManager
-    from src.storage.json_storage import JsonHistoryRepository, JsonSettingsStore
+    from src.storage.json_storage import JsonSettingsStore, SessionDirectoryRepository
     from src.ui.settings_viewmodel import SettingsViewModel
     from src.services.audio_devices import AudioDeviceOption
 except ImportError:  # pragma: no cover - optional GUI dependency.
@@ -14,7 +14,7 @@ except ImportError:  # pragma: no cover - optional GUI dependency.
     Qt = None
     HistoryManager = None
     SettingsManager = None
-    JsonHistoryRepository = None
+    SessionDirectoryRepository = None
     JsonSettingsStore = None
     SettingsViewModel = None
     AudioDeviceOption = None
@@ -88,7 +88,7 @@ class SettingsViewModelKeybindTests(unittest.TestCase):
         )
         self.settings_manager = settings_manager
         history_manager = HistoryManager(
-            JsonHistoryRepository(temp_path / "history.json"),
+            SessionDirectoryRepository(temp_path / "sessions"),
             history_limit=5,
         )
         self.viewmodel = SettingsViewModel(settings_manager, history_manager)

@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 from src.models.interactions import BaseInteraction, SessionRecord
-from src.storage.json_storage import JsonHistoryRepository
+from src.storage.abstract_repository import AbstractRepository
 
 
 class HistoryManager:
-    def __init__(self, repository: JsonHistoryRepository, history_limit: int) -> None:
+    def __init__(
+        self,
+        repository: AbstractRepository[SessionRecord],
+        history_limit: int,
+    ) -> None:
         self._repository = repository
         self._sessions = repository.load()
         self._history_limit = history_limit

@@ -19,7 +19,7 @@ from src.services.providers import (
     OpenAICompatibleProvider,
 )
 from src.services.settings_manager import SettingsManager
-from src.storage.json_storage import JsonHistoryRepository, JsonSettingsStore
+from src.storage.json_storage import JsonSettingsStore, SessionDirectoryRepository
 
 
 class Orchestrator:
@@ -37,7 +37,6 @@ class Orchestrator:
         ocr_agent: OCRAgent,
         tts_agent: TTSAgent,
         clipboard_service: ClipboardService,
-        audio_dir: Path,
     ) -> None:
         self._settings = settings
         self._history_manager = history_manager
@@ -50,7 +49,6 @@ class Orchestrator:
         self._ocr_agent = ocr_agent
         self._tts_agent = tts_agent
         self._clipboard_service = clipboard_service
-        self._audio_dir = audio_dir
 
     @property
     def settings(self) -> AppSettings:
@@ -76,7 +74,6 @@ class Orchestrator:
             ocr_agent=self._ocr_agent,
             tts_agent=self._tts_agent,
             clipboard_service=self._clipboard_service,
-            audio_dir=self._audio_dir,
             settings=self._settings,
         )
         active_session = session or self._history_manager.start_session(mode)
@@ -94,7 +91,7 @@ def build_orchestrator() -> Orchestrator:
     paths = build_app_paths()
     settings_manager = SettingsManager(store=JsonSettingsStore(paths.config_file))
     settings = settings_manager.load()
-    history_repository = JsonHistoryRepository(paths.history_file)
+    history_repository = SessionDirectoryRepository(paths.sessions_dir)
     history_manager = HistoryManager(history_repository, settings.history_length)
     llm_provider = OpenAICompatibleProvider(settings)
     transcription_provider = NagaTranscriptionProvider(settings)
@@ -130,5 +127,4 @@ def build_orchestrator_with_dependencies(
         ocr_agent=OCRAgent(llm_provider),
         tts_agent=TTSAgent(tts_provider),
         clipboard_service=ClipboardService(),
-        audio_dir=paths.audio_dir,
     )

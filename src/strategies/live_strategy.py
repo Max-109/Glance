@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pathlib import Path
+import tempfile
 
 from src.agents.llm_agent import LLMAgent
 from src.models.interactions import LiveInteraction, SessionRecord
@@ -16,13 +16,11 @@ class LiveStrategy(ModeStrategy):
         transcription_agent: TranscriptionAgent,
         llm_agent: LLMAgent,
         tts_agent: TTSAgent,
-        audio_dir: Path,
         settings: AppSettings | None = None,
     ) -> None:
         self._transcription_agent = transcription_agent
         self._llm_agent = llm_agent
         self._tts_agent = tts_agent
-        self._audio_dir = audio_dir
         self._settings = settings
 
     def execute(self, context: dict) -> LiveInteraction:
@@ -52,11 +50,16 @@ class LiveStrategy(ModeStrategy):
                 transcript=transcript,
                 conversation_history=conversation_history,
             )
-        speech_path = self._audio_dir / f"live-{Path(recording_path).stem}.wav"
+        temp_file = tempfile.NamedTemporaryFile(
+            prefix="glance-live-reply-",
+            suffix=".wav",
+            delete=False,
+        )
+        temp_file.close()
         _emit_stage_status(status_callback, "speaking", "Preparing speech...")
         generated_speech_path = self._tts_agent.run(
             text=force_pause_at_end_for_tts(live_reply.text),
-            output_path=str(speech_path),
+            output_path=temp_file.name,
             voice_id=live_reply.voice_id,
         )
         return LiveInteraction(

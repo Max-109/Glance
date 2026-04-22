@@ -71,7 +71,6 @@ class ModeStrategyFactoryTests(unittest.TestCase):
             "ocr_agent": OCRAgent(provider),
             "tts_agent": TTSAgent(provider),
             "clipboard_service": ClipboardService(),
-            "audio_dir": Path("."),
         }
 
     def test_create_returns_quick_strategy(self) -> None:

@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from copy import deepcopy
+import tempfile
 from pathlib import Path
 from threading import Event, Thread
 from typing import Any
 from urllib.parse import urlparse
-from uuid import uuid4
 
 from PySide6.QtCore import Property, QCoreApplication, QTimer, QObject, Signal, Slot
 
@@ -73,7 +73,6 @@ class SettingsViewModel(QObject):
         self,
         settings_manager: SettingsManager,
         history_manager: HistoryManager,
-        audio_dir: Path | None = None,
         audio_device_service: AudioDeviceService | None = None,
         audio_monitor_factory: Callable[[AppSettings], AudioMonitorService]
         | None = None,
@@ -83,7 +82,6 @@ class SettingsViewModel(QObject):
         super().__init__()
         self._settings_manager = settings_manager
         self._history_manager = history_manager
-        self._audio_dir = audio_dir
         self._audio_device_service = audio_device_service or AudioDeviceService()
         self._audio_monitor_factory = audio_monitor_factory or (
             lambda settings: AudioMonitorService(
@@ -825,8 +823,6 @@ class SettingsViewModel(QObject):
             return None
 
     def _ensure_preview_playback_service(self) -> QtAudioPlaybackService:
-        if self._audio_dir is None:
-            raise ValidationError("audio output is not available in settings")
         if self._preview_playback_service is None:
             self._preview_playback_service = self._playback_service_factory()
         return self._preview_playback_service
@@ -843,20 +839,29 @@ class SettingsViewModel(QObject):
     def _run_voice_preview(
         self, settings: AppSettings, voice_name: str, stop_event: Event
     ) -> None:
-        output_path = self._audio_dir / f"voice-preview-{uuid4().hex}.wav"
+        temp_file = tempfile.NamedTemporaryFile(
+            prefix="glance-voice-preview-",
+            suffix=".wav",
+            delete=False,
+        )
+        temp_file.close()
+        output_path = Path(temp_file.name)
+        generated_path = output_path
         try:
             provider = NagaSpeechProvider(settings)
-            provider.synthesize(
+            generated_path = Path(
+                provider.synthesize(
                 text=(
                     f"Hello, I am {self._voice_preview_label(voice_name)}. "
                     "This is how I sound in Glance."
                 ),
                 output_path=output_path,
+                )
             )
             if stop_event.is_set():
                 return
             playback_service = self._ensure_preview_playback_service()
-            playback_service.play_blocking(str(output_path), stop_event=stop_event)
+            playback_service.play_blocking(str(generated_path), stop_event=stop_event)
             if not stop_event.is_set():
                 self._previewStatusRequested.emit(
                     f"Previewed {self._voice_preview_label(voice_name)}.",
@@ -868,6 +873,10 @@ class SettingsViewModel(QObject):
                     f"Voice preview failed: {exc}", "error"
                 )
         finally:
+            try:
+                generated_path.unlink(missing_ok=True)
+            except OSError:
+                pass
             self._previewFinished.emit(voice_name)
 
     @staticmethod
@@ -917,7 +926,13 @@ class SettingsViewModel(QObject):
             self._audioInputTestFinished.emit()
 
     def _run_speaker_test(self, stop_event: Event) -> None:
-        output_path = self._audio_dir / f"speaker-test-{uuid4().hex}.wav"
+        temp_file = tempfile.NamedTemporaryFile(
+            prefix="glance-speaker-test-",
+            suffix=".wav",
+            delete=False,
+        )
+        temp_file.close()
+        output_path = Path(temp_file.name)
         try:
             self._audio_signal_service.write_test_tone(output_path)
             if stop_event.is_set():

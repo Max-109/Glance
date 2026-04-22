@@ -26,7 +26,7 @@ from src.services.providers import (
     OpenAICompatibleProvider,
 )
 from src.services.settings_manager import SettingsManager
-from src.storage.json_storage import JsonHistoryRepository, JsonSettingsStore
+from src.storage.json_storage import JsonSettingsStore, SessionDirectoryRepository
 from src.ui.electron_bridge import SettingsBridgeServer
 from src.ui.electron_window import ElectronShellController
 from src.ui.runtime_visual import (
@@ -132,7 +132,7 @@ class LiveCueController:
     def __init__(
         self,
         *,
-        audio_dir: Path,
+        audio_feedback_dir: Path,
         output_device_id: str,
         logger: logging.Logger,
         signal_service: AudioTestSignalService | None = None,
@@ -142,7 +142,7 @@ class LiveCueController:
             output_device_id=output_device_id,
         )
         self._cue_paths = (signal_service or AudioTestSignalService()).write_live_mode_cues(
-            audio_dir / "live-cues"
+            audio_feedback_dir
         )
         self._previous_state: str | None = None
         self._previous_message = ""
@@ -233,14 +233,10 @@ def run_settings_app() -> int:
     logger.debug("launch pid=%s", os.getpid())
     logger.debug("log file: %s", log_file)
     history_manager = HistoryManager(
-        JsonHistoryRepository(paths.history_file),
+        SessionDirectoryRepository(paths.sessions_dir),
         history_limit=settings.history_length,
     )
-    controller = SettingsViewModel(
-        settings_manager,
-        history_manager,
-        audio_dir=paths.audio_dir,
-    )
+    controller = SettingsViewModel(settings_manager, history_manager)
     settings_bridge = SettingsBridgeServer(controller)
     live_controller = _build_live_controller(
         settings_manager=settings_manager,
@@ -681,7 +677,6 @@ def _build_live_controller(
         playback_service=QtAudioPlaybackService(
             output_device_id=settings.audio_output_device,
         ),
-        audio_dir=paths.audio_dir,
     )
 
 
@@ -693,7 +688,7 @@ def _build_live_cue_controller(
 ) -> LiveCueController | None:
     try:
         return LiveCueController(
-            audio_dir=paths.audio_dir,
+            audio_feedback_dir=paths.audio_feedback_dir,
             output_device_id=output_device_id,
             logger=logger,
         )

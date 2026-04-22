@@ -58,7 +58,6 @@ class LiveStrategyTests(unittest.TestCase):
                 transcription_agent=FakeTranscriptionAgent(),
                 llm_agent=llm_agent,
                 tts_agent=tts_agent,
-                audio_dir=Path(temp_dir),
             )
 
             interaction = strategy.execute({"recording_path": "input.wav"})
@@ -89,7 +88,6 @@ class LiveStrategyTests(unittest.TestCase):
                 transcription_agent=FakeTranscriptionAgent(),
                 llm_agent=llm_agent,
                 tts_agent=FakeTTSAgent(),
-                audio_dir=Path(temp_dir),
             )
             session = SessionRecord(mode="live")
             session.add_interaction(
@@ -119,7 +117,6 @@ class LiveStrategyTests(unittest.TestCase):
                 transcription_agent=FakeTranscriptionAgent(),
                 llm_agent=FakeLLMAgent(),
                 tts_agent=FakeTTSAgent(),
-                audio_dir=Path(temp_dir),
             )
 
             strategy.execute(

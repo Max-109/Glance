@@ -3,9 +3,9 @@ from __future__ import annotations
 from collections.abc import Callable
 import logging
 from pathlib import Path
+import tempfile
 from threading import Event, Lock, Thread, current_thread
 from time import perf_counter
-from uuid import uuid4
 
 from src.core.orchestrator import Orchestrator
 from src.exceptions.app_exceptions import GlanceError, ValidationError
@@ -20,14 +20,12 @@ class LiveSessionController:
         orchestrator: Orchestrator | None,
         recorder,
         playback_service,
-        audio_dir: Path,
         *,
         on_status: Callable[[str, str], None] | None = None,
     ) -> None:
         self._orchestrator = orchestrator
         self._recorder = recorder
         self._playback_service = playback_service
-        self._audio_dir = audio_dir
         self._on_status = on_status
         self._state = "idle"
         self._stop_event = Event()
@@ -102,7 +100,13 @@ class LiveSessionController:
     def _run_loop(self) -> None:
         try:
             while not self._stop_event.is_set():
-                recording_path = self._audio_dir / f"live-input-{uuid4().hex}.wav"
+                temp_file = tempfile.NamedTemporaryFile(
+                    prefix="glance-live-input-",
+                    suffix=".wav",
+                    delete=False,
+                )
+                temp_file.close()
+                recording_temp_path = Path(temp_file.name)
                 turn_started_at = perf_counter()
                 capture_elapsed_ms = 0.0
                 pipeline_elapsed_ms = 0.0
@@ -111,10 +115,11 @@ class LiveSessionController:
                 capture_started_at = perf_counter()
                 try:
                     self._recorder.capture_turn(
-                        str(recording_path),
+                        temp_file.name,
                         stop_event=self._stop_event,
                     )
                 except ValidationError as exc:
+                    _cleanup_temp_file(recording_temp_path)
                     if self._stop_event.is_set():
                         break
                     if str(exc) == "No speech was detected.":
@@ -127,6 +132,7 @@ class LiveSessionController:
                 capture_elapsed_ms = _elapsed_ms(capture_started_at)
 
                 if self._stop_event.is_set():
+                    _cleanup_temp_file(recording_temp_path)
                     break
 
                 pipeline_started_at = perf_counter()
@@ -134,10 +140,11 @@ class LiveSessionController:
                     interaction = self._orchestrator.run_mode(
                         "live",
                         session=self._session,
-                        recording_path=str(recording_path),
+                        recording_path=temp_file.name,
                         status_callback=self._set_status,
                     )
                 except GlanceError as exc:
+                    _cleanup_temp_file(recording_temp_path)
                     logger.exception("Live mode failed")
                     self._set_status("idle", f"Live failed: {exc}")
                     break
@@ -191,3 +198,10 @@ class LiveSessionController:
 
 def _elapsed_ms(started_at: float) -> float:
     return round((perf_counter() - started_at) * 1000, 1)
+
+
+def _cleanup_temp_file(path: Path) -> None:
+    try:
+        path.unlink(missing_ok=True)
+    except OSError:
+        pass

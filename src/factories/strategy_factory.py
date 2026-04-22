@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from pathlib import Path
-
 from src.agents.audio_capture_agent import AudioCaptureAgent
 from src.agents.llm_agent import LLMAgent
 from src.agents.ocr_agent import OCRAgent
@@ -31,7 +29,6 @@ class ModeStrategyFactory:
         ocr_agent: OCRAgent,
         tts_agent: TTSAgent,
         clipboard_service: ClipboardService,
-        audio_dir: Path,
         settings: AppSettings | None = None,
     ) -> ModeStrategy:
         normalized_mode = mode.strip().lower()
@@ -40,7 +37,6 @@ class ModeStrategyFactory:
                 screen_capture_agent=screen_capture_agent,
                 llm_agent=llm_agent,
                 tts_agent=tts_agent,
-                audio_dir=audio_dir,
             )
         if normalized_mode == "ocr":
             return OCRStrategy(
@@ -53,7 +49,6 @@ class ModeStrategyFactory:
                 transcription_agent=transcription_agent,
                 llm_agent=llm_agent,
                 tts_agent=tts_agent,
-                audio_dir=audio_dir,
                 settings=settings,
             )
         raise ValidationError(f"Unsupported mode: {mode!r}")

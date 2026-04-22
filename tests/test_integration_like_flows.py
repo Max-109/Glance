@@ -8,7 +8,7 @@ from src.models.settings import AppSettings
 from src.services.app_paths import AppPaths
 from src.services.history_manager import HistoryManager
 from src.services.providers import LiveSpeechReply
-from src.storage.json_storage import JsonHistoryRepository
+from src.storage.json_storage import SessionDirectoryRepository
 
 
 class FakeScreenCaptureAgent:
@@ -83,7 +83,7 @@ class OrchestratorFlowTests(unittest.TestCase):
     def setUp(self) -> None:
         self.temp_dir = tempfile.TemporaryDirectory()
         temp_path = Path(self.temp_dir.name)
-        history_repo = JsonHistoryRepository(temp_path / "history.json")
+        history_repo = SessionDirectoryRepository(temp_path / "sessions")
         history_manager = HistoryManager(history_repo, history_limit=5)
         settings = AppSettings.from_mapping(
             {
@@ -106,7 +106,6 @@ class OrchestratorFlowTests(unittest.TestCase):
             ocr_agent=FakeOCRAgent(),
             tts_agent=self.tts_agent,
             clipboard_service=self.clipboard,
-            audio_dir=temp_path,
         )
 
     def tearDown(self) -> None:
@@ -137,7 +136,7 @@ class OrchestratorFlowTests(unittest.TestCase):
             "live", recording_path=str(recording_path)
         )
 
-        self.assertEqual(interaction.recording_path, str(recording_path))
+        self.assertTrue(interaction.recording_path.endswith("turn-001-user.wav"))
         self.assertEqual(interaction.transcript, "transcribed:turn.wav")
         self.assertEqual(interaction.response, "live:transcribed:turn.wav:history=0")
         self.assertTrue(interaction.speech_path.endswith(".wav"))
