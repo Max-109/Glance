@@ -260,7 +260,7 @@ export function SettingsPage() {
         setBridgeError("");
         setDrafts((current) => {
           if (!editingField || current[editingField] === undefined) {
-            return {};
+            return Object.keys(current).length === 0 ? current : {};
           }
           return { [editingField]: current[editingField] };
         });
@@ -318,7 +318,7 @@ export function SettingsPage() {
 
   useEffect(() => {
     void refreshState({ includeSystemTheme: true });
-  }, [refreshState]);
+  }, []);
 
   const refreshVisibleState = useEffectEvent(() => {
     if (document.visibilityState !== "visible") {
@@ -344,7 +344,7 @@ export function SettingsPage() {
     return () => {
       bridge.unsubscribeRuntimeStatus(subscriptionId);
     };
-  }, [applyRuntimeStatus]);
+  }, []);
 
   useEffect(() => {
     setIsMacOs(isMacDesktopPlatform());
@@ -357,7 +357,7 @@ export function SettingsPage() {
       window.removeEventListener("focus", refreshVisibleState);
       document.removeEventListener("visibilitychange", refreshVisibleState);
     };
-  }, [refreshVisibleState]);
+  }, []);
 
   const enableSkipLinkOnTab = useEffectEvent((event: KeyboardEvent) => {
     if (event.key !== "Tab" || event.ctrlKey || event.metaKey || event.altKey) {
@@ -406,7 +406,7 @@ export function SettingsPage() {
       window.removeEventListener("blur", hideSkipLink);
       document.removeEventListener("visibilitychange", hideSkipLinkWhenHidden);
     };
-  }, [enableSkipLinkOnTab, hideSkipLink, hideSkipLinkWhenHidden]);
+  }, []);
 
   useEffect(() => {
     if (!liveState.dirty) {
@@ -442,7 +442,7 @@ export function SettingsPage() {
     }, transientRefreshMs);
 
     return () => window.clearInterval(interval);
-  }, [refreshState, transientRefreshActive, transientRefreshMs]);
+  }, [transientRefreshActive, transientRefreshMs]);
 
   const closeSelectOnOutsideInteraction = useEffectEvent((event: PointerEvent) => {
     if (!openSelect) {
@@ -466,7 +466,7 @@ export function SettingsPage() {
         true,
       );
     };
-  }, [closeSelectOnOutsideInteraction]);
+  }, []);
 
   const closeSelectOnEscape = useEffectEvent((event: KeyboardEvent) => {
     if (event.key !== "Escape" || !openSelect) {
@@ -480,7 +480,7 @@ export function SettingsPage() {
     return () => {
       window.removeEventListener("keydown", closeSelectOnEscape, true);
     };
-  }, [closeSelectOnEscape]);
+  }, []);
 
   const blockGlobalSelectAll = useEffectEvent((event: KeyboardEvent) => {
     if (liveState.bindingActive) {
@@ -510,7 +510,7 @@ export function SettingsPage() {
     return () => {
       window.removeEventListener("keydown", blockGlobalSelectAll, true);
     };
-  }, [blockGlobalSelectAll]);
+  }, []);
 
   const routeWheelToScrollHost = useEffectEvent((event: WheelEvent) => {
     const workspace = workspaceRef.current;
@@ -589,7 +589,7 @@ export function SettingsPage() {
     return () => {
       workspace.removeEventListener("wheel", routeWheelToScrollHost, true);
     };
-  }, [routeWheelToScrollHost]);
+  }, []);
 
   const captureShortcut = useEffectEvent(async (event: KeyboardEvent) => {
     if (!liveState.bindingActive || !liveState.bindingField) {
@@ -637,7 +637,7 @@ export function SettingsPage() {
     return () => {
       window.removeEventListener("keydown", captureShortcut, true);
     };
-  }, [captureShortcut, liveState.bindingActive]);
+  }, [liveState.bindingActive]);
 
   const getDraftValue = useMemo(() => {
     return (fieldName: string) => {
