@@ -74,6 +74,7 @@ def _build_state_snapshot(viewmodel: SettingsViewModel) -> dict[str, Any]:
         "languageOptions": viewmodel.languageOptions,
         "promptDefaults": viewmodel.promptDefaults,
         "historyPreview": viewmodel.buildHistoryPreview(),
+        "historyStats": viewmodel.buildHistoryStats(),
     }
 
 

@@ -92,7 +92,11 @@ def build_orchestrator() -> Orchestrator:
     settings_manager = SettingsManager(store=JsonSettingsStore(paths.config_file))
     settings = settings_manager.load()
     history_repository = SessionDirectoryRepository(paths.sessions_dir)
-    history_manager = HistoryManager(history_repository, settings.history_length)
+    history_manager = HistoryManager(
+        history_repository,
+        settings.history_length,
+        retention_enabled=settings.history_retention_enabled,
+    )
     llm_provider = OpenAICompatibleProvider(settings)
     transcription_provider = NagaTranscriptionProvider(settings)
     tts_provider = NagaSpeechProvider(settings)

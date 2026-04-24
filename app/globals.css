@@ -1,19 +1,41 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --font-heading: var(--font-sans);
+  --font-sans: var(--font-sans);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-border: var(--border);
+  --color-accent: var(--ui-accent);
+  --color-accent-foreground: var(--ui-accent-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-destructive: var(--destructive);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
 :root {
   color-scheme: dark;
-  font-family:
-    ui-sans-serif,
-    system-ui,
-    -apple-system,
-    BlinkMacSystemFont,
-    "Segoe UI",
-    sans-serif;
-  --font-mono:
-    ui-monospace,
-    SFMono-Regular,
-    Menlo,
-    Monaco,
-    Consolas,
-    monospace;
 }
 
 * {
@@ -36,6 +58,7 @@ body {
   -webkit-user-select: none;
   user-select: none;
   --font-body:
+    var(--font-sans),
     ui-sans-serif,
     system-ui,
     -apple-system,
@@ -43,6 +66,160 @@ body {
     "Segoe UI",
     sans-serif;
   font-family: var(--font-body);
+}
+
+.glance-redesign {
+  --background: #ffffff;
+  --foreground: oklch(0.141 0.005 285.823);
+  --card: #ffffff;
+  --card-foreground: oklch(0.141 0.005 285.823);
+  --popover: #ffffff;
+  --popover-foreground: oklch(0.141 0.005 285.823);
+  --primary: var(--accent);
+  --primary-foreground: var(--accent-contrast);
+  --secondary: #f4f4f5;
+  --secondary-foreground: oklch(0.21 0.006 285.885);
+  --muted: #f4f4f5;
+  --muted-foreground: oklch(0.552 0.016 285.938);
+  --ui-accent: #f4f4f5;
+  --ui-accent-foreground: oklch(0.21 0.006 285.885);
+  --destructive: #e5484d;
+  --border: oklch(0.92 0.004 286.32);
+  --input: oklch(0.92 0.004 286.32);
+  --ring: color-mix(in srgb, var(--accent) 38%, transparent);
+  --radius: 0.625rem;
+  --page-bg: var(--background);
+  --sidebar-bg: #fafafa;
+  --shell-bg: #ffffff;
+  --shell-side: #fafafa;
+  --shell-side-border: var(--border);
+  --shell-panel: #fafafa;
+  --shell-inset: #ffffff;
+  --shell-active: #f4f4f5;
+  --workspace-base-start: #ffffff;
+  --workspace-base-end: #ffffff;
+  --workspace-border: var(--border);
+  --panel-bg: #fafafa;
+  --panel-border: var(--border);
+  --panel-divider: var(--border);
+  --control-bg: #ffffff;
+  --timing-input-bg: #ffffff;
+  --control-border: var(--input);
+  --control-hover: #f4f4f5;
+  --control-active: #f4f4f5;
+  --text-strong: var(--foreground);
+  --text-base: color-mix(in srgb, var(--foreground) 84%, transparent);
+  --text-muted: color-mix(in srgb, var(--foreground) 56%, transparent);
+  --text-faint: color-mix(in srgb, var(--foreground) 42%, transparent);
+  --item-hover: rgb(0 0 0 / 4%);
+  --item-active: #f4f4f5;
+  --sidebar-item-active: #f4f4f5;
+  --danger: var(--destructive);
+  --danger-soft: rgb(229 72 77 / 12%);
+  --success: var(--accent);
+  --success-soft: color-mix(in srgb, var(--accent) 12%, transparent);
+  --shadow-lg: 0 30px 90px rgba(0, 0, 0, 0.14);
+  --shadow-md: 0 18px 46px rgba(0, 0, 0, 0.12);
+  --chip-bg-soft: rgb(0 0 0 / 3%);
+  --chip-border-soft: var(--border);
+  --panel-bg-deep: rgb(0 0 0 / 3%);
+  --switch-w: 44px;
+  --switch-h: 24px;
+  --switch-thumb: 18px;
+  --switch-radius: 999px;
+  --keycap-bg: #ffffff;
+  --keycap-border: var(--border);
+  --keycap-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 1px 0 rgba(0, 0, 0, 0.08);
+  color-scheme: light;
+  background: var(--page-bg);
+}
+
+.glance-redesign.dark {
+  --background: #18181b;
+  --foreground: oklch(0.985 0 0);
+  --card: #1c1c1f;
+  --card-foreground: oklch(0.985 0 0);
+  --popover: #1c1c1f;
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: var(--accent);
+  --primary-foreground: var(--accent-contrast);
+  --secondary: #27272a;
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: #27272a;
+  --muted-foreground: oklch(0.705 0.015 286.067);
+  --ui-accent: #27272a;
+  --ui-accent-foreground: oklch(0.985 0 0);
+  --destructive: #ff756f;
+  --border: rgb(255 255 255 / 9%);
+  --input: rgb(255 255 255 / 10%);
+  --ring: color-mix(in srgb, var(--accent) 38%, transparent);
+  --page-bg: #18181b;
+  --sidebar-bg: #1c1c1f;
+  --shell-bg: #18181b;
+  --shell-side: #1c1c1f;
+  --shell-side-border: var(--border);
+  --shell-panel: #1c1c1f;
+  --shell-inset: #18181b;
+  --shell-active: #27272a;
+  --workspace-base-start: #18181b;
+  --workspace-base-end: #18181b;
+  --workspace-border: var(--border);
+  --panel-bg: #1c1c1f;
+  --panel-border: var(--border);
+  --panel-divider: var(--border);
+  --control-bg: #18181b;
+  --timing-input-bg: #28282b;
+  --control-border: var(--input);
+  --control-hover: #27272a;
+  --control-active: #27272a;
+  --text-strong: var(--foreground);
+  --text-base: rgb(244 244 245 / 84%);
+  --text-muted: rgb(161 161 170 / 82%);
+  --text-faint: rgb(161 161 170 / 58%);
+  --item-hover: rgb(255 255 255 / 4.5%);
+  --item-active: #27272a;
+  --sidebar-item-active: #27272a;
+  --danger: var(--destructive);
+  --danger-soft: rgb(255 117 111 / 14%);
+  --success: var(--accent);
+  --success-soft: color-mix(in srgb, var(--accent) 12%, transparent);
+  --shadow-lg: 0 30px 90px rgba(0, 0, 0, 0.42);
+  --shadow-md: 0 18px 46px rgba(0, 0, 0, 0.24);
+  --chip-bg-soft: rgb(255 255 255 / 4%);
+  --chip-border-soft: var(--border);
+  --panel-bg-deep: rgb(0 0 0 / 16%);
+  --switch-w: 44px;
+  --switch-h: 24px;
+  --switch-thumb: 18px;
+  --switch-radius: 999px;
+  --keycap-bg: #18181b;
+  --keycap-border: var(--border);
+  --keycap-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 1px 0 rgba(0, 0, 0, 0.45);
+  color-scheme: dark;
+}
+
+@layer components {
+  .btn-primary-chrome {
+    border-radius: var(--radius-lg);
+    border: 1.333px solid rgba(255, 255, 255, 0.12);
+    background: var(--primary);
+    box-shadow:
+      0 0 0 0.667px rgba(0, 0, 0, 0.2) inset,
+      0 2px 2px 0 rgba(255, 255, 255, 0.1) inset,
+      0 2px 2.667px -0.667px rgba(42, 42, 42, 0.1),
+      0 0.667px 0.667px 0 rgba(42, 42, 42, 0.08);
+  }
+
+  .shell-surface {
+    border: 1px solid var(--border);
+    background: var(--shell-panel);
+    box-shadow: 0 18px 48px -42px rgba(0, 0, 0, 0.72);
+  }
+
+  .shell-inset {
+    border: 1px solid var(--border);
+    background: var(--shell-inset);
+  }
 }
 
 button,
@@ -105,20 +282,20 @@ textarea:focus-visible {
   --sidebar-item-active: rgba(78, 79, 79, 0.24);
   --danger: #ff7d72;
   --danger-soft: rgba(255, 125, 114, 0.14);
-  --success: #a7ffde;
-  --success-soft: rgba(167, 255, 222, 0.12);
+  --success: #f0b100;
+  --success-soft: rgba(240, 177, 0, 0.12);
   --shadow-lg: 0 30px 90px rgba(0, 0, 0, 0.42);
   --shadow-md: 0 18px 46px rgba(0, 0, 0, 0.24);
   --radius-xl: 22px;
   --radius-lg: 18px;
   --radius-md: 14px;
   --radius-sm: 11px;
-  --accent: #a7ffde;
-  --accent-strong: #d3fff0;
-  --accent-soft: rgba(167, 255, 222, 0.16);
-  --accent-border: rgba(167, 255, 222, 0.3);
-  --accent-glow: rgba(167, 255, 222, 0.38);
-  --accent-contrast: #07110d;
+  --accent: #f0b100;
+  --accent-strong: #ffd45a;
+  --accent-soft: rgba(240, 177, 0, 0.16);
+  --accent-border: rgba(240, 177, 0, 0.3);
+  --accent-glow: rgba(240, 177, 0, 0.38);
+  --accent-contrast: #100b07;
   --mic-gate-line: color-mix(in srgb, var(--accent) 14%, transparent);
   --mic-gate-ripple: color-mix(in srgb, var(--accent) 65%, transparent);
   --signal: #ffc889;
@@ -1332,14 +1509,14 @@ textarea.control::-webkit-scrollbar-thumb {
   overflow: hidden;
   border: 1px solid var(--panel-border);
   border-radius: 18px;
-  background: rgba(0, 0, 0, 0.16);
+  background: var(--shell-panel);
 }
 
 .mic-gate__status {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 16px;
+  padding: 8px 16px;
   border-bottom: 1px solid var(--panel-divider);
   font-size: 0.76rem;
   color: var(--text-muted);
@@ -1352,7 +1529,7 @@ textarea.control::-webkit-scrollbar-thumb {
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 14px;
-  padding: 14px 16px 12px;
+  padding: 11px 16px 10px;
   border-bottom: 1px solid var(--panel-divider);
   background: rgba(255, 255, 255, 0.015);
 }
@@ -1415,7 +1592,7 @@ textarea.control::-webkit-scrollbar-thumb {
 
 .mic-gate__viz {
   position: relative;
-  min-height: 194px;
+  min-height: 132px;
   padding: 16px 18px;
   background:
     radial-gradient(520px 180px at 72% 60%, color-mix(in srgb, var(--accent) 10%, transparent), transparent 72%),
@@ -1492,15 +1669,16 @@ textarea.control::-webkit-scrollbar-thumb {
   align-items: stretch;
   flex-wrap: wrap;
   gap: 10px;
-  padding: 12px 14px;
+  padding: 10px 14px;
   border-top: 1px solid var(--panel-divider);
 }
 
 .mic-gate__chip {
   display: flex;
   flex-direction: column;
+  justify-content: center;
   gap: 3px;
-  padding: 8px 12px;
+  padding: 7px 12px;
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid var(--panel-border);
@@ -1561,11 +1739,66 @@ textarea.control::-webkit-scrollbar-thumb {
 
 .mic-gate__chip--level {
   width: min(100%, 360px);
+  min-height: 60px;
 }
 
 .mic-gate__test-button {
   min-width: 164px;
   align-self: stretch;
+  justify-content: flex-start;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.mic-gate__action-card {
+  display: flex;
+  min-height: 60px;
+  min-width: 180px;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-strong);
+  text-align: left;
+  cursor: pointer;
+  transition: background 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.mic-gate__action-card:hover {
+  border-color: var(--accent-border);
+  background: color-mix(in srgb, var(--accent) 8%, rgba(255, 255, 255, 0.03));
+}
+
+.mic-gate__action-card:focus-visible {
+  outline: 2px solid var(--accent-border);
+  outline-offset: 2px;
+}
+
+.mic-gate__action-card.is-active {
+  border-color: color-mix(in srgb, var(--accent) 46%, transparent);
+  background: color-mix(in srgb, var(--accent) 12%, rgba(255, 255, 255, 0.03));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+.mic-gate__action-value {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 0.9rem;
+  font-weight: 650;
+}
+
+.mic-gate__action-icon {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: 10px;
+  background: var(--accent);
+  color: var(--accent-contrast);
+  box-shadow: 0 10px 20px -14px var(--accent-glow);
 }
 
 .mic-gate__level-number {
@@ -2867,7 +3100,7 @@ textarea.control::-webkit-scrollbar-thumb {
   border-color: color-mix(in srgb, var(--accent) 50%, var(--keycap-border));
   color: var(--accent-strong);
   background:
-    linear-gradient(180deg, rgba(167, 255, 222, 0.06), rgba(255, 255, 255, 0.01)),
+    linear-gradient(180deg, rgba(240, 177, 0, 0.06), rgba(255, 255, 255, 0.01)),
     var(--keycap-bg);
 }
 
@@ -3116,7 +3349,7 @@ textarea.control::-webkit-scrollbar-thumb {
 .accent-swatch.is-active {
   color: var(--text-strong);
   border-color: color-mix(in srgb, var(--accent) 50%, var(--panel-border));
-  background: rgba(167, 255, 222, 0.08);
+  background: rgba(240, 177, 0, 0.08);
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 24%, transparent),
     0 8px 22px -14px var(--accent-glow);
 }
@@ -3132,7 +3365,7 @@ textarea.control::-webkit-scrollbar-thumb {
     from 200deg,
     #ff7d72,
     #ffc889,
-    #a7ffde,
+    #f0b100,
     #6aa4e2,
     #b7a6ff,
     #ff7d72
@@ -3308,7 +3541,7 @@ textarea.control::-webkit-scrollbar-thumb {
 
 .shortcut-row.is-capturing {
   border-color: color-mix(in srgb, var(--accent) 50%, transparent);
-  background: rgba(167, 255, 222, 0.04);
+  background: rgba(240, 177, 0, 0.04);
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 18%, transparent),
     0 12px 28px -16px var(--accent-glow);
 }
@@ -3327,7 +3560,7 @@ textarea.control::-webkit-scrollbar-thumb {
   padding: 4px 10px;
   border-radius: 999px;
   border: 1px dashed color-mix(in srgb, var(--accent) 60%, transparent);
-  background: rgba(167, 255, 222, 0.05);
+  background: rgba(240, 177, 0, 0.05);
   color: var(--accent-strong);
   font-size: 0.68rem;
   font-weight: 800;
@@ -3447,7 +3680,7 @@ textarea.control::-webkit-scrollbar-thumb {
 
 .session-card__toggle:hover {
   border-color: color-mix(in srgb, var(--accent) 38%, var(--panel-border));
-  background: rgba(167, 255, 222, 0.06);
+  background: rgba(240, 177, 0, 0.06);
   color: var(--accent);
 }
 

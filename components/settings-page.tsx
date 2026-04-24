@@ -30,13 +30,12 @@ import {
 } from "@/lib/color-utils";
 import { eventToKeybind } from "@/lib/keybinds";
 
+import { GlanceAppShell } from "./settings-shell/app-shell";
 import { SettingsTab } from "./settings-tab";
-import { type ProviderTab } from "./settings-tabs/shared";
-import { Button } from "./ui/button";
+import { DEFAULT_ACCENT_COLOR, type ProviderTab } from "./settings-tabs/shared";
 import { Notice } from "./ui/notice";
-import { Sidebar } from "./ui/sidebar";
 
-type SystemTheme = "dark" | "light";
+type SystemTheme = "dark";
 
 const EMPTY_RUNTIME_STATUS: RuntimeStatusPayload = {
   runtimeState: "idle",
@@ -68,6 +67,7 @@ const EMPTY_STATE: BridgeState = {
     tts_model: "eleven-v3",
     tts_voice_id: "auto",
     fallback_language: "en",
+    history_retention_enabled: true,
     history_length: 50,
     screenshot_interval: 1.5,
     screen_change_threshold: 0.08,
@@ -75,9 +75,13 @@ const EMPTY_STATE: BridgeState = {
     audio_input_device: "default",
     audio_output_device: "default",
     audio_activation_threshold: 0.026,
+    audio_silence_timeout_enabled: true,
     audio_silence_seconds: 0.5,
-    audio_max_wait_seconds: 30,
-    audio_max_record_seconds: 100,
+    audio_wait_for_speech_enabled: true,
+    audio_max_wait_seconds: 15,
+    audio_max_turn_length_enabled: true,
+    audio_max_record_seconds: 30,
+    audio_preroll_enabled: true,
     audio_preroll_seconds: 0.25,
     system_prompt_override: "",
     text_prompt_override: "",
@@ -85,7 +89,7 @@ const EMPTY_STATE: BridgeState = {
     voice_polish_prompt_override: "",
     transcription_prompt_override: "",
     theme_preference: "dark",
-    accent_color: "#a7ffde",
+    accent_color: DEFAULT_ACCENT_COLOR,
   },
   errors: {},
   dirty: false,
@@ -112,13 +116,36 @@ const EMPTY_STATE: BridgeState = {
   reasoningOptions: ["minimal", "low", "medium", "high"],
   transcriptionReasoningOptions: ["minimal", "low", "medium", "high"],
   ttsModelOptions: ["eleven-v3"],
-  voiceOptions: ["auto"],
+  voiceOptions: [
+    "auto",
+    "BIvP0GN1cAtSRTxNHnWS",
+    "EkK5I93UQWFDigLMpZcX",
+    "aMSt68OGf4xUZAnLpTU8",
+    "UgBBYS2sOqTuMpoF3BR0",
+    "Z3R5wn05IrDiVCyEkUrK",
+    "RILOU7YmBhvwJGDGjNmP",
+    "tnSpp4vdxKPjI9w0GnoV",
+    "NNl6r8mD7vthiJatiJt1",
+  ],
   voiceOptionLabels: {
     auto: "Auto",
+    BIvP0GN1cAtSRTxNHnWS: "Ellen - Serious, Direct and Confident",
+    EkK5I93UQWFDigLMpZcX: "James - Husky, Engaging and Bold",
+    aMSt68OGf4xUZAnLpTU8: "Juniper - Grounded and Professional",
+    UgBBYS2sOqTuMpoF3BR0: "Mark - Natural Conversations",
+    Z3R5wn05IrDiVCyEkUrK: "Arabella - Mysterious and Emotive",
+    RILOU7YmBhvwJGDGjNmP: "Jane - Professional Audiobook Reader",
+    tnSpp4vdxKPjI9w0GnoV: "Hope - Upbeat and Clear",
+    NNl6r8mD7vthiJatiJt1: "Bradford - Expressive and Articulate",
   },
   languageOptions: ["en", "lt", "fr", "de", "es"],
   promptDefaults: {},
   historyPreview: [],
+  historyStats: {
+    totalSessions: 0,
+    oldestAt: "",
+    newestAt: "",
+  },
 };
 
 function pickRuntimeStatus(snapshot: RuntimeStatusPayload): RuntimeStatusPayload {
@@ -181,7 +208,7 @@ function buildThemeStyle(
   accentColor: string,
   resolvedTheme: SystemTheme,
 ): CSSProperties {
-  const accentHex = normalizeHexColor(accentColor, "#a7ffde");
+  const accentHex = normalizeHexColor(accentColor, DEFAULT_ACCENT_COLOR);
   const accentRgb = hexToRgb(accentHex);
   const accentHsl = rgbToHsl(accentRgb);
   const accentStrong = hslToHex(
@@ -215,7 +242,6 @@ function buildThemeStyle(
 
 export function SettingsPage() {
   const [state, setState] = useState<BridgeState | null>(null);
-  const [systemTheme, setSystemTheme] = useState<SystemTheme>("dark");
   const [isMacOs, setIsMacOs] = useState(false);
   const [providerTab, setProviderTab] = useState<ProviderTab>("transcription");
   const [openSelect, setOpenSelect] = useState<string | null>(null);
@@ -240,10 +266,8 @@ export function SettingsPage() {
     }
   }, [multimodalLive, providerTab]);
   const thresholdValue = thresholdDraft ?? Number(liveState.settings.audio_activation_threshold || 0.026);
-  const themePreference = String(liveState.settings.theme_preference || "dark");
-  const resolvedTheme =
-    themePreference === "system" ? systemTheme : (themePreference as SystemTheme);
-  const accentColor = String(liveState.settings.accent_color || "#a7ffde");
+  const resolvedTheme: SystemTheme = "dark";
+  const accentColor = String(liveState.settings.accent_color || DEFAULT_ACCENT_COLOR);
   const themeStyle = useMemo(
     () => buildThemeStyle(accentColor, resolvedTheme),
     [accentColor, resolvedTheme],
@@ -251,7 +275,7 @@ export function SettingsPage() {
   const activeSection = sectionMeta(liveState.currentSection);
 
   const applySnapshot = useEffectEvent(
-    (snapshot: BridgeState, nextSystemTheme?: SystemTheme) => {
+    (snapshot: BridgeState) => {
       startTransition(() => {
         setState((current) => {
           const nextState = mergeRuntimeSnapshot(current, snapshot);
@@ -264,9 +288,6 @@ export function SettingsPage() {
           }
           return { [editingField]: current[editingField] };
         });
-        if (nextSystemTheme) {
-          setSystemTheme(nextSystemTheme);
-        }
       });
     },
   );
@@ -284,11 +305,7 @@ export function SettingsPage() {
     });
   });
 
-  const refreshState = useEffectEvent(async ({
-    includeSystemTheme = false,
-  }: {
-    includeSystemTheme?: boolean;
-  } = {}) => {
+  const refreshState = useEffectEvent(async () => {
     const bridge = getBridge();
     if (!bridge) {
       setBridgeError("Open Glance from the tray to reconnect.");
@@ -302,13 +319,7 @@ export function SettingsPage() {
     refreshInFlightRef.current = true;
 
     try {
-      const [snapshot, nextSystemTheme] = await Promise.all([
-        bridge.getState(),
-        includeSystemTheme
-          ? bridge.getSystemTheme().catch(() => systemTheme)
-          : Promise.resolve(undefined),
-      ]);
-      applySnapshot(snapshot, nextSystemTheme);
+      applySnapshot(await bridge.getState());
     } catch (error) {
       setBridgeError(formatError(error));
     } finally {
@@ -317,14 +328,14 @@ export function SettingsPage() {
   });
 
   useEffect(() => {
-    void refreshState({ includeSystemTheme: true });
+    void refreshState();
   }, []);
 
   const refreshVisibleState = useEffectEvent(() => {
     if (document.visibilityState !== "visible") {
       return;
     }
-    void refreshState({ includeSystemTheme: true });
+    void refreshState();
   });
 
   useEffect(() => {
@@ -678,6 +689,16 @@ export function SettingsPage() {
     const bridge = getBridge();
     setOpenSelect(null);
     if (!bridge) {
+      setState((current) => {
+        const nextState = current ?? EMPTY_STATE;
+        return {
+          ...nextState,
+          settings: {
+            ...nextState.settings,
+            [fieldName]: value,
+          },
+        };
+      });
       return;
     }
     void withSnapshot(bridge.setField(fieldName, value));
@@ -690,6 +711,16 @@ export function SettingsPage() {
     const bridge = getBridge();
     setOpenSelect(null);
     if (!bridge) {
+      setState((current) => {
+        const nextState = current ?? EMPTY_STATE;
+        return {
+          ...nextState,
+          settings: {
+            ...nextState.settings,
+            [fieldName]: value,
+          },
+        };
+      });
       return;
     }
     void withSnapshot(bridge.setField(fieldName, value));
@@ -832,97 +863,56 @@ export function SettingsPage() {
     : "Discard changes";
 
   return (
-    <main
-      className="desktop-shell"
-      data-theme={resolvedTheme}
-      data-platform={isMacOs ? "darwin" : "other"}
+    <GlanceAppShell
+      state={liveState}
+      title={activeSection.title}
+      description={activeSection.description}
+      footerStatus={footerStatus}
+      discardLabel={discardLabel}
+      theme={resolvedTheme}
+      skipLinkEnabled={skipLinkEnabled}
+      skipLinkRef={skipLinkRef}
+      workspaceRef={workspaceRef}
+      scrollViewportRef={scrollViewportRef}
       style={themeStyle}
+      selectOpen={openSelect !== null}
+      onSelectSection={handleSectionSelect}
+      onSave={() => handleRunAction("save")}
+      onDiscard={() => handleRunAction("reset")}
     >
-      {skipLinkEnabled ? (
-        <a
-          ref={skipLinkRef}
-          className="skip-link"
-          href="#workspace-content"
+      {bridgeError ? (
+        <div
+          className="mb-4 rounded-2xl border border-red-400/25 bg-red-400/10 px-4 py-3 text-sm font-medium text-red-100"
+          role="alert"
         >
-          Skip to content
-        </a>
+          {bridgeError}
+        </div>
       ) : null}
 
-      <div className="desktop-shell__frame">
-        <Sidebar
-          state={liveState}
-          onSelectSection={handleSectionSelect}
-        />
+      <Notice state={liveState} />
 
-        <section className="workspace-shell" ref={workspaceRef}>
-          <header className="workspace-shell__header">
-            <div className="workspace-shell__title-block">
-              <h1>{activeSection.title}</h1>
-              <p>{activeSection.description}</p>
-            </div>
-          </header>
-
-          {bridgeError ? (
-            <div className="bridge-banner" role="alert">
-              <span>{bridgeError}</span>
-            </div>
-          ) : null}
-
-          <Notice state={liveState} />
-
-          <div
-            className="workspace-shell__scroll"
-            id="workspace-content"
-            ref={scrollViewportRef}
-            tabIndex={-1}
-            data-scroll-host="true"
-          >
-            <SettingsTab
-              state={liveState}
-              stateReady={state !== null}
-              providerTab={providerTab}
-              openSelect={openSelect}
-              thresholdValue={thresholdValue}
-              audioLevel={liveState.audioInputLevel}
-              revealedFields={revealedFields}
-              onChangeProviderTab={setProviderTab}
-              onToggleSelect={handleToggleSelect}
-              onSelectValue={handleSelectValue}
-              onSetField={handleSetField}
-              onDraftChange={handleDraftChange}
-              onDraftCommit={handleDraftCommit}
-              onDraftFocus={handleDraftFocus}
-              onToggleReveal={handleToggleReveal}
-              onRunAction={handleRunAction}
-              onThresholdPointerDown={handleThresholdPointerDown}
-              onThresholdNudge={handleThresholdNudge}
-              onStartKeybindCapture={handleStartKeybindCapture}
-              getDraftValue={getDraftValue}
-            />
-          </div>
-
-          <footer className="action-dock">
-            <div className="action-dock__status">{footerStatus}</div>
-            <div className="action-dock__actions">
-              {liveState.manualSaveDirty ? (
-                <Button
-                  label="Save Provider Changes"
-                  icon="check"
-                  variant="primary"
-                  onClick={() => handleRunAction("save")}
-                />
-              ) : null}
-              <Button
-                label={discardLabel}
-                icon="undo"
-                variant="ghost"
-                disabled={!liveState.dirty}
-                onClick={() => handleRunAction("reset")}
-              />
-            </div>
-          </footer>
-        </section>
-      </div>
-    </main>
+      <SettingsTab
+        state={liveState}
+        stateReady={state !== null}
+        providerTab={providerTab}
+        openSelect={openSelect}
+        thresholdValue={thresholdValue}
+        audioLevel={liveState.audioInputLevel}
+        revealedFields={revealedFields}
+        onChangeProviderTab={setProviderTab}
+        onToggleSelect={handleToggleSelect}
+        onSelectValue={handleSelectValue}
+        onSetField={handleSetField}
+        onDraftChange={handleDraftChange}
+        onDraftCommit={handleDraftCommit}
+        onDraftFocus={handleDraftFocus}
+        onToggleReveal={handleToggleReveal}
+        onRunAction={handleRunAction}
+        onThresholdPointerDown={handleThresholdPointerDown}
+        onThresholdNudge={handleThresholdNudge}
+        onStartKeybindCapture={handleStartKeybindCapture}
+        getDraftValue={getDraftValue}
+      />
+    </GlanceAppShell>
   );
 }

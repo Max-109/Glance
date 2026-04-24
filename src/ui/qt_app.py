@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 import os
 import sys
 import logging
@@ -235,6 +236,7 @@ def run_settings_app() -> int:
     history_manager = HistoryManager(
         SessionDirectoryRepository(paths.sessions_dir),
         history_limit=settings.history_length,
+        retention_enabled=settings.history_retention_enabled,
     )
     controller = SettingsViewModel(settings_manager, history_manager)
     settings_bridge = SettingsBridgeServer(controller)
@@ -248,9 +250,30 @@ def run_settings_app() -> int:
         output_device_id=settings.audio_output_device,
         logger=logger,
     )
+
+    def persist_electron_window_size(width: int, height: int) -> None:
+        current_settings = settings_manager.current()
+        if (
+            current_settings.electron_window_width == width
+            and current_settings.electron_window_height == height
+        ):
+            return
+        settings_manager.save(
+            replace(
+                current_settings,
+                electron_window_width=width,
+                electron_window_height=height,
+            ),
+            validate=False,
+        )
+        controller.syncElectronWindowSize(width, height)
+
     settings_window = _build_settings_window(
         bridge_url=settings_bridge.url,
         logger=logger,
+        initial_width=settings.electron_window_width,
+        initial_height=settings.electron_window_height,
+        on_bounds_changed=persist_electron_window_size,
     )
     tray = _build_tray_icon(
         app,
@@ -287,7 +310,10 @@ def run_settings_app() -> int:
         persisted_settings = settings_manager.reload()
         update_console_logging_accent(persisted_settings.accent_color)
         logger.debug("refreshing runtime from saved settings")
-        history_manager.set_history_limit(persisted_settings.history_length)
+        history_manager.set_history_policy(
+            persisted_settings.history_length,
+            persisted_settings.history_retention_enabled,
+        )
         try:
             live_controller.set_orchestrator(
                 _build_runtime_orchestrator(
@@ -367,11 +393,17 @@ def _build_settings_window(
     *,
     bridge_url: str,
     logger: logging.Logger,
+    initial_width: int,
+    initial_height: int,
+    on_bounds_changed,
 ):
     window = ElectronShellController(
         project_root=Path(__file__).resolve().parents[2],
         bridge_url=bridge_url,
         logger=logger,
+        initial_width=initial_width,
+        initial_height=initial_height,
+        on_bounds_changed=on_bounds_changed,
     )
     logger.debug("using Electron settings shell")
     return window

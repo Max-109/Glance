@@ -1,9 +1,13 @@
-import { Icon } from "../icons";
-import { Input } from "../ui/input";
-import { Panel } from "../ui/panel";
-import { SelectInput } from "../ui/select-input";
-import { StatusPill, type StatusPillTone } from "../ui/status-pill";
-import { ToggleField } from "../ui/toggle-field";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { FieldControl, SelectControl, ToggleCard } from "@/components/settings-shell/form-controls";
+import { ProviderCard } from "@/components/settings-shell/provider-card";
+import type { StatusTone } from "@/components/settings-shell/status-badge";
 
 import {
   PROVIDER_CARDS,
@@ -17,17 +21,18 @@ import {
 function providerStatus(
   state: SettingsTabProps["state"],
   providerTab: ProviderTab,
-): { tone: StatusPillTone; label: string; detail: string } {
+): { tone: StatusTone; label: string; detail: string } {
   const multimodalLive = Boolean(state.settings.multimodal_live_enabled);
 
   if (providerTab === "llm") {
     if (multimodalLive) {
       return {
-        tone: "warm",
+        tone: "disabled",
         label: "Disabled",
         detail: "Transcription model handles replies.",
       };
     }
+
     const configured =
       Boolean(settingValue(state, "llm_base_url")) &&
       Boolean(settingValue(state, "llm_model_name")) &&
@@ -39,7 +44,7 @@ function providerStatus(
           detail: settingValue(state, "llm_model_name"),
         }
       : {
-          tone: "warm",
+          tone: "warning",
           label: "Setup",
           detail: "Add the URL, key, and model.",
         };
@@ -57,7 +62,7 @@ function providerStatus(
           detail: settingValue(state, "tts_model"),
         }
       : {
-          tone: "warm",
+          tone: "warning",
           label: "Setup",
           detail: "Add the URL, key, and model.",
         };
@@ -74,7 +79,7 @@ function providerStatus(
         detail: settingValue(state, "transcription_model_name"),
       }
     : {
-        tone: "warm",
+        tone: "warning",
         label: "Setup",
         detail: "Add the URL, key, and model.",
       };
@@ -118,12 +123,16 @@ export function ProvidersTab({
   const replyDisabled = multimodalLive;
 
   return (
-    <div className="stack">
-      <Panel
-        title="Providers"
-        description="Choose where transcription, replies, and voice come from."
-      >
-        <div className="provider-tabs" role="tablist" aria-label="Provider">
+    <Card className="shell-surface gap-0 rounded-2xl py-0 shadow-none">
+      <CardHeader className="border-b border-border px-5 py-4">
+        <CardTitle className="text-base font-semibold">Providers</CardTitle>
+        <CardDescription>
+          Choose where transcription, replies, and voice come from.
+        </CardDescription>
+      </CardHeader>
+
+      <CardContent className="space-y-4 px-5 py-5">
+        <div className="grid gap-3 lg:grid-cols-3" role="tablist" aria-label="Provider">
           {PROVIDER_CARDS.map((provider) => {
             const selected = providerTab === provider.id;
             const status = providerStatus(state, provider.id);
@@ -131,40 +140,28 @@ export function ProvidersTab({
             const tooltip = isReplyBypassed
               ? "Disabled because Transcription is set to multimodal. Turn it off to use a separate reply model."
               : undefined;
+
             return (
-              <button
+              <ProviderCard
                 key={provider.id}
-                type="button"
-                role="tab"
-                aria-selected={selected}
-                aria-disabled={isReplyBypassed || undefined}
-                title={tooltip}
-                className={`provider-tab provider-tab--${provider.id}${selected ? " is-active" : ""}${isReplyBypassed ? " is-bypassed" : ""}`}
-                onClick={() => {
-                  if (isReplyBypassed) return;
-                  onChangeProviderTab(provider.id);
-                }}
-              >
-                <span className="provider-tab__icon">
-                  <Icon name={provider.icon} />
-                </span>
-                <span className="provider-tab__copy">
-                  <span className="provider-tab__eyebrow">{provider.eyebrow}</span>
-                  <span className="provider-tab__title">{provider.label}</span>
-                </span>
-                <StatusPill tone={status.tone} label={status.label} />
-                {status.detail ? (
-                  <span className="provider-tab__detail">{status.detail}</span>
-                ) : null}
-              </button>
+                eyebrow={provider.eyebrow}
+                title={provider.label}
+                icon={provider.icon}
+                status={{ tone: status.tone, label: status.label }}
+                detail={status.detail}
+                selected={selected}
+                disabled={isReplyBypassed}
+                tooltip={tooltip}
+                onClick={() => onChangeProviderTab(provider.id)}
+              />
             );
           })}
         </div>
 
         {providerTab === "llm" ? (
-          <div className="stack">
-            <div className="field-grid field-grid--two-column field-grid--wide-bias">
-              <Input
+          <div className="grid gap-4">
+            <div className="grid gap-4 lg:grid-cols-[1.2fr_0.9fr]">
+              <FieldControl
                 fieldName="llm_base_url"
                 label="Base URL"
                 icon="api"
@@ -176,7 +173,7 @@ export function ProvidersTab({
                 onFocus={() => onDraftFocus("llm_base_url")}
               />
 
-              <Input
+              <FieldControl
                 fieldName="llm_model_name"
                 label="Model"
                 icon="model"
@@ -188,7 +185,7 @@ export function ProvidersTab({
               />
             </div>
 
-            <Input
+            <FieldControl
               fieldName="llm_api_key"
               label="API Key"
               icon="key"
@@ -201,7 +198,7 @@ export function ProvidersTab({
               onToggleReveal={() => onToggleReveal("llm_api_key")}
             />
 
-            <ToggleField
+            <ToggleCard
               label="Reasoning"
               helperText="Let the model think before it answers."
               icon="brain"
@@ -209,32 +206,28 @@ export function ProvidersTab({
               onChange={(nextValue) => onSetField("llm_reasoning_enabled", nextValue)}
             />
 
-            <div
-              className={`reasoning-expand${llmReasoning ? "" : " reasoning-expand--closed"}`}
-              aria-hidden={!llmReasoning}
-            >
-              <div className="reasoning-expand__inner">
-                <SelectInput
-                  fieldName="llm_reasoning"
-                  label="Reasoning Level"
-                  icon="level-3"
-                  value={settingValue(state, "llm_reasoning") || "medium"}
-                  options={state.reasoningOptions}
-                  labels={REASONING_LABELS}
-                  optionIcons={REASONING_ICONS}
-                  helperText="Default depth for replies."
-                  open={openSelect === "llm_reasoning"}
-                  onToggle={() => onToggleSelect("llm_reasoning")}
-                  onSelect={(value) => onSelectValue("llm_reasoning", value)}
-                />
-              </div>
-            </div>
+            {llmReasoning ? (
+              <SelectControl
+                fieldName="llm_reasoning"
+                label="Reasoning Level"
+                icon="level-3"
+                accented
+                value={settingValue(state, "llm_reasoning") || "medium"}
+                options={state.reasoningOptions}
+                labels={REASONING_LABELS}
+                optionIcons={REASONING_ICONS}
+                helperText="Default depth for replies."
+                open={openSelect === "llm_reasoning"}
+                onToggle={() => onToggleSelect("llm_reasoning")}
+                onSelect={(value) => onSelectValue("llm_reasoning", value)}
+              />
+            ) : null}
           </div>
         ) : null}
 
         {providerTab === "speech" ? (
-          <div className="stack">
-            <Input
+          <div className="grid gap-4">
+            <FieldControl
               fieldName="tts_base_url"
               label="Base URL"
               icon="api"
@@ -246,8 +239,8 @@ export function ProvidersTab({
               onFocus={() => onDraftFocus("tts_base_url")}
             />
 
-            <div className="field-grid field-grid--two-column">
-              <Input
+            <div className="grid gap-4 lg:grid-cols-[1.2fr_0.9fr]">
+              <FieldControl
                 fieldName="tts_api_key"
                 label="API Key"
                 icon="key"
@@ -260,7 +253,7 @@ export function ProvidersTab({
                 onToggleReveal={() => onToggleReveal("tts_api_key")}
               />
 
-              <SelectInput
+              <SelectControl
                 fieldName="tts_model"
                 label="Model"
                 icon="speaker"
@@ -275,9 +268,9 @@ export function ProvidersTab({
         ) : null}
 
         {providerTab === "transcription" ? (
-          <div className="stack">
-            <div className="field-grid field-grid--two-column field-grid--wide-bias">
-              <Input
+          <div className="grid gap-4">
+            <div className="grid gap-4 lg:grid-cols-[1.2fr_0.9fr]">
+              <FieldControl
                 fieldName="transcription_base_url"
                 label="Base URL"
                 icon="api"
@@ -289,7 +282,7 @@ export function ProvidersTab({
                 onFocus={() => onDraftFocus("transcription_base_url")}
               />
 
-              <Input
+              <FieldControl
                 fieldName="transcription_model_name"
                 label="Model"
                 icon="mic"
@@ -301,7 +294,7 @@ export function ProvidersTab({
               />
             </div>
 
-            <Input
+            <FieldControl
               fieldName="transcription_api_key"
               label="API Key"
               icon="key"
@@ -314,7 +307,7 @@ export function ProvidersTab({
               onToggleReveal={() => onToggleReveal("transcription_api_key")}
             />
 
-            <ToggleField
+            <ToggleCard
               label="Reasoning"
               helperText="Let the transcription model think before it returns text."
               icon="brain"
@@ -324,28 +317,24 @@ export function ProvidersTab({
               }
             />
 
-            <div
-              className={`reasoning-expand${transcriptionReasoning ? "" : " reasoning-expand--closed"}`}
-              aria-hidden={!transcriptionReasoning}
-            >
-              <div className="reasoning-expand__inner">
-                <SelectInput
-                  fieldName="transcription_reasoning"
-                  label="Reasoning Level"
-                  icon="level-3"
-                  value={settingValue(state, "transcription_reasoning") || "medium"}
-                  options={state.transcriptionReasoningOptions}
-                  labels={REASONING_LABELS}
-                  optionIcons={REASONING_ICONS}
-                  helperText="Default depth for transcription."
-                  open={openSelect === "transcription_reasoning"}
-                  onToggle={() => onToggleSelect("transcription_reasoning")}
-                  onSelect={(value) => onSelectValue("transcription_reasoning", value)}
-                />
-              </div>
-            </div>
+            {transcriptionReasoning ? (
+              <SelectControl
+                fieldName="transcription_reasoning"
+                label="Reasoning Level"
+                icon="level-3"
+                accented
+                value={settingValue(state, "transcription_reasoning") || "medium"}
+                options={state.transcriptionReasoningOptions}
+                labels={REASONING_LABELS}
+                optionIcons={REASONING_ICONS}
+                helperText="Default depth for transcription."
+                open={openSelect === "transcription_reasoning"}
+                onToggle={() => onToggleSelect("transcription_reasoning")}
+                onSelect={(value) => onSelectValue("transcription_reasoning", value)}
+              />
+            ) : null}
 
-            <ToggleField
+            <ToggleCard
               label="Multimodal model"
               helperText="Have this model also write the reply, skipping a separate text model."
               icon="bot"
@@ -356,7 +345,7 @@ export function ProvidersTab({
             />
           </div>
         ) : null}
-      </Panel>
-    </div>
+      </CardContent>
+    </Card>
   );
 }

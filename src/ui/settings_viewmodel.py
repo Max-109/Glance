@@ -32,7 +32,6 @@ from src.services.keybinds import (
     normalize_keybind,
     qt_event_to_keybind,
 )
-from src.services.providers import NagaSpeechProvider
 from src.services.settings_manager import SettingsManager
 
 
@@ -78,6 +77,7 @@ class SettingsViewModel(QObject):
         | None = None,
         audio_signal_service: AudioTestSignalService | None = None,
         playback_service_factory: Callable[[], QtAudioPlaybackService] | None = None,
+        voice_preview_dir: Path | None = None,
     ) -> None:
         super().__init__()
         self._settings_manager = settings_manager
@@ -108,6 +108,7 @@ class SettingsViewModel(QObject):
         self._preview_thread: Thread | None = None
         self._preview_stop_event: Event | None = None
         self._preview_playback_service: QtAudioPlaybackService | None = None
+        self._voice_preview_dir = voice_preview_dir or _default_voice_preview_dir()
         self._audio_input_options = ["default"]
         self._audio_output_options = ["default"]
         self._audio_input_labels = {"default": "System Default Input"}
@@ -132,6 +133,22 @@ class SettingsViewModel(QObject):
     @Property("QVariantMap", notify=settingsChanged)
     def settings(self) -> dict[str, Any]:
         return dict(self._settings_map)
+
+    def syncElectronWindowSize(self, width: int, height: int) -> None:
+        next_values = {
+            "electron_window_width": int(width),
+            "electron_window_height": int(height),
+        }
+        changed = False
+        for field_name, value in next_values.items():
+            if self._baseline_map.get(field_name) != value:
+                self._baseline_map[field_name] = value
+                changed = True
+            if self._settings_map.get(field_name) != value:
+                self._settings_map[field_name] = value
+                changed = True
+        if changed:
+            self.settingsChanged.emit()
 
     @Property("QVariantMap", notify=errorsChanged)
     def errors(self) -> dict[str, str]:
@@ -550,9 +567,13 @@ class SettingsViewModel(QObject):
             "audio_input_device",
             "audio_output_device",
             "audio_activation_threshold",
+            "audio_silence_timeout_enabled",
             "audio_silence_seconds",
+            "audio_wait_for_speech_enabled",
             "audio_max_wait_seconds",
+            "audio_max_turn_length_enabled",
             "audio_max_record_seconds",
+            "audio_preroll_enabled",
             "audio_preroll_seconds",
         )
         updated = False
@@ -599,14 +620,19 @@ class SettingsViewModel(QObject):
         self._coerce_bool(payload, "llm_reasoning_enabled")
         self._coerce_bool(payload, "transcription_reasoning_enabled")
         self._coerce_bool(payload, "multimodal_live_enabled")
+        self._coerce_bool(payload, "history_retention_enabled")
         self._coerce_positive_int(payload, "history_length", errors)
         self._coerce_positive_float(payload, "screenshot_interval", errors)
         self._coerce_positive_float(payload, "batch_window_duration", errors)
         self._coerce_ratio(payload, "screen_change_threshold", errors)
         self._coerce_ratio(payload, "audio_activation_threshold", errors)
+        payload["audio_silence_timeout_enabled"] = True
         self._coerce_positive_float(payload, "audio_silence_seconds", errors)
+        self._coerce_bool(payload, "audio_wait_for_speech_enabled")
         self._coerce_positive_float(payload, "audio_max_wait_seconds", errors)
+        self._coerce_bool(payload, "audio_max_turn_length_enabled")
         self._coerce_positive_float(payload, "audio_max_record_seconds", errors)
+        self._coerce_bool(payload, "audio_preroll_enabled")
         self._coerce_non_negative_float(payload, "audio_preroll_seconds", errors)
         self._coerce_theme(payload, "theme_preference", errors)
         self._coerce_hex_color(payload, "accent_color", errors)
@@ -839,29 +865,21 @@ class SettingsViewModel(QObject):
     def _run_voice_preview(
         self, settings: AppSettings, voice_name: str, stop_event: Event
     ) -> None:
-        temp_file = tempfile.NamedTemporaryFile(
-            prefix="glance-voice-preview-",
-            suffix=".wav",
-            delete=False,
-        )
-        temp_file.close()
-        output_path = Path(temp_file.name)
-        generated_path = output_path
+        preview_path = self._voice_preview_sample_path(voice_name)
         try:
-            provider = NagaSpeechProvider(settings)
-            generated_path = Path(
-                provider.synthesize(
-                text=(
-                    f"Hello, I am {self._voice_preview_label(voice_name)}. "
-                    "This is how I sound in Glance."
-                ),
-                output_path=output_path,
+            if not preview_path.exists() or preview_path.stat().st_size == 0:
+                self._previewStatusRequested.emit(
+                    (
+                        f"No recorded sample for {self._voice_preview_label(voice_name)}. "
+                        "Generate voice previews first."
+                    ),
+                    "error",
                 )
-            )
+                return
             if stop_event.is_set():
                 return
             playback_service = self._ensure_preview_playback_service()
-            playback_service.play_blocking(str(generated_path), stop_event=stop_event)
+            playback_service.play_blocking(str(preview_path), stop_event=stop_event)
             if not stop_event.is_set():
                 self._previewStatusRequested.emit(
                     f"Previewed {self._voice_preview_label(voice_name)}.",
@@ -873,11 +891,10 @@ class SettingsViewModel(QObject):
                     f"Voice preview failed: {exc}", "error"
                 )
         finally:
-            try:
-                generated_path.unlink(missing_ok=True)
-            except OSError:
-                pass
             self._previewFinished.emit(voice_name)
+
+    def _voice_preview_sample_path(self, voice_name: str) -> Path:
+        return self._voice_preview_dir / f"{_safe_cache_part(voice_name)}.wav"
 
     @staticmethod
     def _voice_preview_label(voice_name: str) -> str:
@@ -954,7 +971,7 @@ class SettingsViewModel(QObject):
                 pass
             self._speakerTestFinished.emit()
 
-    def buildHistoryPreview(self, limit: int = 3) -> list[dict[str, Any]]:
+    def buildHistoryPreview(self, limit: int = 8) -> list[dict[str, Any]]:
         sessions = self._history_manager.list_sessions()
         preview_items: list[dict[str, Any]] = []
         for session in reversed(sessions[-limit:]):
@@ -972,6 +989,14 @@ class SettingsViewModel(QObject):
                 }
             )
         return preview_items
+
+    def buildHistoryStats(self) -> dict[str, Any]:
+        sessions = self._history_manager.list_sessions()
+        return {
+            "totalSessions": len(sessions),
+            "oldestAt": sessions[0].created_at if sessions else "",
+            "newestAt": sessions[-1].created_at if sessions else "",
+        }
 
     def _apply_autosave(self) -> None:
         settings = self._validate_current_settings(
@@ -991,6 +1016,10 @@ class SettingsViewModel(QObject):
     def _persist_autosaved_settings(self, settings: AppSettings) -> None:
         current_settings = deepcopy(self._settings_map)
         self._settings_manager.save(settings, validate=False)
+        self._history_manager.set_history_policy(
+            settings.history_length,
+            settings.history_retention_enabled,
+        )
         self._baseline_map = settings.to_dict()
         self._settings_map = deepcopy(self._baseline_map)
         for field_name in self._MANUAL_SAVE_FIELDS:
@@ -1005,6 +1034,10 @@ class SettingsViewModel(QObject):
 
     def _persist_settings(self, settings: AppSettings, *, status_message: str) -> None:
         self._settings_manager.save(settings, validate=False)
+        self._history_manager.set_history_policy(
+            settings.history_length,
+            settings.history_retention_enabled,
+        )
         self._baseline_map = settings.to_dict()
         self._settings_map = deepcopy(self._baseline_map)
         self._errors = {}
@@ -1149,3 +1182,15 @@ class SettingsViewModel(QObject):
             if cleaned:
                 return cleaned
         return "Saved interaction."
+
+
+def _safe_cache_part(value: object) -> str:
+    safe_value = "".join(
+        character if character.isalnum() or character in {"-", "_"} else "-"
+        for character in str(value).strip().lower()
+    ).strip("-")
+    return safe_value or "default"
+
+
+def _default_voice_preview_dir() -> Path:
+    return Path(__file__).resolve().parents[1] / "assets" / "voice-previews"

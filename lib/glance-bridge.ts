@@ -15,6 +15,12 @@ export interface HistoryPreviewItem {
   interactionCount: number;
 }
 
+export interface HistoryStats {
+  totalSessions: number;
+  oldestAt: string;
+  newestAt: string;
+}
+
 export interface RuntimeStatusPayload {
   runtimeState: string;
   runtimeMessage: string;
@@ -61,6 +67,7 @@ export interface BridgeState {
   languageOptions: string[];
   promptDefaults: Record<string, string>;
   historyPreview: HistoryPreviewItem[];
+  historyStats: HistoryStats;
 }
 
 export interface AudioBridgeState {

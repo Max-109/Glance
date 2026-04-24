@@ -4,7 +4,9 @@ import type {
 } from "react";
 import { useEffect, useRef, useState } from "react";
 
-import { Button } from "./button";
+import { Icon } from "@/components/icons";
+
+const DEFAULT_ACCENT_COLOR = "#f0b100";
 
 const MIC_GATE_HISTORY_SECONDS = 6;
 const MIC_GATE_SAMPLE_HZ = 30;
@@ -148,12 +150,12 @@ export function MicThreshold({
     };
 
     const fallbackColors: Colors = {
-      accent: "#a7ffde",
-      accentStrong: "#d3fff0",
-      accentGlow: "rgba(167, 255, 222, 0.38)",
+      accent: DEFAULT_ACCENT_COLOR,
+      accentStrong: "#ffd45a",
+      accentGlow: "rgba(240, 177, 0, 0.38)",
       muted: "rgba(255, 255, 255, 0.22)",
-      line: "rgba(167, 255, 222, 0.14)",
-      ripple: "rgba(167, 255, 222, 0.65)",
+      line: "rgba(240, 177, 0, 0.14)",
+      ripple: "rgba(240, 177, 0, 0.65)",
     };
 
     let cachedColors: Colors = fallbackColors;
@@ -609,14 +611,19 @@ export function MicThreshold({
           </span>
         </div>
 
-        <Button
-          label={active ? "Stop Mic Test" : "Start Mic Test"}
-          icon={active ? "stop" : "mic"}
-          variant="signal"
-          active={active}
-          className="mic-gate__test-button"
+        <button
+          type="button"
+          className={`mic-gate__action-card${active ? " is-active" : ""}`}
           onClick={onToggleTest}
-        />
+        >
+          <span className="mic-gate__chip-label">Mic test</span>
+          <span className="mic-gate__action-value">
+            <span className="mic-gate__action-icon">
+              <Icon name={active ? "stop" : "mic"} className="size-4" />
+            </span>
+            <span>{active ? "Stop test" : "Start test"}</span>
+          </span>
+        </button>
       </div>
     </div>
   );

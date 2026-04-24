@@ -9,10 +9,12 @@ class HistoryManager:
         self,
         repository: AbstractRepository[SessionRecord],
         history_limit: int,
+        retention_enabled: bool = True,
     ) -> None:
         self._repository = repository
-        self._sessions = repository.load()
-        self._history_limit = history_limit
+        self._history_limit = max(1, int(history_limit))
+        self._retention_enabled = bool(retention_enabled)
+        self._sessions = self._apply_retention(repository.load(), persist=True)
 
     def start_session(self, mode: str) -> SessionRecord:
         return SessionRecord(mode=mode)
@@ -34,8 +36,7 @@ class HistoryManager:
             updated_sessions.append(session)
         else:
             updated_sessions[existing_index] = session
-        if len(updated_sessions) > self._history_limit:
-            updated_sessions = updated_sessions[-self._history_limit :]
+        updated_sessions = self._apply_retention(updated_sessions)
         self._repository.save(updated_sessions)
         self._sessions = updated_sessions
 
@@ -47,4 +48,28 @@ class HistoryManager:
         self._sessions = []
 
     def set_history_limit(self, history_limit: int) -> None:
-        self._history_limit = history_limit
+        self.set_history_policy(
+            history_limit=history_limit,
+            retention_enabled=self._retention_enabled,
+        )
+
+    def set_history_policy(self, history_limit: int, retention_enabled: bool) -> None:
+        self._history_limit = max(1, int(history_limit))
+        self._retention_enabled = bool(retention_enabled)
+        self._sessions = self._apply_retention(
+            self._repository.list_all(),
+            persist=True,
+        )
+
+    def _apply_retention(
+        self,
+        sessions: list[SessionRecord],
+        *,
+        persist: bool = False,
+    ) -> list[SessionRecord]:
+        retained_sessions = list(sessions)
+        if self._retention_enabled and len(retained_sessions) > self._history_limit:
+            retained_sessions = retained_sessions[-self._history_limit :]
+        if persist and len(retained_sessions) != len(sessions):
+            self._repository.save(retained_sessions)
+        return retained_sessions

@@ -19,6 +19,7 @@ ENV_KEY_MAP = {
     "TTS_MODEL": "tts_model",
     "TTS_VOICE": "tts_voice_id",
     "FALLBACK_LANGUAGE": "fallback_language",
+    "HISTORY_RETENTION_ENABLED": "history_retention_enabled",
     "HISTORY_LENGTH": "history_length",
     "SCREENSHOT_INTERVAL": "screenshot_interval",
     "SCREEN_CHANGE_THRESHOLD": "screen_change_threshold",

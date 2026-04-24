@@ -13,6 +13,7 @@ import {
   normalizeHexColor,
   rgbToHsl,
 } from "@/lib/color-utils";
+import { DEFAULT_ACCENT_COLOR } from "@/components/settings-tabs/shared";
 
 function planeRatioFromLightness(lightness: number) {
   return clamp((84 - lightness) / 62, 0, 1);
@@ -31,7 +32,7 @@ export function ColorPicker({
   presets: Array<{ label: string; value: string }>;
   onChange: (nextValue: string) => void;
 }) {
-  const normalizedValue = normalizeHexColor(value, "#a7ffde");
+  const normalizedValue = normalizeHexColor(value, DEFAULT_ACCENT_COLOR);
   const initialPreset = presets.find(
     (preset) => preset.value.toLowerCase() === normalizedValue,
   );

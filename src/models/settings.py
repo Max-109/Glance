@@ -86,7 +86,11 @@ ELEVEN_V3_VOICE_LABELS = {
 DEFAULT_FIXED_TTS_VOICE = "UgBBYS2sOqTuMpoF3BR0"
 DEFAULT_TTS_VOICE = AUTO_TTS_VOICE_ID
 TTS_VOICE_OPTIONS = [AUTO_TTS_VOICE_ID, *ELEVEN_V3_VOICE_BY_ID.keys()]
-DEFAULT_ACCENT_COLOR = "#a7ffde"
+DEFAULT_ACCENT_COLOR = "#f0b100"
+DEFAULT_ELECTRON_WINDOW_WIDTH = 924
+DEFAULT_ELECTRON_WINDOW_HEIGHT = 741
+MIN_ELECTRON_WINDOW_WIDTH = 640
+MIN_ELECTRON_WINDOW_HEIGHT = 500
 _HEX_COLOR_PATTERN = re.compile(r"^#[0-9a-f]{6}$")
 
 
@@ -111,6 +115,7 @@ class AppSettings:
     tts_model: str = "eleven-v3"
     tts_voice_id: str = DEFAULT_TTS_VOICE
     fallback_language: str = "en"
+    history_retention_enabled: bool = True
     history_length: int = 50
     screenshot_interval: float = 1.5
     screen_change_threshold: float = 0.08
@@ -118,9 +123,13 @@ class AppSettings:
     audio_input_device: str = "default"
     audio_output_device: str = "default"
     audio_activation_threshold: float = 0.02
+    audio_silence_timeout_enabled: bool = True
     audio_silence_seconds: float = 0.5
+    audio_wait_for_speech_enabled: bool = True
     audio_max_wait_seconds: float = 15.0
+    audio_max_turn_length_enabled: bool = True
     audio_max_record_seconds: float = 30.0
+    audio_preroll_enabled: bool = True
     audio_preroll_seconds: float = 0.25
     system_prompt_override: str = ""
     text_prompt_override: str = DEFAULT_TEXT_REPLY_PROMPT
@@ -129,12 +138,15 @@ class AppSettings:
     transcription_prompt_override: str = DEFAULT_TRANSCRIPTION_PROMPT
     theme_preference: str = "dark"
     accent_color: str = DEFAULT_ACCENT_COLOR
+    electron_window_width: int = DEFAULT_ELECTRON_WINDOW_WIDTH
+    electron_window_height: int = DEFAULT_ELECTRON_WINDOW_HEIGHT
 
     def validate(self) -> None:
         self.live_keybind = normalize_keybind(self.live_keybind)
         self.quick_keybind = normalize_keybind(self.quick_keybind)
         self.ocr_keybind = normalize_keybind(self.ocr_keybind)
         self.tts_voice_id = normalize_tts_voice_id(self.tts_voice_id)
+        self.audio_silence_timeout_enabled = True
         if not keybinds_are_unique(
             [self.live_keybind, self.quick_keybind, self.ocr_keybind]
         ):
@@ -182,6 +194,14 @@ class AppSettings:
         if self.theme_preference not in {"dark", "light", "system"}:
             raise ValidationError("theme_preference must be dark, light, or system.")
         self.accent_color = normalize_hex_color(self.accent_color)
+        if self.electron_window_width < MIN_ELECTRON_WINDOW_WIDTH:
+            raise ValidationError(
+                f"electron_window_width must be at least {MIN_ELECTRON_WINDOW_WIDTH}."
+            )
+        if self.electron_window_height < MIN_ELECTRON_WINDOW_HEIGHT:
+            raise ValidationError(
+                f"electron_window_height must be at least {MIN_ELECTRON_WINDOW_HEIGHT}."
+            )
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -231,6 +251,9 @@ class AppSettings:
                 data.get("tts_voice_id", cls.tts_voice_id)
             ),
             fallback_language=data.get("fallback_language", cls.fallback_language),
+            history_retention_enabled=coerce_bool(
+                data.get("history_retention_enabled", cls.history_retention_enabled)
+            ),
             history_length=int(data.get("history_length", cls.history_length)),
             screenshot_interval=float(
                 data.get("screenshot_interval", cls.screenshot_interval)
@@ -248,14 +271,30 @@ class AppSettings:
             audio_activation_threshold=float(
                 data.get("audio_activation_threshold", cls.audio_activation_threshold)
             ),
+            audio_silence_timeout_enabled=True,
             audio_silence_seconds=float(
                 data.get("audio_silence_seconds", cls.audio_silence_seconds)
+            ),
+            audio_wait_for_speech_enabled=coerce_bool(
+                data.get(
+                    "audio_wait_for_speech_enabled",
+                    cls.audio_wait_for_speech_enabled,
+                )
             ),
             audio_max_wait_seconds=float(
                 data.get("audio_max_wait_seconds", cls.audio_max_wait_seconds)
             ),
+            audio_max_turn_length_enabled=coerce_bool(
+                data.get(
+                    "audio_max_turn_length_enabled",
+                    cls.audio_max_turn_length_enabled,
+                )
+            ),
             audio_max_record_seconds=float(
                 data.get("audio_max_record_seconds", cls.audio_max_record_seconds)
+            ),
+            audio_preroll_enabled=coerce_bool(
+                data.get("audio_preroll_enabled", cls.audio_preroll_enabled)
             ),
             audio_preroll_seconds=float(
                 data.get("audio_preroll_seconds", cls.audio_preroll_seconds)
@@ -288,6 +327,16 @@ class AppSettings:
             theme_preference=data.get("theme_preference", cls.theme_preference),
             accent_color=normalize_hex_color(
                 data.get("accent_color", cls.accent_color)
+            ),
+            electron_window_width=coerce_min_int(
+                data.get("electron_window_width", cls.electron_window_width),
+                DEFAULT_ELECTRON_WINDOW_WIDTH,
+                MIN_ELECTRON_WINDOW_WIDTH,
+            ),
+            electron_window_height=coerce_min_int(
+                data.get("electron_window_height", cls.electron_window_height),
+                DEFAULT_ELECTRON_WINDOW_HEIGHT,
+                MIN_ELECTRON_WINDOW_HEIGHT,
             ),
         )
         if validate:
@@ -335,6 +384,14 @@ def coerce_bool(value: object) -> bool:
     if lowered_value in {"0", "false", "no", "off", ""}:
         return False
     return bool(value)
+
+
+def coerce_min_int(value: object, default: int, minimum: int) -> int:
+    try:
+        coerced_value = int(value)
+    except (TypeError, ValueError):
+        return default
+    return max(minimum, coerced_value)
 
 
 def normalize_hex_color(value: object) -> str:

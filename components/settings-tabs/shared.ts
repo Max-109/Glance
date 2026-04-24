@@ -87,7 +87,10 @@ export const THEME_LABELS: Record<string, string> = {
   system: "System",
 };
 
+export const DEFAULT_ACCENT_COLOR = "#f0b100";
+
 export const ACCENT_PRESETS = [
+  { label: "Yellow", value: DEFAULT_ACCENT_COLOR },
   { label: "Signal", value: "#a7ffde" },
   { label: "Clay", value: "#b58f70" },
   { label: "Violet", value: "#b7a6ff" },

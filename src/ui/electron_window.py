@@ -7,9 +7,16 @@ import shutil
 import subprocess
 from pathlib import Path
 from threading import Lock, Thread
-from typing import Any
+from typing import Any, Callable
 
 from PySide6.QtCore import QObject, Signal, Slot
+
+from src.models.settings import (
+    DEFAULT_ELECTRON_WINDOW_HEIGHT,
+    DEFAULT_ELECTRON_WINDOW_WIDTH,
+    MIN_ELECTRON_WINDOW_HEIGHT,
+    MIN_ELECTRON_WINDOW_WIDTH,
+)
 
 
 class ElectronUnavailableError(RuntimeError):
@@ -43,11 +50,15 @@ class ElectronShellController(QObject):
         project_root: Path,
         bridge_url: str,
         logger: logging.Logger,
+        initial_width: int = DEFAULT_ELECTRON_WINDOW_WIDTH,
+        initial_height: int = DEFAULT_ELECTRON_WINDOW_HEIGHT,
+        on_bounds_changed: Callable[[int, int], None] | None = None,
     ) -> None:
         super().__init__()
         self._project_root = project_root
         self._bridge_url = bridge_url
         self._logger = logger
+        self._on_bounds_changed = on_bounds_changed
         self._entrypoint = project_root / "electron" / "main.js"
         self._electron_binary = find_electron_binary(project_root)
         if not self._entrypoint.exists():
@@ -62,8 +73,16 @@ class ElectronShellController(QObject):
         self._visible = False
         self._x = 120
         self._y = 48
-        self._width = 924
-        self._height = 741
+        self._width = _coerce_window_dimension(
+            initial_width,
+            DEFAULT_ELECTRON_WINDOW_WIDTH,
+            MIN_ELECTRON_WINDOW_WIDTH,
+        )
+        self._height = _coerce_window_dimension(
+            initial_height,
+            DEFAULT_ELECTRON_WINDOW_HEIGHT,
+            MIN_ELECTRON_WINDOW_HEIGHT,
+        )
         self._process: subprocess.Popen[str] | None = None
         self._stdin_lock = Lock()
         self._processEventReceived.connect(self._apply_process_event)
@@ -226,8 +245,23 @@ class ElectronShellController(QObject):
         if event_type == "bounds":
             bounds = event.get("bounds", {})
             if isinstance(bounds, dict):
-                self._width = int(bounds.get("width", self._width))
-                self._height = int(bounds.get("height", self._height))
+                self._x = int(bounds.get("x", self._x))
+                self._y = int(bounds.get("y", self._y))
+                next_width = _coerce_window_dimension(
+                    bounds.get("width"),
+                    self._width,
+                    MIN_ELECTRON_WINDOW_WIDTH,
+                )
+                next_height = _coerce_window_dimension(
+                    bounds.get("height"),
+                    self._height,
+                    MIN_ELECTRON_WINDOW_HEIGHT,
+                )
+                if (next_width, next_height) != (self._width, self._height):
+                    self._width = next_width
+                    self._height = next_height
+                    if self._on_bounds_changed is not None:
+                        self._on_bounds_changed(self._width, self._height)
             return
         if event_type == "ready":
             self._logger.debug("Electron settings shell is ready.")
@@ -246,3 +280,11 @@ def _looks_like_electron_error(line: str) -> bool:
         token in lowered_line
         for token in ("error", "exception", "fatal", "failed", "traceback")
     )
+
+
+def _coerce_window_dimension(value: object, fallback: int, minimum: int) -> int:
+    try:
+        coerced = int(value)
+    except (TypeError, ValueError):
+        return fallback
+    return max(minimum, coerced)

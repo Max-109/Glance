@@ -77,9 +77,13 @@ class ThresholdAudioRecorderTests(unittest.TestCase):
                 "llm_model_name": "model-a",
                 "tts_base_url": "https://tts.example.com/v1",
                 "audio_activation_threshold": 0.05,
+                "audio_silence_timeout_enabled": False,
                 "audio_silence_seconds": 1.25,
+                "audio_wait_for_speech_enabled": False,
                 "audio_max_wait_seconds": 9.5,
+                "audio_max_turn_length_enabled": False,
                 "audio_max_record_seconds": 18.0,
+                "audio_preroll_enabled": False,
                 "audio_preroll_seconds": 0.4,
             }
         )
@@ -87,9 +91,13 @@ class ThresholdAudioRecorderTests(unittest.TestCase):
         recorder = ThresholdAudioRecorder(settings)
 
         self.assertEqual(recorder._activation_threshold, 0.05)
+        self.assertTrue(recorder._silence_timeout_enabled)
         self.assertEqual(recorder._silence_seconds, 1.25)
+        self.assertFalse(recorder._max_wait_enabled)
         self.assertEqual(recorder._max_wait_seconds, 9.5)
+        self.assertFalse(recorder._max_record_enabled)
         self.assertEqual(recorder._max_record_seconds, 18.0)
+        self.assertFalse(recorder._preroll_enabled)
         self.assertEqual(recorder._preroll_seconds, 0.4)
 
     def test_capture_turn_respects_wait_timeout_during_input_overflow(self) -> None:

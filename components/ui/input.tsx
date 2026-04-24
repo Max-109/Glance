@@ -1,141 +1,20 @@
-import type { KeyboardEvent } from "react";
+import * as React from "react"
+import { Input as InputPrimitive } from "@base-ui/react/input"
 
-import { Icon } from "../icons";
+import { cn } from "@/lib/utils"
 
-export function Input({
-  fieldName,
-  label,
-  value,
-  helperText,
-  errorText,
-  icon,
-  suffix,
-  multiline = false,
-  inputMode,
-  placeholder,
-  secret = false,
-  revealed = false,
-  onFocus,
-  onChange,
-  onCommit,
-  onToggleReveal,
-}: {
-  fieldName: string;
-  label?: string;
-  value: string;
-  helperText?: string;
-  errorText?: string;
-  icon?: string;
-  suffix?: string;
-  multiline?: boolean;
-  inputMode?: "text" | "decimal" | "numeric" | "search" | "url";
-  placeholder?: string;
-  secret?: boolean;
-  revealed?: boolean;
-  onFocus?: () => void;
-  onChange: (value: string) => void;
-  onCommit: (value: string) => void;
-  onToggleReveal?: () => void;
-}) {
-  const describedBy = errorText
-    ? `${fieldName}-error`
-    : helperText
-      ? `${fieldName}-helper`
-      : undefined;
-  const inputType =
-    secret && !revealed ? "password" : inputMode === "url" ? "url" : "text";
-
-  const handleKeyDown = (
-    event: KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>,
-  ) => {
-    if (event.key === "Enter" && !multiline) {
-      event.currentTarget.blur();
-    }
-  };
-
+function Input({ className, type, ...props }: React.ComponentProps<"input">) {
   return (
-    <label className="field">
-      {label ? <span className="field__label">{label}</span> : null}
-      {multiline ? (
-        <div
-          className="field__control-shell field__control-shell--textarea"
-          data-field-name={fieldName}
-        >
-          {icon ? (
-            <span className="field__icon">
-              <Icon name={icon} />
-            </span>
-          ) : null}
-          <textarea
-            className={`control control--textarea${errorText ? " is-error" : ""}`}
-            value={value}
-            name={fieldName}
-            autoComplete="off"
-            spellCheck={false}
-            placeholder={placeholder}
-            aria-describedby={describedBy}
-            aria-invalid={errorText ? true : undefined}
-            onChange={(event) => onChange(event.currentTarget.value)}
-            onBlur={(event) => onCommit(event.currentTarget.value)}
-            onKeyDown={handleKeyDown}
-            onFocus={() => onFocus?.()}
-          />
-        </div>
-      ) : (
-        <span
-          className={`field__control-shell${errorText ? " has-error" : ""}`}
-          data-field-name={fieldName}
-        >
-          {icon ? (
-            <span className="field__icon">
-              <Icon name={icon} />
-            </span>
-          ) : null}
-          <input
-            className={`control${errorText ? " is-error" : ""}`}
-            value={value}
-            type={inputType}
-            name={fieldName}
-            inputMode={inputMode}
-            autoComplete="off"
-            spellCheck={false}
-            placeholder={placeholder}
-            aria-describedby={describedBy}
-            aria-invalid={errorText ? true : undefined}
-            onChange={(event) => onChange(event.currentTarget.value)}
-            onBlur={(event) => onCommit(event.currentTarget.value)}
-            onKeyDown={handleKeyDown}
-            onFocus={() => onFocus?.()}
-          />
-          {suffix ? <span className="field__suffix">{suffix}</span> : null}
-          {secret && onToggleReveal ? (
-            <button
-              type="button"
-              className="field__icon-button"
-              aria-label={revealed ? "Hide secret" : "Show secret"}
-              aria-pressed={revealed}
-              onClick={onToggleReveal}
-            >
-              <span
-                className="icon--toggle"
-                key={revealed ? "eye-off" : "eye"}
-                data-enter="true"
-              >
-                <Icon name={revealed ? "eye-off" : "eye"} />
-              </span>
-            </button>
-          ) : null}
-        </span>
+    <InputPrimitive
+      type={type}
+      data-slot="input"
+      className={cn(
+        "h-9 w-full min-w-0 rounded-3xl border border-transparent bg-input/50 px-3 py-1 text-base transition-[color,box-shadow,background-color] outline-none file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 md:text-sm dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40",
+        className
       )}
-      {errorText ? (
-        <span className="field__meta field__meta--error" id={`${fieldName}-error`}>
-          {errorText}
-        </span>
-      ) : helperText ? (
-        <span className="field__meta" id={`${fieldName}-helper`}>
-          {helperText}
-        </span>
-      ) : null}
-    </label>
-  );
+      {...props}
+    />
+  )
 }
+
+export { Input }

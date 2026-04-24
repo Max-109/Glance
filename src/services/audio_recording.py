@@ -50,21 +50,25 @@ class ThresholdAudioRecorder:
             if activation_threshold is None
             else activation_threshold
         )
+        self._silence_timeout_enabled = True
         self._silence_seconds = (
             settings.audio_silence_seconds
             if silence_seconds is None
             else silence_seconds
         )
+        self._max_wait_enabled = settings.audio_wait_for_speech_enabled
         self._max_wait_seconds = (
             settings.audio_max_wait_seconds
             if max_wait_seconds is None
             else max_wait_seconds
         )
+        self._max_record_enabled = settings.audio_max_turn_length_enabled
         self._max_record_seconds = (
             settings.audio_max_record_seconds
             if max_record_seconds is None
             else max_record_seconds
         )
+        self._preroll_enabled = settings.audio_preroll_enabled
         self._preroll_seconds = (
             settings.audio_preroll_seconds
             if preroll_seconds is None
@@ -79,16 +83,22 @@ class ThresholdAudioRecorder:
         if stop_event and stop_event.is_set():
             raise ValidationError("Recording stopped before capture began.")
 
-        pre_roll_limit = max(
-            1, int(self._preroll_seconds * self._sample_rate / self._chunk_size)
+        pre_roll_limit = (
+            max(1, int(self._preroll_seconds * self._sample_rate / self._chunk_size))
+            if self._preroll_enabled
+            else 0
         )
         pre_roll_frames: deque = deque(maxlen=pre_roll_limit)
         frames: list = []
-        silence_chunk_limit = max(
-            1, int(self._silence_seconds * self._sample_rate / self._chunk_size)
+        silence_chunk_limit = (
+            max(1, int(self._silence_seconds * self._sample_rate / self._chunk_size))
+            if self._silence_timeout_enabled
+            else None
         )
-        max_record_chunks = max(
-            1, int(self._max_record_seconds * self._sample_rate / self._chunk_size)
+        max_record_chunks = (
+            max(1, int(self._max_record_seconds * self._sample_rate / self._chunk_size))
+            if self._max_record_enabled
+            else None
         )
         silence_chunks = 0
         started = False
@@ -115,7 +125,11 @@ class ThresholdAudioRecorder:
                     elapsed_wait = perf_counter() - wait_started_at
                     if overflowed:
                         overflowed_chunks += 1
-                        if not started and elapsed_wait >= self._max_wait_seconds:
+                        if (
+                            not started
+                            and self._max_wait_enabled
+                            and elapsed_wait >= self._max_wait_seconds
+                        ):
                             logger.info(
                                 "Live capture wait expired after %.2f s with %d overflowed chunks",
                                 elapsed_wait,
@@ -134,7 +148,10 @@ class ThresholdAudioRecorder:
                             frames.extend(pre_roll_frames)
                             silence_chunks = 0
                             continue
-                        if elapsed_wait >= self._max_wait_seconds:
+                        if (
+                            self._max_wait_enabled
+                            and elapsed_wait >= self._max_wait_seconds
+                        ):
                             logger.info(
                                 "Live capture wait expired after %.2f s with %d overflowed chunks",
                                 elapsed_wait,
@@ -149,9 +166,12 @@ class ThresholdAudioRecorder:
                     else:
                         silence_chunks = 0
 
-                    if silence_chunks >= silence_chunk_limit:
+                    if (
+                        silence_chunk_limit is not None
+                        and silence_chunks >= silence_chunk_limit
+                    ):
                         break
-                    if len(frames) >= max_record_chunks:
+                    if max_record_chunks is not None and len(frames) >= max_record_chunks:
                         break
         except OSError as exc:  # pragma: no cover - depends on device permissions.
             raise PermissionDeniedError(

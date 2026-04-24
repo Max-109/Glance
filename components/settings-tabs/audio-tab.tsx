@@ -1,12 +1,27 @@
-import { Button } from "../ui/button";
-import { MicThreshold } from "../ui/mic-threshold";
-import { NumberInput } from "../ui/number-input";
-import { SelectInput } from "../ui/select-input";
+import {
+  Card,
+  CardContent,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { GlanceButton } from "@/components/settings-shell/button";
+import { SelectControl } from "@/components/settings-shell/form-controls";
+import { StatusBadge, type StatusTone } from "@/components/settings-shell/status-badge";
+import { TimingControl } from "@/components/settings-shell/timing-control";
+import { MicThreshold } from "@/components/ui/mic-threshold";
 
 import { type SettingsTabProps, settingValue } from "./shared";
 
 type DeviceTone = "ready" | "fallback" | "missing" | "testing";
 type TimingTone = "responsive" | "patient" | "custom";
+
+function mapStatusTone(tone: DeviceTone | TimingTone): StatusTone {
+  if (tone === "ready" || tone === "responsive") return "accent";
+  if (tone === "missing") return "danger";
+  if (tone === "testing") return "warning";
+  return "neutral";
+}
 
 function computeDeviceStatus(state: SettingsTabProps["state"]): {
   tone: DeviceTone;
@@ -25,7 +40,7 @@ function computeDeviceStatus(state: SettingsTabProps["state"]): {
   const usingFallback =
     !inputValue || inputValue === "default" || !outputValue || outputValue === "default";
   if (usingFallback) {
-    return { tone: "fallback", label: "Using system defaults" };
+    return { tone: "fallback", label: "System defaults" };
   }
   return { tone: "ready", label: "Ready" };
 }
@@ -35,15 +50,33 @@ function parseTiming(raw: string): number {
   return Number.isFinite(value) ? value : 0;
 }
 
+function settingBoolean(
+  state: SettingsTabProps["state"],
+  fieldName: string,
+  fallback = true,
+): boolean {
+  const value = state.settings[fieldName];
+  if (value === undefined || value === null) return fallback;
+  if (typeof value === "boolean") return value;
+  return String(value).toLowerCase() === "true";
+}
+
 function computeTimingStatus(values: {
   silence: number;
   wait: number;
   maxRecord: number;
   preroll: number;
+  enabledCount: number;
 }): { tone: TimingTone; label: string } | null {
-  const { silence, wait, maxRecord, preroll } = values;
+  const { silence, wait, maxRecord, preroll, enabledCount } = values;
+  if (enabledCount === 0) {
+    return { tone: "custom", label: "Manual stop" };
+  }
+  if (enabledCount < 4) {
+    return { tone: "custom", label: "Custom profile" };
+  }
   if (silence <= 1 && wait <= 20 && maxRecord <= 60 && preroll <= 0.6) {
-    return { tone: "responsive", label: "Tuned for fast turns" };
+    return { tone: "responsive", label: "Fast turns" };
   }
   if (silence >= 2.5 || wait >= 40 || maxRecord >= 180) {
     return { tone: "patient", label: "Patient mode" };
@@ -65,6 +98,7 @@ export function AudioTab({
   onDraftCommit,
   onDraftFocus,
   onRunAction,
+  onSetField,
   onThresholdPointerDown,
   onThresholdNudge,
   getDraftValue,
@@ -80,36 +114,54 @@ export function AudioTab({
   | "onDraftCommit"
   | "onDraftFocus"
   | "onRunAction"
+  | "onSetField"
   | "onThresholdPointerDown"
   | "onThresholdNudge"
   | "getDraftValue"
 >) {
   const deviceStatus = computeDeviceStatus(state);
-
   const silence = parseTiming(getDraftValue("audio_silence_seconds"));
   const wait = parseTiming(getDraftValue("audio_max_wait_seconds"));
   const maxRecord = parseTiming(getDraftValue("audio_max_record_seconds"));
   const preroll = parseTiming(getDraftValue("audio_preroll_seconds"));
-  const timingStatus = computeTimingStatus({ silence, wait, maxRecord, preroll });
+  const silenceEnabled = true;
+  const waitEnabled = settingBoolean(state, "audio_wait_for_speech_enabled");
+  const maxRecordEnabled = settingBoolean(state, "audio_max_turn_length_enabled");
+  const prerollEnabled = settingBoolean(state, "audio_preroll_enabled");
+  const enabledCount = [
+    silenceEnabled,
+    waitEnabled,
+    maxRecordEnabled,
+    prerollEnabled,
+  ].filter(Boolean).length;
+  const timingStatus = computeTimingStatus({
+    silence,
+    wait,
+    maxRecord,
+    preroll,
+    enabledCount,
+  });
 
   return (
-    <div className="stack">
-      <section className={`audio-panel audio-panel--devices`}>
-        <div className={`audio-panel__status audio-panel__status--${deviceStatus.tone}`}>
-          <span className="audio-panel__status-dot" />
-          <span>{deviceStatus.label}</span>
-        </div>
-
-        <div className="audio-panel__toolbar audio-panel__toolbar--solo">
-          <div className="audio-panel__toolbar-heading">
-            <span className="audio-panel__toolbar-title">Devices</span>
-            <p className="audio-panel__toolbar-copy">Choose input and output devices.</p>
+    <div className="grid gap-4">
+      <Card className="shell-surface gap-0 rounded-2xl py-0 shadow-none">
+        <CardHeader className="border-b border-border px-5 py-4">
+          <div className="flex min-w-0 items-start justify-between gap-3">
+            <div>
+              <CardTitle className="text-base font-semibold">Devices</CardTitle>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Choose input and output devices.
+              </p>
+            </div>
+            <StatusBadge tone={mapStatusTone(deviceStatus.tone)}>
+              {deviceStatus.label}
+            </StatusBadge>
           </div>
-        </div>
+        </CardHeader>
 
-        <div className="audio-panel__body">
-          <div className="field-grid field-grid--two-column">
-            <SelectInput
+        <CardContent className="grid gap-4 px-5 py-5">
+          <div className="grid gap-4 lg:grid-cols-2">
+            <SelectControl
               fieldName="audio_input_device"
               label="Input Device"
               icon="mic"
@@ -122,7 +174,7 @@ export function AudioTab({
               onSelect={(value) => onSelectValue("audio_input_device", value)}
             />
 
-            <SelectInput
+            <SelectControl
               fieldName="audio_output_device"
               label="Output Device"
               icon="headphones"
@@ -135,29 +187,32 @@ export function AudioTab({
               onSelect={(value) => onSelectValue("audio_output_device", value)}
             />
           </div>
-        </div>
+        </CardContent>
 
-        <div className="audio-panel__chips">
-          <Button
-            label="Refresh"
+        <CardFooter className="flex-wrap gap-3 border-t border-border px-5 py-4">
+          <GlanceButton
             icon="refresh"
             variant="secondary"
             onClick={() => onRunAction("refreshAudioDevices")}
-          />
-          <Button
-            label={state.speakerTestActive ? "Stop Speaker Test" : "Test Speakers"}
+          >
+            Refresh
+          </GlanceButton>
+          <GlanceButton
             icon={state.speakerTestActive ? "stop" : "play"}
-            variant={state.speakerTestActive ? "signal" : "secondary"}
-            active={state.speakerTestActive}
+            variant={state.speakerTestActive ? "primary" : "secondary"}
             onClick={() =>
               onRunAction(
                 state.speakerTestActive ? "stopSpeakerTest" : "playSpeakerTest",
               )
             }
-          />
-          <div className="inline-note inline-note--end">{state.audioDeviceStatusMessage}</div>
-        </div>
-      </section>
+          >
+            {state.speakerTestActive ? "Stop Speaker Test" : "Test Speakers"}
+          </GlanceButton>
+          <div className="min-w-0 flex-1 text-sm text-muted-foreground">
+            {state.audioDeviceStatusMessage}
+          </div>
+        </CardFooter>
+      </Card>
 
       <MicThreshold
         level={audioLevel}
@@ -174,100 +229,112 @@ export function AudioTab({
         }
       />
 
-      <section className={`audio-panel audio-panel--timing`}>
-        {timingStatus ? (
-          <div className={`audio-panel__status audio-panel__status--${timingStatus.tone}`}>
-            <span className="audio-panel__status-dot" />
-            <span>{timingStatus.label}</span>
+      <Card className="shell-surface gap-0 rounded-2xl py-0 shadow-none">
+        <CardHeader className="border-b border-border px-5 py-4">
+          <div className="flex min-w-0 items-start justify-between gap-3">
+            <div>
+              <CardTitle className="text-base font-semibold">Timing</CardTitle>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Choose what stops a live turn and how much audio Glance keeps.
+              </p>
+            </div>
+            {timingStatus ? (
+              <StatusBadge tone={mapStatusTone(timingStatus.tone)}>
+                {timingStatus.label}
+              </StatusBadge>
+            ) : null}
           </div>
-        ) : null}
+        </CardHeader>
 
-        <div className="audio-panel__toolbar audio-panel__toolbar--solo">
-          <div className="audio-panel__toolbar-heading">
-            <span className="audio-panel__toolbar-title">Timing</span>
-            <p className="audio-panel__toolbar-copy">
-              Set how long Glance waits, listens, and keeps pre-roll.
-            </p>
-          </div>
-        </div>
-
-        <div className="audio-panel__body">
-          <div className="field-grid field-grid--two-column">
-            <NumberInput
+        <CardContent className="grid gap-4 px-5 py-5">
+          <div className="grid gap-4 lg:grid-cols-2">
+            <TimingControl
               fieldName="audio_silence_seconds"
               label="Silence Timeout"
               icon="timer"
               suffix="s"
-              inputMode="decimal"
               step={0.1}
               min={0.1}
+              visualMax={3}
+              enabled={silenceEnabled}
               value={getDraftValue("audio_silence_seconds")}
               errorText={state.errors.audio_silence_seconds}
-              helperText="How much silence ends the current turn."
+              helperText="Ends a turn after the speaker goes quiet."
               onChange={(value) => onDraftChange("audio_silence_seconds", value)}
               onCommit={(value) => onDraftCommit("audio_silence_seconds", value)}
               onFocus={() => onDraftFocus("audio_silence_seconds")}
             />
 
-            <NumberInput
+            <TimingControl
               fieldName="audio_max_wait_seconds"
               label="Wait for Speech"
               icon="timer"
               suffix="s"
-              inputMode="decimal"
               step={0.5}
               min={0.5}
+              visualMax={60}
+              enabled={waitEnabled}
               value={getDraftValue("audio_max_wait_seconds")}
               errorText={state.errors.audio_max_wait_seconds}
-              helperText="How long live mode waits before it goes idle."
+              helperText="Gives Live a window to hear the first word."
+              onToggleEnabled={() =>
+                onSetField("audio_wait_for_speech_enabled", !waitEnabled)
+              }
               onChange={(value) => onDraftChange("audio_max_wait_seconds", value)}
               onCommit={(value) => onDraftCommit("audio_max_wait_seconds", value)}
               onFocus={() => onDraftFocus("audio_max_wait_seconds")}
             />
 
-            <NumberInput
+            <TimingControl
               fieldName="audio_max_record_seconds"
               label="Max Turn Length"
-              icon="timer"
+              icon="gauge"
               suffix="s"
-              inputMode="decimal"
               step={1}
               min={1}
+              visualMax={180}
+              enabled={maxRecordEnabled}
               value={getDraftValue("audio_max_record_seconds")}
               errorText={state.errors.audio_max_record_seconds}
-              helperText="Hard limit for one spoken turn."
+              helperText="Stops a recording that runs too long."
+              onToggleEnabled={() =>
+                onSetField("audio_max_turn_length_enabled", !maxRecordEnabled)
+              }
               onChange={(value) => onDraftChange("audio_max_record_seconds", value)}
               onCommit={(value) => onDraftCommit("audio_max_record_seconds", value)}
               onFocus={() => onDraftFocus("audio_max_record_seconds")}
             />
 
-            <NumberInput
+            <TimingControl
               fieldName="audio_preroll_seconds"
               label="Pre-Roll"
               icon="rewind"
               suffix="s"
-              inputMode="decimal"
               step={0.05}
               min={0}
+              visualMax={1.5}
+              enabled={prerollEnabled}
               value={getDraftValue("audio_preroll_seconds")}
               errorText={state.errors.audio_preroll_seconds}
-              helperText="Audio kept right before speech starts."
+              helperText="Keeps a little audio from right before speech starts."
+              onToggleEnabled={() => onSetField("audio_preroll_enabled", !prerollEnabled)}
               onChange={(value) => onDraftChange("audio_preroll_seconds", value)}
               onCommit={(value) => onDraftCommit("audio_preroll_seconds", value)}
               onFocus={() => onDraftFocus("audio_preroll_seconds")}
             />
           </div>
-        </div>
+        </CardContent>
 
-        <div className="audio-panel__chips audio-panel__chips--end">
-          <Button
-            label="Reset audio settings"
+        <CardFooter className="justify-end border-t border-border px-5 py-4">
+          <GlanceButton
             icon="undo"
             variant="ghost"
             onClick={() => onRunAction("resetAudioDefaults")}
-          />
-        </div>
-      </section>
+          >
+            Reset audio settings
+          </GlanceButton>
+        </CardFooter>
+      </Card>
     </div>
   );
 }

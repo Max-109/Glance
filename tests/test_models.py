@@ -11,7 +11,11 @@ from src.models.prompt_defaults import (
 from src.models.settings import (
     AppSettings,
     DEFAULT_ACCENT_COLOR,
+    DEFAULT_ELECTRON_WINDOW_HEIGHT,
+    DEFAULT_ELECTRON_WINDOW_WIDTH,
     DEFAULT_TTS_VOICE,
+    MIN_ELECTRON_WINDOW_HEIGHT,
+    MIN_ELECTRON_WINDOW_WIDTH,
 )
 
 
@@ -32,6 +36,7 @@ class AppSettingsTests(unittest.TestCase):
             "https://transcribe.example.com/v1",
         )
         self.assertEqual(settings.history_length, 50)
+        self.assertTrue(settings.history_retention_enabled)
 
     def test_from_mapping_uses_transcription_defaults_when_values_missing(self) -> None:
         settings = AppSettings.from_mapping(
@@ -140,12 +145,72 @@ class AppSettingsTests(unittest.TestCase):
                 "llm_model_name": "model-a",
                 "tts_base_url": "https://tts.example.com/v1",
                 "llm_reasoning_enabled": "false",
-                "accent_color": "A7FFDE",
+                "accent_color": "F0B100",
             }
         )
 
         self.assertFalse(settings.llm_reasoning_enabled)
         self.assertEqual(settings.accent_color, DEFAULT_ACCENT_COLOR)
+
+    def test_from_mapping_coerces_audio_timing_toggles(self) -> None:
+        settings = AppSettings.from_mapping(
+            {
+                "llm_base_url": "https://api.example.com/v1",
+                "llm_model_name": "model-a",
+                "tts_base_url": "https://tts.example.com/v1",
+                "audio_silence_timeout_enabled": "false",
+                "audio_wait_for_speech_enabled": False,
+                "audio_max_turn_length_enabled": "0",
+                "audio_preroll_enabled": True,
+            }
+        )
+
+        self.assertTrue(settings.audio_silence_timeout_enabled)
+        self.assertFalse(settings.audio_wait_for_speech_enabled)
+        self.assertFalse(settings.audio_max_turn_length_enabled)
+        self.assertTrue(settings.audio_preroll_enabled)
+
+    def test_from_mapping_persists_electron_window_size(self) -> None:
+        settings = AppSettings.from_mapping(
+            {
+                "llm_base_url": "https://api.example.com/v1",
+                "llm_model_name": "model-a",
+                "tts_base_url": "https://tts.example.com/v1",
+                "electron_window_width": 1180,
+                "electron_window_height": 820,
+            }
+        )
+
+        self.assertEqual(settings.electron_window_width, 1180)
+        self.assertEqual(settings.electron_window_height, 820)
+
+    def test_from_mapping_clamps_tiny_electron_window_size(self) -> None:
+        settings = AppSettings.from_mapping(
+            {
+                "llm_base_url": "https://api.example.com/v1",
+                "llm_model_name": "model-a",
+                "tts_base_url": "https://tts.example.com/v1",
+                "electron_window_width": 100,
+                "electron_window_height": 100,
+            }
+        )
+
+        self.assertEqual(settings.electron_window_width, MIN_ELECTRON_WINDOW_WIDTH)
+        self.assertEqual(settings.electron_window_height, MIN_ELECTRON_WINDOW_HEIGHT)
+
+    def test_from_mapping_uses_default_electron_window_size_for_bad_values(self) -> None:
+        settings = AppSettings.from_mapping(
+            {
+                "llm_base_url": "https://api.example.com/v1",
+                "llm_model_name": "model-a",
+                "tts_base_url": "https://tts.example.com/v1",
+                "electron_window_width": "wide",
+                "electron_window_height": None,
+            }
+        )
+
+        self.assertEqual(settings.electron_window_width, DEFAULT_ELECTRON_WINDOW_WIDTH)
+        self.assertEqual(settings.electron_window_height, DEFAULT_ELECTRON_WINDOW_HEIGHT)
 
     def test_from_mapping_loads_prompt_overrides(self) -> None:
         settings = AppSettings.from_mapping(
