@@ -7,11 +7,7 @@ from src.exceptions.app_exceptions import ProviderError
 
 
 class ClipboardService:
-    def __init__(self) -> None:
-        self.last_copied_text = ""
-
     def copy_text(self, text: str) -> None:
-        self.last_copied_text = text
         system = platform.system().lower()
         try:
             if system == "darwin":

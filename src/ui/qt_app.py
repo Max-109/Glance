@@ -657,7 +657,6 @@ def _toggle_window(settings_window, force_show: bool = False) -> None:
 
     cursor_pos = QCursor.pos()
     width = int(settings_window.width())
-    height = int(settings_window.height())
     settings_window.setX(cursor_pos.x() - width + 24)
     settings_window.setY(cursor_pos.y() + 18)
     settings_window.show()
@@ -804,10 +803,6 @@ def _create_fallback_app_icon() -> QIcon:
     painter.end()
 
     return QIcon(pixmap)
-
-
-def _create_fallback_tray_icon() -> QIcon:
-    return _create_tray_icon(Qt.ColorScheme.Dark, state="idle")
 
 
 def _build_runtime_orchestrator(

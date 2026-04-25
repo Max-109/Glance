@@ -39,7 +39,7 @@ class ProviderPromptTests(unittest.TestCase):
     def test_system_prompt_keeps_base_identity_and_appends_override(
         self,
     ) -> None:
-        prompt = self.provider._build_system_prompt(match_user_language=False)
+        prompt = self.provider._build_system_prompt()
 
         self.assertIn(
             "You are Glance, a live desktop voice assistant.", prompt
@@ -70,9 +70,7 @@ class ProviderPromptTests(unittest.TestCase):
                 return_value="Lithuania",
             ),
         ):
-            prompt = self.provider._build_system_prompt(
-                match_user_language=False
-            )
+            prompt = self.provider._build_system_prompt()
 
         self.assertTrue(
             prompt.startswith(
@@ -88,7 +86,7 @@ class ProviderPromptTests(unittest.TestCase):
             "You are a terse text assistant."
         )
 
-        prompt = self.provider._build_system_prompt(match_user_language=False)
+        prompt = self.provider._build_system_prompt()
 
         self.assertIn("You are a terse text assistant.", prompt)
         self.assertNotIn(DEFAULT_TEXT_REPLY_PROMPT, prompt)
@@ -96,7 +94,7 @@ class ProviderPromptTests(unittest.TestCase):
     def test_system_prompt_matches_user_language_and_supports_immediate_switch(
         self,
     ) -> None:
-        prompt = self.provider._build_system_prompt(match_user_language=False)
+        prompt = self.provider._build_system_prompt()
 
         self.assertIn(
             "Reply in the same language as the user's request", prompt

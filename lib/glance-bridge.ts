@@ -6,7 +6,7 @@ export type SectionId =
   | "advanced"
   | "history";
 
-export interface HistoryPreviewItem {
+interface HistoryPreviewItem {
   id: string;
   mode: string;
   createdAt: string;
@@ -15,7 +15,7 @@ export interface HistoryPreviewItem {
   interactionCount: number;
 }
 
-export interface HistoryStats {
+interface HistoryStats {
   totalSessions: number;
   oldestAt: string;
   newestAt: string;
@@ -69,13 +69,13 @@ export interface BridgeState {
   historyStats: HistoryStats;
 }
 
-export interface AudioBridgeState {
+interface AudioBridgeState {
   audioInputLevel: number;
   audioInputTestActive: boolean;
   audioDeviceStatusMessage: string;
 }
 
-export interface GlanceBridge {
+interface GlanceBridge {
   getState: () => Promise<BridgeState>;
   getAudioState: () => Promise<AudioBridgeState>;
   setSection: (section: SectionId) => Promise<BridgeState>;

@@ -157,7 +157,6 @@ class OpenAICompatibleProvider:
         user_prompt: str,
         image_paths: list[str] | None = None,
         transcript: str | None = None,
-        match_user_language: bool = False,
     ) -> str:
         content: list[dict] = [{"type": "text", "text": user_prompt}]
         for image_path in image_paths or []:
@@ -172,7 +171,7 @@ class OpenAICompatibleProvider:
                 {"type": "text", "text": f"User transcript: {transcript}"}
             )
 
-        system_prompt = self._build_system_prompt(match_user_language)
+        system_prompt = self._build_system_prompt()
         started_at = perf_counter()
         try:
             response = self._client.chat.completions.create(
@@ -443,7 +442,7 @@ class OpenAICompatibleProvider:
         transcript: str,
         conversation_history: list[dict[str, str]] | None = None,
     ) -> list[dict]:
-        system_prompt = self._build_system_prompt(match_user_language=True)
+        system_prompt = self._build_system_prompt()
         system_prompt += (
             " You are running inside Glance Live mode with runtime tools "
             "available. Use a tool only when it materially helps answer the "
@@ -643,7 +642,7 @@ class OpenAICompatibleProvider:
             return "off"
         return self._settings.llm_reasoning
 
-    def _build_system_prompt(self, match_user_language: bool) -> str:
+    def _build_system_prompt(self) -> str:
         prompt = _with_runtime_context(
             self._resolve_prompt_override(
                 "text_prompt_override", DEFAULT_TEXT_REPLY_PROMPT

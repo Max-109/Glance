@@ -68,12 +68,6 @@ export const REASONING_ICONS: Record<string, string> = {
   high: "level-4",
 };
 
-export const THEME_LABELS: Record<string, string> = {
-  dark: "Dark",
-  light: "Light",
-  system: "System",
-};
-
 export const DEFAULT_ACCENT_COLOR = "#f0b100";
 
 export const ACCENT_PRESETS = [

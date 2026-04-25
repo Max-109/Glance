@@ -5,7 +5,7 @@ import shutil
 from datetime import datetime
 from pathlib import Path
 
-from src.exceptions.app_exceptions import NotFoundError, StorageError
+from src.exceptions.app_exceptions import StorageError
 from src.models.interactions import (
     LiveInteraction,
     OCRInteraction,
@@ -92,21 +92,6 @@ class SessionDirectoryRepository(AbstractRepository[SessionRecord]):
             raise StorageError(
                 f"Could not save sessions to {self._sessions_dir}"
             ) from exc
-
-    def add(self, entity: SessionRecord) -> None:
-        sessions = self.list_all()
-        sessions.append(entity)
-        self.save(sessions)
-
-    def remove(self, entity_id: str) -> None:
-        sessions = [
-            session
-            for session in self.list_all()
-            if session.entity_id != entity_id
-        ]
-        if len(sessions) == len(self.list_all()):
-            raise NotFoundError(f"Session '{entity_id}' was not found.")
-        self.save(sessions)
 
     def list_all(self) -> list[SessionRecord]:
         return list(self._sessions)

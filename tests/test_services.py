@@ -3,11 +3,9 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from src.agents.audio_capture_agent import AudioCaptureAgent
 from src.agents.llm_agent import LLMAgent
 from src.agents.ocr_agent import OCRAgent
 from src.agents.screen_capture_agent import ScreenCaptureAgent
-from src.agents.screen_diff_agent import ScreenDiffAgent
 from src.agents.tts_agent import TTSAgent
 from src.agents.transcription_agent import TranscriptionAgent
 from src.exceptions.app_exceptions import ValidationError
@@ -28,7 +26,7 @@ from src.services.ocr import (
 
 
 class DummyProvider:
-    def generate_reply(self, **kwargs):
+    def generate_reply(self, **_kwargs):
         return "ok"
 
     def prepare_speech_text(
@@ -37,6 +35,7 @@ class DummyProvider:
         *,
         session_id: str | None = None,
     ) -> LiveSpeechReply:
+        del session_id
         return LiveSpeechReply(
             voice_id="UgBBYS2sOqTuMpoF3BR0",
             text=text,
@@ -49,6 +48,7 @@ class DummyProvider:
         conversation_history=None,
         session_id: str | None = None,
     ) -> LiveSpeechReply:
+        del conversation_history, session_id
         return LiveSpeechReply(
             voice_id="UgBBYS2sOqTuMpoF3BR0",
             text=transcript,
@@ -63,6 +63,7 @@ class DummyProvider:
     def synthesize(
         self, text: str, output_path: Path, *, voice_id: str | None = None
     ) -> str:
+        del text, voice_id
         return str(output_path)
 
 
@@ -117,8 +118,6 @@ class ModeStrategyFactoryTests(unittest.TestCase):
         self.factory = ModeStrategyFactory()
         self.dependencies = {
             "screen_capture_agent": ScreenCaptureAgent(),
-            "screen_diff_agent": ScreenDiffAgent(),
-            "audio_capture_agent": AudioCaptureAgent(),
             "transcription_agent": TranscriptionAgent(provider),
             "llm_agent": LLMAgent(provider),
             "ocr_agent": OCRAgent(provider),

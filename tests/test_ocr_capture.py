@@ -20,7 +20,7 @@ class OCRCaptureControllerTests(unittest.TestCase):
 
         controller = OCRCaptureController(
             orchestrator_factory=lambda: None,
-            on_message=lambda message, kind: None,
+            on_message=lambda _message, _kind: None,
         )
 
         def record_primary_screen_call():

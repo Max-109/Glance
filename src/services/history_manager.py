@@ -47,12 +47,6 @@ class HistoryManager:
         self._repository.save([])
         self._sessions = []
 
-    def set_history_limit(self, history_limit: int) -> None:
-        self.set_history_policy(
-            history_limit=history_limit,
-            retention_enabled=self._retention_enabled,
-        )
-
     def set_history_policy(
         self, history_limit: int, retention_enabled: bool
     ) -> None:

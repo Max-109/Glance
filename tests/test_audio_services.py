@@ -133,7 +133,7 @@ class TenVadAudioRecorderTests(unittest.TestCase):
             def __enter__(self):
                 return self
 
-            def __exit__(self, exc_type, exc, tb):
+            def __exit__(self, _exc_type, _exc, _tb):
                 return False
 
             def read(self, chunk_size):
@@ -148,12 +148,12 @@ class TenVadAudioRecorderTests(unittest.TestCase):
 
         fake_vad = FakeVad()
         fake_sd = SimpleNamespace(
-            InputStream=lambda **kwargs: FakeInputStream()
+            InputStream=lambda **_kwargs: FakeInputStream()
         )
         recorder = TenVadAudioRecorder(
             settings,
             device_service=SimpleNamespace(
-                resolve_input_device=lambda device_id: None
+                resolve_input_device=lambda _device_id: None
             ),
             vad_factory=lambda: fake_vad,
             sample_rate=160,
@@ -188,14 +188,14 @@ class TenVadAudioRecorderTests(unittest.TestCase):
         )
 
         class FakeVad:
-            def process(self, frame):
+            def process(self, _frame):
                 return audio_recording.VadFrameDecision(0.0, False)
 
         class FakeInputStream:
             def __enter__(self):
                 return self
 
-            def __exit__(self, exc_type, exc, tb):
+            def __exit__(self, _exc_type, _exc, _tb):
                 return False
 
             def read(self, chunk_size):
@@ -208,13 +208,13 @@ class TenVadAudioRecorderTests(unittest.TestCase):
                 )
 
         fake_sd = SimpleNamespace(
-            InputStream=lambda **kwargs: FakeInputStream()
+            InputStream=lambda **_kwargs: FakeInputStream()
         )
         clock_values = iter([0.0, 0.3, 0.7, 1.2])
         recorder = TenVadAudioRecorder(
             settings,
             device_service=SimpleNamespace(
-                resolve_input_device=lambda device_id: None
+                resolve_input_device=lambda _device_id: None
             ),
             vad_factory=lambda: FakeVad(),
             hop_size=16,

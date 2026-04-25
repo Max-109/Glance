@@ -194,14 +194,6 @@ function formatError(error: unknown): string {
   return "Glance isn't connected right now.";
 }
 
-function isMacDesktopPlatform() {
-  if (typeof navigator === "undefined") {
-    return false;
-  }
-
-  return /mac/i.test(`${navigator.platform} ${navigator.userAgent}`);
-}
-
 function hasValidationErrors(state: BridgeState): boolean {
   return Object.keys(state.errors).length > 0;
 }
@@ -263,7 +255,6 @@ function buildThemeStyle(
 
 export function SettingsPage() {
   const [state, setState] = useState<BridgeState | null>(null);
-  const [isMacOs, setIsMacOs] = useState(false);
   const [providerTab, setProviderTab] = useState<ProviderTab>("transcription");
   const [openSelect, setOpenSelect] = useState<string | null>(null);
   const [skipLinkEnabled, setSkipLinkEnabled] = useState(false);
@@ -400,10 +391,6 @@ export function SettingsPage() {
     return () => {
       bridge.unsubscribeRuntimeStatus(subscriptionId);
     };
-  }, []);
-
-  useEffect(() => {
-    setIsMacOs(isMacDesktopPlatform());
   }, []);
 
   useEffect(() => {

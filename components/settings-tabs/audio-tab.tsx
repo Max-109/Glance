@@ -349,7 +349,7 @@ export function AudioTab({
               value={settingValue(state, "audio_input_device") || "default"}
               options={state.audioInputDeviceOptions}
               labels={state.audioInputDeviceLabels}
-              helperText="Live and mic test."
+              helperText="Live."
               open={openSelect === "audio_input_device"}
               onToggle={() => onToggleSelect("audio_input_device")}
               onSelect={(value) => onSelectValue("audio_input_device", value)}

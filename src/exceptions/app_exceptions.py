@@ -6,10 +6,6 @@ class ValidationError(GlanceError):
     "Raised when the user or system provides invalid data."
 
 
-class NotFoundError(GlanceError):
-    "Raised when an expected entity cannot be found."
-
-
 class StorageError(GlanceError):
     "Raised when persistence fails."
 

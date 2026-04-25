@@ -45,6 +45,7 @@ class FakeLLMAgent:
         conversation_history: list[dict[str, str]] | None = None,
         session_id: str | None = None,
     ) -> LiveSpeechReply:
+        del session_id
         self.calls.append(
             {
                 "mode": "live",
@@ -60,6 +61,7 @@ class FakeLLMAgent:
     def prepare_speech_text(
         self, *, text: str
     ) -> str:  # pragma: no cover - regression guard.
+        del text
         raise AssertionError(
             "live strategy should not call prepare_speech_text"
         )
@@ -120,17 +122,20 @@ class FakeToolLLMAgent:
         ]
 
     def run_tool_turn(self, *, messages, tools, session_id=None):
+        del session_id
         self.message_snapshots.append(list(messages))
         self.tool_payloads.append(list(tools))
         return self.turns.pop(0)
 
     def run_multimodal_tool_turn(self, *, messages, tools, session_id=None):
+        del session_id
         self.multimodal_turn_count += 1
         return self.run_tool_turn(
-            messages=messages, tools=tools, session_id=session_id
+            messages=messages, tools=tools
         )
 
     def prepare_speech_text(self, *, text, session_id=None):
+        del session_id
         self.prepare_inputs.append(text)
         return LiveSpeechReply(
             voice_id="UgBBYS2sOqTuMpoF3BR0",
@@ -144,6 +149,7 @@ class FakeToolLLMAgent:
         )
 
     def generate_live_speech_reply_from_audio(self, **kwargs):
+        del kwargs
         raise AssertionError("tool mode must use the multimodal tool loop")
 
 
@@ -215,16 +221,15 @@ def _notice_call(name: str, arguments: dict) -> ToolCallRequest:
 
 class LiveStrategyTests(unittest.TestCase):
     def test_execute_uses_single_llm_reply_for_tts(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            llm_agent = FakeLLMAgent()
-            tts_agent = FakeTTSAgent()
-            strategy = LiveStrategy(
-                transcription_agent=FakeTranscriptionAgent(),
-                llm_agent=llm_agent,
-                tts_agent=tts_agent,
-            )
+        llm_agent = FakeLLMAgent()
+        tts_agent = FakeTTSAgent()
+        strategy = LiveStrategy(
+            transcription_agent=FakeTranscriptionAgent(),
+            llm_agent=llm_agent,
+            tts_agent=tts_agent,
+        )
 
-            interaction = strategy.execute({"recording_path": "input.wav"})
+        interaction = strategy.execute({"recording_path": "input.wav"})
 
         self.assertEqual(
             llm_agent.calls,
@@ -248,27 +253,24 @@ class LiveStrategyTests(unittest.TestCase):
     def test_execute_replays_prior_live_turns_into_conversation_history(
         self,
     ) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            llm_agent = FakeLLMAgent()
-            strategy = LiveStrategy(
-                transcription_agent=FakeTranscriptionAgent(),
-                llm_agent=llm_agent,
-                tts_agent=FakeTTSAgent(),
+        llm_agent = FakeLLMAgent()
+        strategy = LiveStrategy(
+            transcription_agent=FakeTranscriptionAgent(),
+            llm_agent=llm_agent,
+            tts_agent=FakeTTSAgent(),
+        )
+        session = SessionRecord(mode="live")
+        session.add_interaction(
+            LiveInteraction(
+                mode="live",
+                recording_path="first.wav",
+                transcript="first user turn",
+                response="first assistant reply",
+                speech_path="first-reply.wav",
             )
-            session = SessionRecord(mode="live")
-            session.add_interaction(
-                LiveInteraction(
-                    mode="live",
-                    recording_path="first.wav",
-                    transcript="first user turn",
-                    response="first assistant reply",
-                    speech_path="first-reply.wav",
-                )
-            )
+        )
 
-            strategy.execute(
-                {"recording_path": "input.wav", "session": session}
-            )
+        strategy.execute({"recording_path": "input.wav", "session": session})
 
         self.assertEqual(
             llm_agent.calls[0]["conversation_history"],
@@ -281,22 +283,21 @@ class LiveStrategyTests(unittest.TestCase):
     def test_execute_emits_stage_updates_for_transcribe_reply_and_voice(
         self,
     ) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            stages: list[tuple[str, str]] = []
-            strategy = LiveStrategy(
-                transcription_agent=FakeTranscriptionAgent(),
-                llm_agent=FakeLLMAgent(),
-                tts_agent=FakeTTSAgent(),
-            )
+        stages: list[tuple[str, str]] = []
+        strategy = LiveStrategy(
+            transcription_agent=FakeTranscriptionAgent(),
+            llm_agent=FakeLLMAgent(),
+            tts_agent=FakeTTSAgent(),
+        )
 
-            strategy.execute(
-                {
-                    "recording_path": "input.wav",
-                    "status_callback": lambda state, message: stages.append(
-                        (state, message)
-                    ),
-                }
-            )
+        strategy.execute(
+            {
+                "recording_path": "input.wav",
+                "status_callback": lambda state, message: stages.append(
+                    (state, message)
+                ),
+            }
+        )
 
         self.assertEqual(
             stages,

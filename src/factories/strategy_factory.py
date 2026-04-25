@@ -2,11 +2,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from src.agents.audio_capture_agent import AudioCaptureAgent
 from src.agents.llm_agent import LLMAgent
 from src.agents.ocr_agent import OCRAgent
 from src.agents.screen_capture_agent import ScreenCaptureAgent
-from src.agents.screen_diff_agent import ScreenDiffAgent
 from src.agents.tts_agent import TTSAgent
 from src.agents.transcription_agent import TranscriptionAgent
 from src.exceptions.app_exceptions import ValidationError
@@ -26,8 +24,6 @@ class ModeStrategyFactory:
         *,
         mode: str,
         screen_capture_agent: ScreenCaptureAgent,
-        screen_diff_agent: ScreenDiffAgent,
-        audio_capture_agent: AudioCaptureAgent,
         transcription_agent: TranscriptionAgent,
         llm_agent: LLMAgent,
         ocr_agent: OCRAgent,

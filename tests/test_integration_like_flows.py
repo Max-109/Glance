@@ -7,7 +7,6 @@ from src.core.orchestrator import Orchestrator
 from src.exceptions.app_exceptions import ValidationError
 from src.factories.strategy_factory import ModeStrategyFactory
 from src.models.settings import AppSettings
-from src.services.app_paths import AppPaths
 from src.services.history_manager import HistoryManager
 from src.services.providers import LiveSpeechReply
 from src.storage.json_storage import SessionDirectoryRepository
@@ -16,16 +15,6 @@ from src.storage.json_storage import SessionDirectoryRepository
 class FakeScreenCaptureAgent:
     def run(self, *, image_path=None, output_path=None):
         return image_path or output_path or "capture.png"
-
-
-class FakeScreenDiffAgent:
-    def run(self, *, previous_path, current_path):
-        return previous_path != current_path
-
-
-class FakeAudioCaptureAgent:
-    def run(self, *, transcript):
-        return transcript.strip()
 
 
 class FakeTranscriptionAgent:
@@ -40,11 +29,12 @@ class FakeLLMAgent:
         user_prompt,
         image_paths=None,
         transcript=None,
-        match_user_language=False,
     ):
+        del transcript
         return f"reply:{user_prompt}:{len(image_paths or [])}"
 
     def prepare_speech_text(self, *, text, session_id=None):
+        del session_id
         return LiveSpeechReply(
             voice_id="UgBBYS2sOqTuMpoF3BR0",
             text=text,
@@ -57,6 +47,7 @@ class FakeLLMAgent:
         conversation_history=None,
         session_id=None,
     ):
+        del session_id
         return LiveSpeechReply(
             voice_id="UgBBYS2sOqTuMpoF3BR0",
             text=(
@@ -100,6 +91,7 @@ class FakeLLMAgent:
 
 class FakeOCRAgent:
     def run(self, *, image_path, instruction=""):
+        del instruction
         return f"ocr:{image_path}"
 
 
@@ -140,8 +132,6 @@ class OrchestratorFlowTests(unittest.TestCase):
             history_manager=history_manager,
             strategy_factory=ModeStrategyFactory(),
             screen_capture_agent=FakeScreenCaptureAgent(),
-            screen_diff_agent=FakeScreenDiffAgent(),
-            audio_capture_agent=FakeAudioCaptureAgent(),
             transcription_agent=FakeTranscriptionAgent(),
             llm_agent=FakeLLMAgent(),
             ocr_agent=FakeOCRAgent(),

@@ -16,13 +16,5 @@ class AbstractRepository(ABC, Generic[T]):
         "Persist all entities to storage."
 
     @abstractmethod
-    def add(self, entity: T) -> None:
-        "Add one entity to storage."
-
-    @abstractmethod
-    def remove(self, entity_id: str) -> None:
-        "Remove one entity from storage."
-
-    @abstractmethod
     def list_all(self) -> list[T]:
         "Return all in-memory entities."

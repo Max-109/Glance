@@ -463,19 +463,13 @@ class ToolNoticeContext:
     user_context: str = ""
     last_notice_kind: str = ""
     last_notice_subject: str = ""
-    last_spoken_notice: str = ""
     last_search_notice: str = ""
-    last_search_query: str = ""
     last_search_results: list[dict[str, str]] = field(default_factory=list)
-    last_opened_url: str = ""
-    last_opened_title: str = ""
-    last_opened_site: str = ""
     previous_records: list[ToolCallRecord] = field(default_factory=list)
 
     def mark_spoken(self, call: ToolCallRequest, notice: str) -> None:
         self.last_notice_kind = _notice_kind(call.name)
         self.last_notice_subject = _notice_subject(call)
-        self.last_spoken_notice = notice
         if call.name == "web_search":
             self.last_search_notice = notice
 
@@ -488,16 +482,11 @@ class ToolNoticeContext:
         self.previous_records.append(record)
         metadata = result.metadata
         if call.name == "web_search":
-            self.last_search_query = str(metadata.get("query", "")).strip()
             self.last_search_results = [
                 item
                 for item in metadata.get("results", [])
                 if isinstance(item, dict)
             ]
-        elif call.name == "web_fetch":
-            self.last_opened_url = str(metadata.get("url", "")).strip()
-            self.last_opened_title = str(metadata.get("title", "")).strip()
-            self.last_opened_site = str(metadata.get("site_name", "")).strip()
 
 
 def compose_tool_notice(

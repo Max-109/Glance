@@ -33,7 +33,7 @@ export function hexToRgb(hex: string, fallback = "") {
   };
 }
 
-export function rgbToHex({ r, g, b }: { r: number; g: number; b: number }) {
+function rgbToHex({ r, g, b }: { r: number; g: number; b: number }) {
   return `#${[r, g, b]
     .map((channel) => clamp(Math.round(channel), 0, 255).toString(16).padStart(2, "0"))
     .join("")}`;
@@ -70,7 +70,7 @@ export function rgbToHsl({ r, g, b }: { r: number; g: number; b: number }) {
   };
 }
 
-export function hslToRgb(h: number, s: number, l: number) {
+function hslToRgb(h: number, s: number, l: number) {
   const normalizedS = clamp(s, 0, 100) / 100;
   const normalizedL = clamp(l, 0, 100) / 100;
   const chroma = (1 - Math.abs(2 * normalizedL - 1)) * normalizedS;

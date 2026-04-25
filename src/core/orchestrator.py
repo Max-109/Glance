@@ -1,10 +1,8 @@
 from __future__ import annotations
 
-from src.agents.audio_capture_agent import AudioCaptureAgent
 from src.agents.llm_agent import LLMAgent
 from src.agents.ocr_agent import OCRAgent
 from src.agents.screen_capture_agent import ScreenCaptureAgent
-from src.agents.screen_diff_agent import ScreenDiffAgent
 from src.agents.tts_agent import TTSAgent
 from src.agents.transcription_agent import TranscriptionAgent
 from src.factories.strategy_factory import ModeStrategyFactory
@@ -33,8 +31,6 @@ class Orchestrator:
         history_manager: HistoryManager,
         strategy_factory: ModeStrategyFactory,
         screen_capture_agent: ScreenCaptureAgent,
-        screen_diff_agent: ScreenDiffAgent,
-        audio_capture_agent: AudioCaptureAgent,
         transcription_agent: TranscriptionAgent,
         llm_agent: LLMAgent,
         ocr_agent: OCRAgent,
@@ -45,8 +41,6 @@ class Orchestrator:
         self._history_manager = history_manager
         self._strategy_factory = strategy_factory
         self._screen_capture_agent = screen_capture_agent
-        self._screen_diff_agent = screen_diff_agent
-        self._audio_capture_agent = audio_capture_agent
         self._transcription_agent = transcription_agent
         self._llm_agent = llm_agent
         self._ocr_agent = ocr_agent
@@ -70,8 +64,6 @@ class Orchestrator:
         strategy = self._strategy_factory.create(
             mode=mode,
             screen_capture_agent=self._screen_capture_agent,
-            screen_diff_agent=self._screen_diff_agent,
-            audio_capture_agent=self._audio_capture_agent,
             transcription_agent=self._transcription_agent,
             llm_agent=self._llm_agent,
             ocr_agent=self._ocr_agent,
@@ -131,8 +123,6 @@ def build_orchestrator_with_dependencies(
             static_speech_dir=paths.audio_feedback_dir
         ),
         screen_capture_agent=ScreenCaptureAgent(),
-        screen_diff_agent=ScreenDiffAgent(),
-        audio_capture_agent=AudioCaptureAgent(),
         transcription_agent=TranscriptionAgent(transcription_provider),
         llm_agent=LLMAgent(llm_provider, transcription_provider),
         ocr_agent=OCRAgent(llm_provider),

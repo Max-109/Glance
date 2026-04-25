@@ -4,7 +4,6 @@ import re
 from dataclasses import dataclass
 
 from src.agents.ocr_agent import OCRAgent
-from src.exceptions.app_exceptions import ProviderError
 from src.services.clipboard import ClipboardService
 
 
@@ -86,10 +85,3 @@ def _strip_intro_line(text: str) -> str:
     ):
         return "\n".join(lines[1:])
     return text
-
-
-def require_ocr_text(text: str) -> str:
-    cleaned = sanitize_ocr_output(text)
-    if not cleaned:
-        raise ProviderError("OCR found no visible text.")
-    return cleaned

@@ -22,13 +22,11 @@ class LLMAgent(BaseAgent):
         user_prompt: str,
         image_paths: list[str] | None = None,
         transcript: str | None = None,
-        match_user_language: bool = False,
     ) -> str:
         return self._provider.generate_reply(
             user_prompt=user_prompt,
             image_paths=image_paths,
             transcript=transcript,
-            match_user_language=match_user_language,
         )
 
     def prepare_speech_text(self, *, text: str, session_id: str | None = None):

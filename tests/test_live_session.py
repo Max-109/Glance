@@ -1,4 +1,3 @@
-import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
@@ -9,6 +8,7 @@ from src.services.live_session import LiveSessionController
 
 class FakeRecorder:
     def capture_turn(self, recording_path: str, stop_event) -> None:
+        del stop_event
         Path(recording_path).touch()
 
 
@@ -72,22 +72,21 @@ class LiveSessionControllerTests(unittest.TestCase):
         orchestrator = FakeOrchestrator()
         playback_service = FakePlaybackService()
 
-        with tempfile.TemporaryDirectory() as temp_dir:
-            controller = LiveSessionController(
-                orchestrator=orchestrator,
-                recorder=FakeRecorder(),
-                playback_service=playback_service,
-                on_status=lambda state, message: statuses.append(
-                    (state, message)
-                ),
-            )
+        controller = LiveSessionController(
+            orchestrator=orchestrator,
+            recorder=FakeRecorder(),
+            playback_service=playback_service,
+            on_status=lambda state, message: statuses.append(
+                (state, message)
+            ),
+        )
 
-            controller.start()
+        controller.start()
 
-            thread = controller._thread
-            if thread is not None:
-                thread.join(timeout=2)
-                self.assertFalse(thread.is_alive())
+        thread = controller._thread
+        if thread is not None:
+            thread.join(timeout=2)
+            self.assertFalse(thread.is_alive())
 
         self.assertEqual(orchestrator.opened_modes, ["live"])
         self.assertEqual(playback_service.calls, ["reply.wav"])
@@ -109,22 +108,21 @@ class LiveSessionControllerTests(unittest.TestCase):
         orchestrator = FakeOrchestrator()
         playback_service = FakePlaybackService()
 
-        with tempfile.TemporaryDirectory() as temp_dir:
-            controller = LiveSessionController(
-                orchestrator=orchestrator,
-                recorder=SilentRecorder(),
-                playback_service=playback_service,
-                on_status=lambda state, message: statuses.append(
-                    (state, message)
-                ),
-            )
+        controller = LiveSessionController(
+            orchestrator=orchestrator,
+            recorder=SilentRecorder(),
+            playback_service=playback_service,
+            on_status=lambda state, message: statuses.append(
+                (state, message)
+            ),
+        )
 
-            controller.start()
+        controller.start()
 
-            thread = controller._thread
-            if thread is not None:
-                thread.join(timeout=2)
-                self.assertFalse(thread.is_alive())
+        thread = controller._thread
+        if thread is not None:
+            thread.join(timeout=2)
+            self.assertFalse(thread.is_alive())
 
         self.assertEqual(orchestrator.opened_modes, ["live"])
         self.assertEqual(orchestrator.run_calls, [])

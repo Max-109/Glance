@@ -22,7 +22,6 @@ from src.models.prompt_defaults import PROMPT_DEFAULTS, normalize_prompt_value
 from src.models.settings import (
     AUTO_TTS_VOICE_ID,
     AppSettings,
-    ELEVEN_V3_VOICES,
     ENDPOINT_PATIENCE_OPTIONS,
     TOOL_POLICY_OPTIONS,
     TTS_VOICE_OPTIONS,
@@ -39,7 +38,6 @@ from src.services.history_manager import HistoryManager
 from src.services.keybinds import (
     keybinds_are_unique,
     normalize_keybind,
-    qt_event_to_keybind,
 )
 from src.services.settings_manager import SettingsManager
 
@@ -127,7 +125,6 @@ class SettingsViewModel(QObject):
         self._current_section = "api"
         self._binding_field = ""
         self._previewing_voice = ""
-        self._preview_thread: Thread | None = None
         self._preview_stop_event: Event | None = None
         self._preview_playback_service: QtAudioPlaybackService | None = None
         self._voice_preview_dir = (
@@ -203,10 +200,6 @@ class SettingsViewModel(QObject):
     @Property(str, notify=statusChanged)
     def statusKind(self) -> str:
         return self._status_kind
-
-    @Property("QStringList", notify=audioDevicesChanged)
-    def audioDeviceOptions(self) -> list[str]:
-        return list(self._audio_input_options)
 
     @Property("QStringList", notify=audioDevicesChanged)
     def audioInputDeviceOptions(self) -> list[str]:
@@ -385,30 +378,6 @@ class SettingsViewModel(QObject):
         self.bindingChanged.emit()
         self._set_status("Keybind capture canceled.", "neutral")
 
-    @Slot(int, int, str)
-    def captureKeybind(self, key: int, modifiers: int, text: str) -> None:
-        if not self._binding_field:
-            return
-        keybind = qt_event_to_keybind(key, modifiers, text)
-        if keybind is None:
-            return
-        if keybind == "ESC":
-            self.cancelKeybindCapture()
-            return
-        field_name = self._binding_field
-        conflicts_with = self._find_keybind_conflict(field_name, keybind)
-        if conflicts_with is not None:
-            self._errors[field_name] = f"Already used by {conflicts_with}."
-            self.errorsChanged.emit()
-            self._set_status("Each keybind must be unique.", "error")
-            return
-        self._binding_field = ""
-        self.bindingChanged.emit()
-        self.setField(field_name, keybind)
-        self._set_status(
-            f"{self._binding_label(field_name)} keybind saved.", "success"
-        )
-
     @Slot(str, str)
     def assignKeybind(self, field_name: str, keybind: str) -> None:
         if field_name not in {"live_keybind", "ocr_keybind"}:
@@ -463,11 +432,10 @@ class SettingsViewModel(QObject):
         self._preview_stop_event = stop_event
         preview_thread = Thread(
             target=self._run_voice_preview,
-            args=(preview_settings, voice_name, stop_event),
+            args=(voice_name, stop_event),
             name="glance-voice-preview",
             daemon=True,
         )
-        self._preview_thread = preview_thread
         self._previewStarted.emit(voice_name)
         preview_thread.start()
 
@@ -822,7 +790,6 @@ class SettingsViewModel(QObject):
             return
         self._previewing_voice = ""
         self._preview_stop_event = None
-        self._preview_thread = None
         self.previewChanged.emit()
 
     @Slot()
@@ -913,9 +880,7 @@ class SettingsViewModel(QObject):
             set_output_device(output_device_id)
         return playback_service
 
-    def _run_voice_preview(
-        self, settings: AppSettings, voice_name: str, stop_event: Event
-    ) -> None:
+    def _run_voice_preview(self, voice_name: str, stop_event: Event) -> None:
         preview_path = self._voice_preview_sample_path(voice_name)
         try:
             if not preview_path.exists() or preview_path.stat().st_size == 0:
