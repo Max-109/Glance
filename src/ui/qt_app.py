@@ -63,6 +63,9 @@ from src.ui.runtime_visual import (
 from src.ui.settings_viewmodel import SettingsViewModel
 
 
+APP_NAME = "Glance"
+
+
 class LiveStatusBridge(QObject):
     statusChanged = Signal(str, str)
 
@@ -261,13 +264,15 @@ def run_settings_app() -> int:
     os.environ.setdefault("QT_LOGGING_RULES", "qt.multimedia.ffmpeg=false")
     QCoreApplication.setAttribute(Qt.AA_MacDontSwapCtrlAndMeta, True)
     app = QApplication(sys.argv)
-    app.setApplicationName("Glance")
-    app.setOrganizationName("Glance")
+    app.setApplicationName(APP_NAME)
+    app.setApplicationDisplayName(APP_NAME)
+    app.setOrganizationName(APP_NAME)
     app.setQuitOnLastWindowClosed(False)
 
     app_icon = _load_app_icon()
     if not app_icon.isNull():
         app.setWindowIcon(app_icon)
+    _configure_macos_app_identity(app_icon)
 
     paths = build_app_paths()
     settings_manager = SettingsManager(
@@ -461,6 +466,67 @@ def run_settings_app() -> int:
 def _env_flag_enabled(name: str) -> bool:
     value = os.environ.get(name, "")
     return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _configure_macos_app_identity(app_icon: QIcon) -> None:
+    if sys.platform != "darwin":
+        return
+    try:
+        from AppKit import NSApplication, NSImage
+        from Foundation import NSBundle, NSProcessInfo
+        from AppKit import NSApplicationActivationPolicyAccessory
+    except Exception:
+        return
+
+    _set_macos_activation_policy(
+        NSApplication.sharedApplication(),
+        NSApplicationActivationPolicyAccessory,
+    )
+    bundle = NSBundle.mainBundle()
+    _set_macos_bundle_names(
+        bundle.localizedInfoDictionary() or bundle.infoDictionary()
+    )
+    _set_macos_process_name(NSProcessInfo.processInfo())
+
+    icon_path = _asset_path("glance_app_icon.svg")
+    image = NSImage.alloc().initWithContentsOfFile_(str(icon_path))
+    if image is None or app_icon.isNull():
+        return
+    NSApplication.sharedApplication().setApplicationIconImage_(image)
+
+
+def _set_macos_activation_policy(application, policy) -> None:
+    setter = getattr(application, "setActivationPolicy_", None)
+    if not callable(setter):
+        return
+    try:
+        setter(policy)
+    except Exception:
+        return
+
+
+def _set_macos_bundle_names(info_dictionary) -> None:
+    if info_dictionary is None:
+        return
+    for key in ("CFBundleName", "CFBundleDisplayName"):
+        setter = getattr(info_dictionary, "setObject_forKey_", None)
+        if callable(setter):
+            setter(APP_NAME, key)
+            continue
+        try:
+            info_dictionary[key] = APP_NAME
+        except Exception:
+            continue
+
+
+def _set_macos_process_name(process_info) -> None:
+    setter = getattr(process_info, "setProcessName_", None)
+    if not callable(setter):
+        return
+    try:
+        setter(APP_NAME)
+    except Exception:
+        return
 
 
 def _build_settings_window(
