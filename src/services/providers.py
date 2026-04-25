@@ -70,8 +70,10 @@ _COUNTRY_BY_REGION_CODE = {
     "UA": "Ukraine",
     "US": "United States",
 }
-OCR_EXTRACTION_PROMPT = """You are an OCR engine. Return clean clipboard text
-from the image, not a visual line-by-line transcript.
+OCR_EXTRACTION_PROMPT = """You are an OCR engine. Return polished, readable
+clipboard text from the image, not a visual line-by-line transcript. The output
+must be immediately usable to paste into a message, document, search box, or
+chat without manual cleanup.
 
 Rules:
 - Output only text that is visibly present in the image.
@@ -82,8 +84,14 @@ Rules:
 - Do not include surrounding UI text unless it is needed to identify the
   requested item.
 - Preserve original wording, spelling, capitalization, and punctuation.
+- Insert normal spaces between adjacent visible words or labels that belong
+  together. Never merge separate words, labels, chips, badges, or values into
+  one run-on string.
 - Join prose or UI copy that is only split across lines because the interface
   wrapped it visually.
+- When OCRing compact UI, make the text readable while preserving meaning. For
+  example, output "OUTPUT Voice CONFIGURED eleven-v3", not
+  "OUTPUTVoiceCONFIGUREDeleven-v3".
 - Preserve headings, labels, menu items, lists, table rows, and columns.
 - If table or grid text is visible, return it as a Markdown table.
 - Do not summarize, explain, translate, infer hidden text, add labels.

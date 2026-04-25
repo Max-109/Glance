@@ -68,6 +68,15 @@ class AudioTestSignalService:
                     (2349.32, 0.032, 0.17),
                 ],
             ),
+            "quick_ocr_complete": self._write_tone_sequence(
+                output_dir / "quick-ocr-complete.wav",
+                [
+                    (1567.98, 0.012, 0.12),
+                    (None, 0.008, 0.0),
+                    (2349.32, 0.018, 0.15),
+                    (3135.96, 0.036, 0.18),
+                ],
+            ),
         }
 
     def _write_tone_sequence(

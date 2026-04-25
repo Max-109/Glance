@@ -301,12 +301,19 @@ class AudioTestSignalServiceTests(unittest.TestCase):
 
             self.assertEqual(
                 set(cue_paths.keys()),
-                {"start", "reply_ready", "cancel", "ocr_complete"},
+                {
+                    "start",
+                    "reply_ready",
+                    "cancel",
+                    "ocr_complete",
+                    "quick_ocr_complete",
+                },
             )
             self.assertTrue(cue_paths["start"].exists())
             self.assertTrue(cue_paths["reply_ready"].exists())
             self.assertTrue(cue_paths["cancel"].exists())
             self.assertTrue(cue_paths["ocr_complete"].exists())
+            self.assertTrue(cue_paths["quick_ocr_complete"].exists())
 
             with wave.open(str(cue_paths["start"]), "rb") as start_file:
                 self.assertEqual(start_file.getnchannels(), 1)
@@ -329,6 +336,13 @@ class AudioTestSignalServiceTests(unittest.TestCase):
                 self.assertEqual(ocr_file.getnchannels(), 1)
                 self.assertEqual(ocr_file.getframerate(), 24000)
                 self.assertGreater(ocr_file.getnframes(), 0)
+
+            with wave.open(
+                str(cue_paths["quick_ocr_complete"]), "rb"
+            ) as quick_ocr_file:
+                self.assertEqual(quick_ocr_file.getnchannels(), 1)
+                self.assertEqual(quick_ocr_file.getframerate(), 24000)
+                self.assertGreater(quick_ocr_file.getnframes(), 0)
 
 
 if __name__ == "__main__":

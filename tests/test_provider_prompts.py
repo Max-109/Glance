@@ -207,6 +207,30 @@ class ProviderPromptTests(unittest.TestCase):
             captured["user_prompt"],
         )
 
+    def test_extract_text_prompt_requires_readable_clipboard_spacing(
+        self,
+    ) -> None:
+        captured = {}
+
+        def fake_generate_reply(**kwargs):
+            captured.update(kwargs)
+            return "OUTPUT Voice CONFIGURED eleven-v3"
+
+        self.provider.generate_reply = fake_generate_reply
+
+        self.provider.extract_text("screen.png")
+
+        prompt = captured["user_prompt"]
+        self.assertIn("immediately usable to paste", prompt)
+        self.assertIn(
+            "Insert normal spaces between adjacent visible words",
+            prompt,
+        )
+        self.assertIn("Never merge separate words", prompt)
+        self.assertIn("OUTPUT Voice CONFIGURED eleven-v3", prompt)
+        self.assertIn("not\n  \"OUTPUTVoiceCONFIGUREDeleven-v3\"", prompt)
+        self.assertIn("Do not say that you extracted the text", prompt)
+
     def test_parse_live_speech_reply_uses_fixed_voice_when_not_auto(
         self,
     ) -> None:

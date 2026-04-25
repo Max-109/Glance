@@ -207,6 +207,14 @@ class LiveCueController:
         if cue_path is None or not cue_path.exists():
             return
 
+        self.play_cue(cue_key)
+
+    def play_cue(self, cue_key: str) -> None:
+        if not self._enabled:
+            return
+        cue_path = self._cue_paths.get(cue_key)
+        if cue_path is None or not cue_path.exists():
+            return
         Thread(
             target=self._play_cue,
             args=(cue_key, cue_path),
@@ -293,8 +301,10 @@ def run_settings_app() -> int:
 
     def show_ocr_message(message: str, kind: str) -> None:
         controller._apply_status_update(message, kind)
+        if kind == "success" and live_cue_controller is not None:
+            live_cue_controller.play_cue("quick_ocr_complete")
         tray = tray_holder.get("tray")
-        if tray is not None and kind in {"success", "error"}:
+        if tray is not None and kind == "error":
             tray.showMessage("Glance", message)
 
     ocr_controller = OCRCaptureController(
