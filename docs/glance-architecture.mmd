@@ -1,0 +1,12 @@
+flowchart LR
+    Hotkeys["Global hotkeys<br/>Live / OCR"] --> Tray["PySide6 tray runtime<br/>status, cues, window control"]
+    Tray --> Bridge["SettingsBridgeServer<br/>local bridge API"]
+    Bridge --> Shell["Electron + Next.js settings shell<br/>Tools, Audio, Providers, Voice, Preferences, History"]
+    Tray --> Orchestrator["Orchestrator<br/>sessions, settings, history"]
+    Orchestrator --> Live["Live strategy<br/>mic, transcript, reply, speech"]
+    Orchestrator --> OCR["OCR strategy<br/>screen capture to clipboard"]
+    Live --> Providers["OpenAI-compatible providers<br/>LLM, transcription, TTS"]
+    Live --> Tools["Runtime tools<br/>screenshot, OCR, web search, web fetch"]
+    OCR --> Providers
+    Orchestrator --> Store["~/.glance<br/>config.json, sessions, audio feedback"]
+    Shell --> Store
