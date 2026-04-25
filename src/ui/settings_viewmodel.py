@@ -38,6 +38,7 @@ from src.services.settings_manager import SettingsManager
 
 
 class SettingsViewModel(QObject):
+    _DEFAULT_STATUS_DURATION_MS = 5000
     _SUCCESS_STATUS_DURATION_MS = 2200
     _TRANSIENT_INFO_STATUS_DURATION_MS = 2200
     _STATUS_REPLACE_DELAY_MS = 180
@@ -689,9 +690,13 @@ class SettingsViewModel(QObject):
 
     def _set_status(self, message: str, kind: str) -> None:
         self._status_revision += 1
-        duration_ms = (
-            self._SUCCESS_STATUS_DURATION_MS if message and kind == "success" else None
-        )
+        duration_ms = None
+        if message:
+            duration_ms = (
+                self._SUCCESS_STATUS_DURATION_MS
+                if kind == "success"
+                else self._DEFAULT_STATUS_DURATION_MS
+            )
         self._apply_status(message, kind, duration_ms)
 
     def _set_transient_status(self, message: str, kind: str = "neutral") -> None:

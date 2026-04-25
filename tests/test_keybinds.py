@@ -260,6 +260,21 @@ class SettingsViewModelKeybindTests(unittest.TestCase):
         self.assertEqual(self.viewmodel.statusKind, "neutral")
         self.assertTrue(self.viewmodel._status_timer.isActive())
 
+    def test_neutral_status_auto_dismisses_after_default_timeout(self) -> None:
+        self.viewmodel._set_status("Previewing Arabella.", "neutral")
+
+        self.assertEqual(self.viewmodel.statusMessage, "Previewing Arabella.")
+        self.assertEqual(self.viewmodel.statusKind, "neutral")
+        self.assertTrue(self.viewmodel._status_timer.isActive())
+        self.assertGreater(
+            self.viewmodel._status_timer.remainingTime(),
+            self.viewmodel._DEFAULT_STATUS_DURATION_MS - 500,
+        )
+        self.assertLessEqual(
+            self.viewmodel._status_timer.remainingTime(),
+            self.viewmodel._DEFAULT_STATUS_DURATION_MS + 500,
+        )
+
     def test_invalid_audio_preroll_shows_validation_error(self) -> None:
         self.viewmodel.setField("audio_preroll_seconds", "-1")
         self.viewmodel.save()
