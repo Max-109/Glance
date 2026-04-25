@@ -1,5 +1,3 @@
-import type { PointerEvent as ReactPointerEvent } from "react";
-
 import type { BridgeState } from "@/lib/glance-bridge";
 
 export type ProviderTab = "llm" | "speech" | "transcription";
@@ -9,7 +7,6 @@ export interface SettingsTabProps {
   stateReady: boolean;
   providerTab: ProviderTab;
   openSelect: string | null;
-  thresholdValue: number;
   audioLevel: number;
   revealedFields: Record<string, boolean>;
   onChangeProviderTab: (tab: ProviderTab) => void;
@@ -27,8 +24,6 @@ export interface SettingsTabProps {
     action: string,
     payload?: Record<string, string | number | boolean>,
   ) => void;
-  onThresholdPointerDown: (event: ReactPointerEvent<HTMLDivElement>) => void;
-  onThresholdNudge: (delta: number) => void;
   onStartKeybindCapture: (fieldName: string) => void;
   getDraftValue: (fieldName: string) => string;
 }

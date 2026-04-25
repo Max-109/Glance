@@ -101,6 +101,7 @@ const ICONS: Record<string, TablerIcon> = {
   zap: IconBolt,
   flame: IconFlame,
   anchor: IconTargetArrow,
+  target: IconTargetArrow,
   book: IconBook2,
   theater: IconDiamond,
   heart: IconHeart,

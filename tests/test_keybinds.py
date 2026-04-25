@@ -198,10 +198,10 @@ class SettingsViewModelKeybindTests(unittest.TestCase):
         self.assertTrue(self.viewmodel.dirty)
 
     def test_audio_fields_stay_dirty_until_manual_save(self) -> None:
-        self.viewmodel.setField("audio_activation_threshold", "0.08")
+        self.viewmodel.setField("audio_vad_threshold", "0.6")
 
         self.assertEqual(
-            self.settings_manager.reload().audio_activation_threshold, 0.02
+            self.settings_manager.reload().audio_vad_threshold, 0.5
         )
         self.assertTrue(self.viewmodel.dirty)
 

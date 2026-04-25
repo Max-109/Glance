@@ -16,7 +16,7 @@ from src.core.orchestrator import build_orchestrator_with_dependencies
 from src.services.app_paths import build_app_paths
 from src.services.app_logging import configure_app_logging, update_console_logging_accent
 from src.services.audio_playback import QtAudioPlaybackService
-from src.services.audio_recording import ThresholdAudioRecorder
+from src.services.audio_recording import build_live_audio_recorder
 from src.services.audio_signal import AudioTestSignalService
 from src.services.global_hotkeys import GlobalHotkeyManager
 from src.services.history_manager import HistoryManager
@@ -322,15 +322,19 @@ def run_settings_app() -> int:
                     paths=paths,
                 )
             )
-            live_controller.set_recorder(ThresholdAudioRecorder(persisted_settings))
+        except Exception as exc:
+            live_controller.set_orchestrator(None)
+            logger.exception("Live orchestrator unavailable during refresh")
+            tray.showMessage("Glance", f"Live unavailable: {exc}")
+        try:
+            live_controller.set_recorder(_build_live_recorder(persisted_settings))
             live_controller.set_output_device(persisted_settings.audio_output_device)
             if live_cue_controller is not None:
                 live_cue_controller.set_output_device(
                     persisted_settings.audio_output_device
                 )
         except Exception as exc:
-            live_controller.set_orchestrator(None)
-            live_controller.set_recorder(None)
+            live_controller.set_recorder(None, str(exc))
             logger.exception("Live runtime unavailable during refresh")
             tray.showMessage("Glance", f"Live unavailable: {exc}")
         try:
@@ -693,23 +697,33 @@ def _build_live_controller(
     paths,
 ) -> LiveSessionController:
     settings = settings_manager.current()
+    unavailable_message = ""
     try:
         orchestrator = _build_runtime_orchestrator(
             settings_manager=settings_manager,
             history_manager=history_manager,
             paths=paths,
         )
-        recorder = ThresholdAudioRecorder(settings)
-    except Exception:
+    except Exception as exc:
         orchestrator = None
+        unavailable_message = str(exc)
+    try:
+        recorder = _build_live_recorder(settings)
+    except Exception as exc:
         recorder = None
+        unavailable_message = str(exc)
     return LiveSessionController(
         orchestrator=orchestrator,
         recorder=recorder,
+        unavailable_message=unavailable_message,
         playback_service=QtAudioPlaybackService(
             output_device_id=settings.audio_output_device,
         ),
     )
+
+
+def _build_live_recorder(settings):
+    return build_live_audio_recorder(settings)
 
 
 def _build_live_cue_controller(

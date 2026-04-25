@@ -385,7 +385,8 @@ class OpenAICompatibleProvider:
             "Use a tool only when it materially helps answer the user's spoken request. "
             "Do not expose tool call names, JSON, arguments, raw fetched text, or screenshot "
             "metadata to the user. When you have enough information, give only the final "
-            "natural answer text."
+            "natural answer text. Do not narrate the tool work in the final answer; answer "
+            "with the result directly."
         )
         messages: list[dict] = [{"role": "system", "content": system_prompt}]
         messages.extend(_normalize_chat_messages(conversation_history))
@@ -569,7 +570,8 @@ class OpenAICompatibleProvider:
             "of giving a final answer. Tool calls, tool names, JSON, arguments, raw fetched text, "
             "and screenshot metadata are private runtime details; never say them to the user. "
             "When you have enough information, give only the final spoken answer and follow all "
-            "voice, emotion, and VOICE_ID rules above."
+            "voice, emotion, and VOICE_ID rules above. Do not narrate the tool work in the final "
+            "answer; answer with the result directly."
         )
         return prompt
 

@@ -93,6 +93,7 @@ MIN_ELECTRON_WINDOW_WIDTH = 640
 MIN_ELECTRON_WINDOW_HEIGHT = 500
 DEFAULT_TOOL_POLICY = "allow"
 TOOL_POLICY_OPTIONS = {"allow", "deny"}
+ENDPOINT_PATIENCE_OPTIONS = {"fast", "balanced", "patient"}
 _HEX_COLOR_PATTERN = re.compile(r"^#[0-9a-f]{6}$")
 
 
@@ -128,9 +129,8 @@ class AppSettings:
     batch_window_duration: float = 4.0
     audio_input_device: str = "default"
     audio_output_device: str = "default"
-    audio_activation_threshold: float = 0.02
-    audio_silence_timeout_enabled: bool = True
-    audio_silence_seconds: float = 0.5
+    audio_vad_threshold: float = 0.5
+    audio_endpoint_patience: str = "balanced"
     audio_wait_for_speech_enabled: bool = True
     audio_max_wait_seconds: float = 15.0
     audio_max_turn_length_enabled: bool = True
@@ -152,7 +152,6 @@ class AppSettings:
         self.quick_keybind = normalize_keybind(self.quick_keybind)
         self.ocr_keybind = normalize_keybind(self.ocr_keybind)
         self.tts_voice_id = normalize_tts_voice_id(self.tts_voice_id)
-        self.audio_silence_timeout_enabled = True
         if not keybinds_are_unique(
             [self.live_keybind, self.quick_keybind, self.ocr_keybind]
         ):
@@ -195,10 +194,12 @@ class AppSettings:
             raise ValidationError("screen_change_threshold must be between 0 and 1.")
         if self.batch_window_duration <= 0:
             raise ValidationError("batch_window_duration must be positive.")
-        if not 0 < self.audio_activation_threshold <= 1:
-            raise ValidationError("audio_activation_threshold must be between 0 and 1.")
-        if self.audio_silence_seconds <= 0:
-            raise ValidationError("audio_silence_seconds must be positive.")
+        if not 0 < self.audio_vad_threshold <= 1:
+            raise ValidationError("audio_vad_threshold must be between 0 and 1.")
+        if self.audio_endpoint_patience not in ENDPOINT_PATIENCE_OPTIONS:
+            raise ValidationError(
+                "audio_endpoint_patience must be fast, balanced, or patient."
+            )
         if self.audio_max_wait_seconds <= 0:
             raise ValidationError("audio_max_wait_seconds must be positive.")
         if self.audio_max_record_seconds <= 0:
@@ -297,12 +298,11 @@ class AppSettings:
             audio_output_device=data.get(
                 "audio_output_device", cls.audio_output_device
             ),
-            audio_activation_threshold=float(
-                data.get("audio_activation_threshold", cls.audio_activation_threshold)
+            audio_vad_threshold=float(
+                data.get("audio_vad_threshold", cls.audio_vad_threshold)
             ),
-            audio_silence_timeout_enabled=True,
-            audio_silence_seconds=float(
-                data.get("audio_silence_seconds", cls.audio_silence_seconds)
+            audio_endpoint_patience=normalize_endpoint_patience(
+                data.get("audio_endpoint_patience", cls.audio_endpoint_patience)
             ),
             audio_wait_for_speech_enabled=coerce_bool(
                 data.get(
@@ -409,6 +409,13 @@ def normalize_tool_policy(value: object) -> str:
     if normalized_value in TOOL_POLICY_OPTIONS:
         return normalized_value
     return DEFAULT_TOOL_POLICY
+
+
+def normalize_endpoint_patience(value: object) -> str:
+    normalized_value = str(value).strip().lower()
+    if normalized_value in ENDPOINT_PATIENCE_OPTIONS:
+        return normalized_value
+    return AppSettings.audio_endpoint_patience
 
 
 def coerce_bool(value: object) -> bool:

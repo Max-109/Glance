@@ -8,10 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
-import type {
-  CSSProperties,
-  PointerEvent as ReactPointerEvent,
-} from "react";
+import type { CSSProperties } from "react";
 
 import {
   sectionMeta,
@@ -78,9 +75,8 @@ const EMPTY_STATE: BridgeState = {
     batch_window_duration: 4,
     audio_input_device: "default",
     audio_output_device: "default",
-    audio_activation_threshold: 0.026,
-    audio_silence_timeout_enabled: true,
-    audio_silence_seconds: 0.5,
+    audio_vad_threshold: 0.5,
+    audio_endpoint_patience: "balanced",
     audio_wait_for_speech_enabled: true,
     audio_max_wait_seconds: 15,
     audio_max_turn_length_enabled: true,
@@ -254,9 +250,8 @@ export function SettingsPage() {
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [revealedFields, setRevealedFields] = useState<Record<string, boolean>>({});
   const [bridgeError, setBridgeError] = useState("");
-  const [thresholdDraft, setThresholdDraft] = useState<number | null>(null);
-  const thresholdCommitRef = useRef(0);
   const refreshInFlightRef = useRef(false);
+  const audioRefreshInFlightRef = useRef(false);
   const skipLinkRef = useRef<HTMLAnchorElement | null>(null);
   const workspaceRef = useRef<HTMLElement | null>(null);
   const scrollViewportRef = useRef<HTMLDivElement | null>(null);
@@ -269,7 +264,6 @@ export function SettingsPage() {
       setProviderTab("transcription");
     }
   }, [multimodalLive, providerTab]);
-  const thresholdValue = thresholdDraft ?? Number(liveState.settings.audio_activation_threshold || 0.026);
   const resolvedTheme: SystemTheme = "dark";
   const accentColor = String(liveState.settings.accent_color || DEFAULT_ACCENT_COLOR);
   const themeStyle = useMemo(
@@ -340,6 +334,32 @@ export function SettingsPage() {
       return;
     }
     void refreshState();
+  });
+
+  const refreshAudioState = useEffectEvent(async () => {
+    const bridge = getBridge();
+    if (!bridge || typeof bridge.getAudioState !== "function") {
+      return;
+    }
+    if (audioRefreshInFlightRef.current) {
+      return;
+    }
+
+    audioRefreshInFlightRef.current = true;
+    try {
+      const audioState = await bridge.getAudioState();
+      startTransition(() => {
+        setState((current) => ({
+          ...(current ?? EMPTY_STATE),
+          ...audioState,
+        }));
+      });
+      setBridgeError("");
+    } catch (error) {
+      setBridgeError(formatError(error));
+    } finally {
+      audioRefreshInFlightRef.current = false;
+    }
   });
 
   useEffect(() => {
@@ -438,11 +458,9 @@ export function SettingsPage() {
   }, [liveState.dirty]);
 
   const transientRefreshActive =
-    liveState.audioInputTestActive ||
     liveState.previewActive ||
     liveState.speakerTestActive ||
     liveState.saving;
-  const transientRefreshMs = liveState.audioInputTestActive ? 500 : 700;
 
   useEffect(() => {
     if (!transientRefreshActive) {
@@ -454,10 +472,26 @@ export function SettingsPage() {
         return;
       }
       void refreshState();
-    }, transientRefreshMs);
+    }, 700);
 
     return () => window.clearInterval(interval);
-  }, [transientRefreshActive, transientRefreshMs]);
+  }, [transientRefreshActive]);
+
+  useEffect(() => {
+    if (!liveState.audioInputTestActive) {
+      return;
+    }
+
+    void refreshAudioState();
+    const interval = window.setInterval(() => {
+      if (document.visibilityState !== "visible") {
+        return;
+      }
+      void refreshAudioState();
+    }, 90);
+
+    return () => window.clearInterval(interval);
+  }, [liveState.audioInputTestActive]);
 
   const closeSelectOnOutsideInteraction = useEffectEvent((event: PointerEvent) => {
     if (!openSelect) {
@@ -775,83 +809,6 @@ export function SettingsPage() {
     );
   }
 
-  async function commitThreshold(nextValue: number) {
-    const bridge = getBridge();
-    const normalizedValue = clamp(Number(nextValue.toFixed(3)), 0.001, 1);
-    const requestId = thresholdCommitRef.current + 1;
-    thresholdCommitRef.current = requestId;
-    setThresholdDraft(normalizedValue);
-
-    if (!bridge) {
-      setThresholdDraft(null);
-      return;
-    }
-
-    try {
-      const snapshot = await bridge.setField(
-        "audio_activation_threshold",
-        normalizedValue,
-      );
-      if (thresholdCommitRef.current !== requestId) {
-        return;
-      }
-      applySnapshot(snapshot);
-    } catch (error) {
-      if (thresholdCommitRef.current !== requestId) {
-        return;
-      }
-      setBridgeError(formatError(error));
-    } finally {
-      if (thresholdCommitRef.current === requestId) {
-        setThresholdDraft(null);
-      }
-    }
-  }
-
-  function handleThresholdPointerDown(
-    event: ReactPointerEvent<HTMLDivElement>,
-  ) {
-    const track = event.currentTarget;
-
-    const updateThreshold = (clientY: number) => {
-      const rect = track.getBoundingClientRect();
-      const ratio = Math.min(
-        1,
-        Math.max(0, 1 - (clientY - rect.top) / rect.height),
-      );
-      setThresholdDraft(Number(ratio.toFixed(3)));
-      return ratio;
-    };
-
-    let lastRatio = updateThreshold(event.clientY);
-
-    const handlePointerMove = (moveEvent: PointerEvent) => {
-      lastRatio = updateThreshold(moveEvent.clientY);
-    };
-
-    const handlePointerUp = () => {
-      window.removeEventListener("pointermove", handlePointerMove);
-      window.removeEventListener("pointerup", handlePointerUp);
-      void commitThreshold(lastRatio);
-    };
-
-    window.addEventListener("pointermove", handlePointerMove);
-    window.addEventListener("pointerup", handlePointerUp);
-  }
-
-  function handleThresholdNudge(delta: number) {
-    // Sentinels for Home/End: -1 → set to min, +1 → set to max
-    let nextValue: number;
-    if (delta === -1) {
-      nextValue = 0.001;
-    } else if (delta === 1) {
-      nextValue = 1;
-    } else {
-      nextValue = clamp(Number((thresholdValue + delta).toFixed(3)), 0.001, 1);
-    }
-    void commitThreshold(nextValue);
-  }
-
   const footerStatus = bridgeError
     ? "Not connected"
     : liveState.saving
@@ -900,7 +857,6 @@ export function SettingsPage() {
         stateReady={state !== null}
         providerTab={providerTab}
         openSelect={openSelect}
-        thresholdValue={thresholdValue}
         audioLevel={liveState.audioInputLevel}
         revealedFields={revealedFields}
         onChangeProviderTab={setProviderTab}
@@ -912,8 +868,6 @@ export function SettingsPage() {
         onDraftFocus={handleDraftFocus}
         onToggleReveal={handleToggleReveal}
         onRunAction={handleRunAction}
-        onThresholdPointerDown={handleThresholdPointerDown}
-        onThresholdNudge={handleThresholdNudge}
         onStartKeybindCapture={handleStartKeybindCapture}
         getDraftValue={getDraftValue}
       />

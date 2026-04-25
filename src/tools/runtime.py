@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 from html.parser import HTMLParser
 from pathlib import Path
 from typing import Any, Callable
-from urllib.parse import quote_plus, urlparse
+from urllib.parse import parse_qs, quote_plus, unquote, urlparse
 from urllib.request import Request, urlopen
 
 from src.agents.screen_capture_agent import ScreenCaptureAgent
@@ -33,6 +33,7 @@ class ToolResult:
     result_path: str = ""
     artifact_paths: list[str] = field(default_factory=list)
     images: list[ToolImage] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -40,7 +41,6 @@ class ToolDefinition:
     name: str
     description: str
     parameters_schema: dict[str, Any]
-    pre_speech_notice: str
     timeout_seconds: float
     executor: Callable[[dict[str, Any]], ToolResult]
 
@@ -122,7 +122,6 @@ class RuntimeToolRegistry:
                     },
                     "additionalProperties": False,
                 },
-                pre_speech_notice="I'll take a quick screenshot.",
                 timeout_seconds=6,
                 executor=self._take_screenshot,
             ),
@@ -150,7 +149,6 @@ class RuntimeToolRegistry:
                     "required": ["query"],
                     "additionalProperties": False,
                 },
-                pre_speech_notice="I'll search the web for that.",
                 timeout_seconds=12,
                 executor=_web_search,
             ),
@@ -171,16 +169,15 @@ class RuntimeToolRegistry:
                     "required": ["url"],
                     "additionalProperties": False,
                 },
-                pre_speech_notice="I'll read that page.",
                 timeout_seconds=12,
                 executor=_web_fetch,
             ),
         }
 
     def _take_screenshot(self, arguments: dict[str, Any]) -> ToolResult:
-        del arguments
         if self._screen_capture_agent is None:
             raise ToolExecutionError("Screen capture is not available in this runtime.")
+        reason = str(arguments.get("reason", "")).strip()
         temp_file = tempfile.NamedTemporaryFile(
             prefix="glance-tool-screenshot-",
             suffix=".png",
@@ -195,6 +192,7 @@ class RuntimeToolRegistry:
             ),
             artifact_paths=[screenshot_path],
             images=[ToolImage(path=screenshot_path, mime_type="image/png")],
+            metadata={"reason": reason},
         )
 
 
@@ -338,6 +336,17 @@ def _web_search(arguments: dict[str, Any]) -> ToolResult:
             ".json",
             json.dumps({"query": query, "results": results}, indent=2),
         ),
+        metadata={
+            "query": query,
+            "results": [
+                {
+                    "title": result["title"],
+                    "url": result["url"],
+                    "site_name": short_site_name(result["url"]),
+                }
+                for result in results
+            ],
+        },
     )
 
 
@@ -355,6 +364,11 @@ def _web_fetch(arguments: dict[str, Any]) -> ToolResult:
     return ToolResult(
         content=content,
         result_path=_write_temp_result("glance-web-fetch-", ".md", content),
+        metadata={
+            "url": url,
+            "title": title,
+            "site_name": short_site_name(url),
+        },
     )
 
 
@@ -469,8 +483,45 @@ def _extract_title(body: str) -> str:
 
 def _normalize_duckduckgo_url(url: str) -> str:
     if url.startswith("//"):
-        return f"https:{url}"
-    return html.unescape(url)
+        url = f"https:{url}"
+    normalized_url = html.unescape(url)
+    parsed = urlparse(normalized_url)
+    if parsed.netloc.endswith("duckduckgo.com") and parsed.path.startswith("/l/"):
+        destination = parse_qs(parsed.query).get("uddg", [""])[0]
+        if destination:
+            return unquote(destination)
+    return normalized_url
+
+
+def short_site_name(url: str) -> str:
+    parsed = urlparse(str(url))
+    host = parsed.netloc.lower().split("@")[-1].split(":")[0]
+    if host.startswith("www."):
+        host = host[4:]
+    if not host:
+        return ""
+    known_names = {
+        "bbc.com": "BBC",
+        "cnn.com": "CNN",
+        "github.com": "GitHub",
+        "openai.com": "OpenAI",
+        "weather.com": "Weather.com",
+        "wikipedia.org": "Wikipedia",
+        "youtube.com": "YouTube",
+    }
+    for domain, label in known_names.items():
+        if host == domain or host.endswith(f".{domain}"):
+            return label
+    parts = [part for part in host.split(".") if part not in {"co", "com", "net", "org"}]
+    if not parts:
+        return ""
+    base = parts[-2] if len(parts) > 1 and len(parts[-1]) <= 3 else parts[0]
+    if not re.fullmatch(r"[a-z0-9-]{2,18}", base):
+        return ""
+    words = [word for word in base.split("-") if word]
+    if len(words) > 2:
+        return ""
+    return " ".join(word.capitalize() for word in words)
 
 
 def _write_temp_result(prefix: str, suffix: str, content: str) -> str:

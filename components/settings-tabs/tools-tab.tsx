@@ -12,7 +12,7 @@ const TOOL_CARDS = [
     title: "Screenshot",
     icon: "photo-search",
     policyField: "tool_take_screenshot_policy",
-    notice: "I'll take a quick screenshot.",
+    notice: "Example: I'll take a quick screenshot of your code.",
     description: "Use the current screen when the question needs visual context.",
   },
   {
@@ -20,15 +20,15 @@ const TOOL_CARDS = [
     title: "Web Search",
     icon: "world-search",
     policyField: "tool_web_search_policy",
-    notice: "I'll search the web for that.",
+    notice: "Example: I'm checking the weather in Vilnius.",
     description: "Look up recent or changing information from public results.",
   },
   {
     id: "fetch",
-    title: "Web Fetch",
+    title: "Open Page",
     icon: "fetch",
     policyField: "tool_web_fetch_policy",
-    notice: "I'll read that page.",
+    notice: "Example: I found OpenAI. I'm opening it.",
     description: "Read a specific page when a link matters to the answer.",
   },
 ] as const;
@@ -160,7 +160,7 @@ function ToolCard({
 
       <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.035] px-3 py-3">
         <p className="font-mono text-[0.68rem] font-bold uppercase tracking-[0.16em] text-[var(--text-muted)]">
-          spoken first
+          adaptive speech
         </p>
         <p className="mt-1 text-sm text-[var(--text-strong)]">{notice}</p>
       </div>

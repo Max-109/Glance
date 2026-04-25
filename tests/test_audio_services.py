@@ -5,11 +5,12 @@ from types import SimpleNamespace
 from unittest.mock import patch
 import wave
 
-from src.exceptions.app_exceptions import ValidationError
+from src.exceptions.app_exceptions import PermissionDeniedError, ValidationError
 from src.models.settings import AppSettings
 from src.services.audio_devices import AudioDeviceService
 import src.services.audio_recording as audio_recording
-from src.services.audio_recording import ThresholdAudioRecorder
+from src.services.audio_recording import TenVadAudioRecorder
+from src.services.audio_recording import build_live_audio_recorder
 from src.services.audio_signal import AudioTestSignalService
 
 
@@ -69,55 +70,47 @@ class AudioDeviceServiceTests(unittest.TestCase):
         self.assertIs(service.resolve_output_device("default"), default)
 
 
-class ThresholdAudioRecorderTests(unittest.TestCase):
-    def test_recorder_uses_settings_backed_audio_thresholds(self) -> None:
+class TenVadAudioRecorderTests(unittest.TestCase):
+    def test_ten_vad_frame_conversion_uses_int16_at_hop_size(self) -> None:
+        frame = TenVadAudioRecorder._to_ten_vad_frame(
+            audio_recording.np.array([[0.0], [0.5], [-1.0]], dtype=audio_recording.np.float32)
+        )
+
+        self.assertEqual(frame.dtype, audio_recording.np.int16)
+        self.assertEqual(frame.shape, (3,))
+        self.assertEqual(frame.tolist(), [0, 16383, -32767])
+
+    def test_capture_turn_waits_through_short_pause_and_writes_wav(self) -> None:
         settings = AppSettings.from_mapping(
             {
                 "llm_base_url": "https://api.example.com/v1",
                 "llm_model_name": "model-a",
                 "tts_base_url": "https://tts.example.com/v1",
-                "audio_activation_threshold": 0.05,
-                "audio_silence_timeout_enabled": False,
-                "audio_silence_seconds": 1.25,
-                "audio_wait_for_speech_enabled": False,
-                "audio_max_wait_seconds": 9.5,
+                "audio_endpoint_patience": "fast",
+                "audio_max_wait_seconds": 2,
                 "audio_max_turn_length_enabled": False,
-                "audio_max_record_seconds": 18.0,
-                "audio_preroll_enabled": False,
-                "audio_preroll_seconds": 0.4,
+                "audio_preroll_seconds": 0.0,
             }
         )
+        decisions = [
+            (0.0, False),
+            (0.0, False),
+            (0.92, True),
+            (0.94, True),
+            (0.95, True),
+            (0.0, False),
+            (0.93, True),
+            *[(0.0, False)] * 12,
+        ]
 
-        recorder = ThresholdAudioRecorder(settings)
+        class FakeVad:
+            def __init__(self):
+                self.frames = []
 
-        self.assertEqual(recorder._activation_threshold, 0.05)
-        self.assertTrue(recorder._silence_timeout_enabled)
-        self.assertEqual(recorder._silence_seconds, 1.25)
-        self.assertFalse(recorder._max_wait_enabled)
-        self.assertEqual(recorder._max_wait_seconds, 9.5)
-        self.assertFalse(recorder._max_record_enabled)
-        self.assertEqual(recorder._max_record_seconds, 18.0)
-        self.assertFalse(recorder._preroll_enabled)
-        self.assertEqual(recorder._preroll_seconds, 0.4)
-
-    def test_capture_turn_respects_wait_timeout_during_input_overflow(self) -> None:
-        settings = AppSettings.from_mapping(
-            {
-                "llm_base_url": "https://api.example.com/v1",
-                "llm_model_name": "model-a",
-                "tts_base_url": "https://tts.example.com/v1",
-                "audio_max_wait_seconds": 1.5,
-            }
-        )
-        recorder = ThresholdAudioRecorder(
-            settings,
-            device_service=SimpleNamespace(resolve_input_device=lambda device_id: None),
-        )
-        recorder._level = lambda block: 0.0
-
-        class FakeBlock:
-            def copy(self):
-                return self
+            def process(self, frame):
+                self.frames.append(frame)
+                probability, speech = decisions[min(len(self.frames) - 1, len(decisions) - 1)]
+                return audio_recording.VadFrameDecision(probability, speech)
 
         class FakeInputStream:
             def __enter__(self):
@@ -127,23 +120,132 @@ class ThresholdAudioRecorderTests(unittest.TestCase):
                 return False
 
             def read(self, chunk_size):
-                del chunk_size
-                return FakeBlock(), True
+                return (
+                    audio_recording.np.full(
+                        (chunk_size, 1),
+                        0.2,
+                        dtype=audio_recording.np.float32,
+                    ),
+                    False,
+                )
 
+        fake_vad = FakeVad()
         fake_sd = SimpleNamespace(InputStream=lambda **kwargs: FakeInputStream())
-        clock_values = iter([0.0, 0.6, 1.2, 1.8])
+        recorder = TenVadAudioRecorder(
+            settings,
+            device_service=SimpleNamespace(resolve_input_device=lambda device_id: None),
+            vad_factory=lambda: fake_vad,
+            sample_rate=160,
+            hop_size=16,
+            speech_confirmation_frames=3,
+            preroll_seconds=0.0,
+        )
 
         with tempfile.TemporaryDirectory() as temp_dir, patch.object(
             audio_recording, "sd", fake_sd
-        ), patch.object(audio_recording, "np", object()), patch.object(
+        ):
+            output_path = recorder.capture_turn(str(Path(temp_dir) / "turn.wav"))
+
+            self.assertTrue(Path(output_path).exists())
+            with wave.open(output_path, "rb") as wav_file:
+                self.assertEqual(wav_file.getframerate(), 160)
+                self.assertEqual(wav_file.getnchannels(), 1)
+                self.assertGreater(wav_file.getnframes(), 0)
+            self.assertGreaterEqual(len(fake_vad.frames), 10)
+
+    def test_capture_turn_times_out_without_confirmed_speech(self) -> None:
+        settings = AppSettings.from_mapping(
+            {
+                "llm_base_url": "https://api.example.com/v1",
+                "llm_model_name": "model-a",
+                "tts_base_url": "https://tts.example.com/v1",
+                "audio_max_wait_seconds": 1,
+            }
+        )
+
+        class FakeVad:
+            def process(self, frame):
+                return audio_recording.VadFrameDecision(0.0, False)
+
+        class FakeInputStream:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, tb):
+                return False
+
+            def read(self, chunk_size):
+                return (
+                    audio_recording.np.zeros(
+                        (chunk_size, 1),
+                        dtype=audio_recording.np.float32,
+                    ),
+                    False,
+                )
+
+        fake_sd = SimpleNamespace(InputStream=lambda **kwargs: FakeInputStream())
+        clock_values = iter([0.0, 0.3, 0.7, 1.2])
+        recorder = TenVadAudioRecorder(
+            settings,
+            device_service=SimpleNamespace(resolve_input_device=lambda device_id: None),
+            vad_factory=lambda: FakeVad(),
+            hop_size=16,
+        )
+
+        with tempfile.TemporaryDirectory() as temp_dir, patch.object(
+            audio_recording, "sd", fake_sd
+        ), patch.object(
             audio_recording,
             "perf_counter",
             side_effect=lambda: next(clock_values),
         ):
             with self.assertRaises(ValidationError) as error_context:
-                recorder.capture_turn(str(Path(temp_dir) / "input.wav"))
+                recorder.capture_turn(str(Path(temp_dir) / "turn.wav"))
 
         self.assertEqual(str(error_context.exception), "No speech was detected.")
+
+    def test_live_recorder_factory_requires_speech_detection(self) -> None:
+        settings = AppSettings.from_mapping(
+            {
+                "llm_base_url": "https://api.example.com/v1",
+                "llm_model_name": "model-a",
+                "tts_base_url": "https://tts.example.com/v1",
+            }
+        )
+
+        with patch.object(
+            audio_recording,
+            "TenVadEngine",
+            side_effect=PermissionDeniedError(
+                audio_recording.SPEECH_DETECTION_SETUP_MESSAGE
+            ),
+        ):
+            with self.assertRaises(PermissionDeniedError) as error_context:
+                build_live_audio_recorder(settings)
+
+        self.assertEqual(
+            str(error_context.exception),
+            audio_recording.SPEECH_DETECTION_SETUP_MESSAGE,
+        )
+
+    def test_live_recorder_factory_checks_speech_detection_before_capture(self) -> None:
+        settings = AppSettings.from_mapping(
+            {
+                "llm_base_url": "https://api.example.com/v1",
+                "llm_model_name": "model-a",
+                "tts_base_url": "https://tts.example.com/v1",
+            }
+        )
+
+        with patch.object(
+            audio_recording,
+            "TenVadEngine",
+            return_value=object(),
+        ) as engine_factory:
+            recorder = build_live_audio_recorder(settings)
+
+        engine_factory.assert_called_once_with(hop_size=256, threshold=0.5)
+        self.assertIsInstance(recorder, TenVadAudioRecorder)
 
 
 class AudioTestSignalServiceTests(unittest.TestCase):

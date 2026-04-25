@@ -86,8 +86,31 @@ class AppSettingsTests(unittest.TestCase):
         self.assertEqual(settings.transcription_base_url, "https://api.naga.ac/v1")
         self.assertEqual(settings.transcription_api_key, "")
 
-    def test_default_audio_silence_timeout_is_half_second(self) -> None:
-        self.assertEqual(AppSettings().audio_silence_seconds, 0.5)
+    def test_default_audio_detection_is_balanced(self) -> None:
+        self.assertEqual(AppSettings().audio_vad_threshold, 0.5)
+        self.assertEqual(AppSettings().audio_endpoint_patience, "balanced")
+
+    def test_from_mapping_ignores_removed_audio_threshold_settings(self) -> None:
+        settings = AppSettings.from_mapping(
+            {
+                "llm_base_url": "https://api.example.com/v1",
+                "llm_model_name": "model-a",
+                "tts_base_url": "https://tts.example.com/v1",
+                "audio_turn_detection_mode": "threshold",
+                "audio_activation_threshold": 0,
+                "audio_silence_timeout_enabled": "false",
+                "audio_silence_seconds": 0.1,
+            }
+        )
+
+        self.assertFalse(hasattr(settings, "audio_turn_detection_mode"))
+        self.assertFalse(hasattr(settings, "audio_activation_threshold"))
+        self.assertFalse(hasattr(settings, "audio_silence_timeout_enabled"))
+        self.assertFalse(hasattr(settings, "audio_silence_seconds"))
+        self.assertNotIn("audio_turn_detection_mode", settings.to_dict())
+        self.assertNotIn("audio_activation_threshold", settings.to_dict())
+        self.assertNotIn("audio_silence_timeout_enabled", settings.to_dict())
+        self.assertNotIn("audio_silence_seconds", settings.to_dict())
 
     def test_from_mapping_normalizes_keybinds_to_uppercase(self) -> None:
         settings = AppSettings.from_mapping(
@@ -116,16 +139,21 @@ class AppSettingsTests(unittest.TestCase):
                 }
             )
 
-    def test_validate_rejects_invalid_audio_activation_threshold(self) -> None:
+    def test_validate_rejects_invalid_audio_vad_settings(self) -> None:
         with self.assertRaises(ValidationError):
             AppSettings.from_mapping(
                 {
                     "llm_base_url": "https://api.example.com/v1",
-                    "llm_model_name": "model-a",
                     "tts_base_url": "https://tts.example.com/v1",
-                    "audio_activation_threshold": 0,
+                    "audio_vad_threshold": 2,
                 }
             )
+        with self.assertRaises(ValidationError):
+            AppSettings(
+                llm_base_url="https://api.example.com/v1",
+                tts_base_url="https://tts.example.com/v1",
+                audio_endpoint_patience="rushed",
+            ).validate()
 
     def test_validate_rejects_negative_audio_preroll(self) -> None:
         with self.assertRaises(ValidationError):
@@ -194,14 +222,12 @@ class AppSettingsTests(unittest.TestCase):
                 "llm_base_url": "https://api.example.com/v1",
                 "llm_model_name": "model-a",
                 "tts_base_url": "https://tts.example.com/v1",
-                "audio_silence_timeout_enabled": "false",
                 "audio_wait_for_speech_enabled": False,
                 "audio_max_turn_length_enabled": "0",
                 "audio_preroll_enabled": True,
             }
         )
 
-        self.assertTrue(settings.audio_silence_timeout_enabled)
         self.assertFalse(settings.audio_wait_for_speech_enabled)
         self.assertFalse(settings.audio_max_turn_length_enabled)
         self.assertTrue(settings.audio_preroll_enabled)

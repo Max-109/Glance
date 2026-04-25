@@ -173,6 +173,19 @@ class ProviderPromptTests(unittest.TestCase):
         )
         self.assertIn("Choose the voice before composing the final reply", prompt)
 
+    def test_live_tool_prompts_answer_directly_after_tools(self) -> None:
+        text_prompt = self.provider.build_live_tool_messages(
+            transcript="what is the weather in Vilnius",
+            conversation_history=[],
+        )[0]["content"]
+        audio_prompt = self.provider._build_live_tool_speech_system_prompt()
+
+        for prompt in (text_prompt, audio_prompt):
+            with self.subTest(prompt=prompt[:40]):
+                self.assertIn("Do not narrate the tool work", prompt)
+                self.assertIn("answer with the result directly", prompt)
+                self.assertIn("tool", prompt)
+
     def test_parse_live_speech_reply_uses_fixed_voice_when_not_auto(self) -> None:
         self.provider._settings.tts_voice_id = "UgBBYS2sOqTuMpoF3BR0"
 

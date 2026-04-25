@@ -16,6 +16,7 @@ from src.models.settings import (
     AUTO_TTS_VOICE_ID,
     AppSettings,
     ELEVEN_V3_VOICES,
+    ENDPOINT_PATIENCE_OPTIONS,
     TOOL_POLICY_OPTIONS,
     TTS_VOICE_OPTIONS,
     coerce_bool,
@@ -299,9 +300,6 @@ class SettingsViewModel(QObject):
             self.errorsChanged.emit()
         self._recompute_dirty()
         self.settingsChanged.emit()
-        if field_name in self._MANUAL_SAVE_FIELDS:
-            return
-        self._apply_autosave()
 
     @Slot()
     def save(self) -> None:
@@ -567,9 +565,8 @@ class SettingsViewModel(QObject):
         audio_fields = (
             "audio_input_device",
             "audio_output_device",
-            "audio_activation_threshold",
-            "audio_silence_timeout_enabled",
-            "audio_silence_seconds",
+            "audio_vad_threshold",
+            "audio_endpoint_patience",
             "audio_wait_for_speech_enabled",
             "audio_max_wait_seconds",
             "audio_max_turn_length_enabled",
@@ -630,9 +627,8 @@ class SettingsViewModel(QObject):
         self._coerce_positive_float(payload, "screenshot_interval", errors)
         self._coerce_positive_float(payload, "batch_window_duration", errors)
         self._coerce_ratio(payload, "screen_change_threshold", errors)
-        self._coerce_ratio(payload, "audio_activation_threshold", errors)
-        payload["audio_silence_timeout_enabled"] = True
-        self._coerce_positive_float(payload, "audio_silence_seconds", errors)
+        self._coerce_ratio(payload, "audio_vad_threshold", errors)
+        self._coerce_endpoint_patience(payload, "audio_endpoint_patience", errors)
         self._coerce_bool(payload, "audio_wait_for_speech_enabled")
         self._coerce_positive_float(payload, "audio_max_wait_seconds", errors)
         self._coerce_bool(payload, "audio_max_turn_length_enabled")
@@ -1163,6 +1159,17 @@ class SettingsViewModel(QObject):
         payload[field_name] = value
         if value not in TOOL_POLICY_OPTIONS:
             errors[field_name] = "Choose allow or deny."
+
+    @staticmethod
+    def _coerce_endpoint_patience(
+        payload: dict[str, Any],
+        field_name: str,
+        errors: dict[str, str],
+    ) -> None:
+        value = str(payload.get(field_name, "balanced")).strip().lower()
+        payload[field_name] = value
+        if value not in ENDPOINT_PATIENCE_OPTIONS:
+            errors[field_name] = "Choose fast, balanced, or patient."
 
     @staticmethod
     def _coerce_hex_color(

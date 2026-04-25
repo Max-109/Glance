@@ -2,7 +2,12 @@ import unittest
 from pathlib import Path
 
 from src.models.settings import AppSettings
-from src.tools import RuntimeToolRegistry, ToolCallRequest, ToolExecutor
+from src.tools import (
+    RuntimeToolRegistry,
+    ToolCallRequest,
+    ToolExecutor,
+    short_site_name,
+)
 
 
 class FakeScreenCaptureAgent:
@@ -50,6 +55,15 @@ class RuntimeToolTests(unittest.TestCase):
         self.assertEqual(len(result.images), 1)
         self.assertTrue(Path(result.images[0].path).exists())
         self.assertEqual(result.artifact_paths, [result.images[0].path])
+        self.assertEqual(result.metadata, {"reason": "read code"})
+
+    def test_short_site_name_prefers_human_source_names(self) -> None:
+        self.assertEqual(short_site_name("https://platform.openai.com/docs"), "OpenAI")
+        self.assertEqual(short_site_name("https://weather.com/weather/today"), "Weather.com")
+        self.assertEqual(
+            short_site_name("https://very-long-dashed-source-name.example.com/page"),
+            "",
+        )
 
     def test_disabled_tool_is_not_exposed_and_does_not_execute(self) -> None:
         screen_capture_agent = FakeScreenCaptureAgent()

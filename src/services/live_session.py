@@ -22,12 +22,14 @@ class LiveSessionController:
         playback_service,
         *,
         on_status: Callable[[str, str], None] | None = None,
+        unavailable_message: str = "",
     ) -> None:
         self._orchestrator = orchestrator
         self._recorder = recorder
         self._playback_service = playback_service
         self._on_status = on_status
         self._state = "idle"
+        self._unavailable_message = str(unavailable_message).strip()
         self._stop_event = Event()
         self._thread: Thread | None = None
         self._session = None
@@ -41,9 +43,10 @@ class LiveSessionController:
         with self._lock:
             self._orchestrator = orchestrator
 
-    def set_recorder(self, recorder) -> None:
+    def set_recorder(self, recorder, unavailable_message: str = "") -> None:
         with self._lock:
             self._recorder = recorder
+            self._unavailable_message = str(unavailable_message).strip()
 
     def set_output_device(self, output_device_id: str) -> None:
         with self._lock:
@@ -76,7 +79,8 @@ class LiveSessionController:
         if self._recorder is None:
             self._set_status(
                 "idle",
-                "Live can't start with the current audio settings.",
+                self._unavailable_message
+                or "Live can't start with the current audio settings.",
             )
             return
         self._stop_event.clear()

@@ -138,12 +138,9 @@ export function PreferencesTab({
   const activePrompt = promptRows.find((row) => row.id === activePromptId) ?? promptRows[1];
   const activeValue = getDraftValue(activePrompt.id);
   const activeIsCustom = activeValue !== activePrompt.defaultValue;
+  const activeWords = wordCount(activeValue);
   const customPromptCount = promptRows.reduce(
     (count, row) => count + (getDraftValue(row.id) !== row.defaultValue ? 1 : 0),
-    0,
-  );
-  const totalWords = promptRows.reduce(
-    (count, row) => count + wordCount(getDraftValue(row.id)),
     0,
   );
 
@@ -184,7 +181,7 @@ export function PreferencesTab({
             <div>
               <CardTitle className="text-base font-semibold">Accent</CardTitle>
               <CardDescription>
-                Pick the color used for highlights, icons, and the mic threshold.
+                Pick the color used for highlights, icons, and mic controls.
               </CardDescription>
             </div>
             <span className="hidden rounded-full border border-[color-mix(in_srgb,var(--accent)_34%,transparent)] bg-[color-mix(in_srgb,var(--accent)_10%,transparent)] px-3 py-1 font-mono text-[0.68rem] font-bold uppercase tracking-[0.16em] text-[var(--accent-strong)] sm:inline-flex">
@@ -327,11 +324,11 @@ export function PreferencesTab({
                   </div>
                 </div>
 
-                <div className="min-h-[32rem]">
+                <div className="min-h-[43rem]">
                   <Textarea
                     name={activePrompt.id}
                     value={activeValue}
-                    className="h-[32rem] min-h-[32rem] resize-y rounded-none border-0 bg-[var(--timing-input-bg,#28282b)] px-6 py-5 font-mono text-[0.82rem] leading-6 text-[var(--text-strong)] shadow-none focus-visible:ring-0"
+                    className="h-[43rem] min-h-[43rem] resize-y overflow-y-auto overscroll-contain rounded-none border-0 bg-[var(--timing-input-bg,#28282b)] px-6 py-5 font-mono text-[0.82rem] leading-6 text-[var(--text-strong)] shadow-none focus-visible:ring-0"
                     spellCheck={false}
                     onChange={(event) =>
                       onDraftChange(activePrompt.id, event.currentTarget.value)
@@ -340,6 +337,7 @@ export function PreferencesTab({
                       onDraftCommit(activePrompt.id, event.currentTarget.value)
                     }
                     onFocus={() => onDraftFocus(activePrompt.id)}
+                    onWheelCapture={(event) => event.stopPropagation()}
                   />
                 </div>
               </section>
@@ -363,7 +361,7 @@ export function PreferencesTab({
                     Total prompt text
                   </span>
                   <span className="mt-3 block text-3xl font-semibold tabular-nums text-[var(--text-strong)]">
-                    {totalWords}
+                    {activeWords}
                   </span>
                 </div>
               </aside>

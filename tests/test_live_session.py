@@ -118,6 +118,30 @@ class LiveSessionControllerTests(unittest.TestCase):
             ],
         )
 
+    def test_missing_speech_detector_shows_setup_message(self) -> None:
+        statuses: list[tuple[str, str]] = []
+        orchestrator = FakeOrchestrator()
+        playback_service = FakePlaybackService()
+        message = (
+            "Speech detection is unavailable. Run `python -m pip install -r "
+            "requirements.txt`, then restart Glance."
+        )
+
+        controller = LiveSessionController(
+            orchestrator=orchestrator,
+            recorder=None,
+            playback_service=playback_service,
+            on_status=lambda state, message: statuses.append((state, message)),
+            unavailable_message=message,
+        )
+
+        controller.start()
+
+        self.assertIsNone(controller._thread)
+        self.assertEqual(orchestrator.opened_modes, [])
+        self.assertEqual(playback_service.calls, [])
+        self.assertEqual(statuses, [("idle", message)])
+
 
 if __name__ == "__main__":
     unittest.main()

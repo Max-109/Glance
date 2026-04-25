@@ -149,7 +149,7 @@ export function sectionMeta(section: SectionId): {
   if (section === "audio") {
     return {
       title: "Audio",
-      description: "Choose devices and tune the mic.",
+      description: "Tune mic and pauses.",
     };
   }
   if (section === "history") {
