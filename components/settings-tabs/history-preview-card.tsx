@@ -44,7 +44,7 @@ function modeMeta(mode: string) {
   const normalizedMode = mode.toLowerCase();
   if (normalizedMode === "quick") {
     return {
-      label: "Quick Ask",
+      label: "Legacy",
       icon: "replies",
       tone: "text-sky-300",
       rail: "bg-sky-300",

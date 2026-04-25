@@ -114,7 +114,6 @@ _HEX_COLOR_PATTERN = re.compile(r"^#[0-9a-f]{6}$")
 @dataclass
 class AppSettings:
     live_keybind: str = "CMD+SHIFT+L"
-    quick_keybind: str = "CMD+SHIFT+Q"
     ocr_keybind: str = "CMD+SHIFT+O"
     llm_base_url: str = ""
     llm_api_key: str = ""
@@ -163,12 +162,9 @@ class AppSettings:
 
     def validate(self) -> None:
         self.live_keybind = normalize_keybind(self.live_keybind)
-        self.quick_keybind = normalize_keybind(self.quick_keybind)
         self.ocr_keybind = normalize_keybind(self.ocr_keybind)
         self.tts_voice_id = normalize_tts_voice_id(self.tts_voice_id)
-        if not keybinds_are_unique(
-            [self.live_keybind, self.quick_keybind, self.ocr_keybind]
-        ):
+        if not keybinds_are_unique([self.live_keybind, self.ocr_keybind]):
             raise ValidationError("Each keybind must be unique.")
         if not self.llm_base_url.strip():
             raise ValidationError("llm_base_url cannot be empty.")
@@ -257,9 +253,6 @@ class AppSettings:
         settings = cls(
             live_keybind=normalize_keybind(
                 data.get("live_keybind", cls.live_keybind)
-            ),
-            quick_keybind=normalize_keybind(
-                data.get("quick_keybind", cls.quick_keybind)
             ),
             ocr_keybind=normalize_keybind(
                 data.get("ocr_keybind", cls.ocr_keybind)

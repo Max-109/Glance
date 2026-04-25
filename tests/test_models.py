@@ -134,8 +134,9 @@ class AppSettingsTests(unittest.TestCase):
         )
 
         self.assertEqual(settings.live_keybind, "CMD+SHIFT+L")
-        self.assertEqual(settings.quick_keybind, "CTRL+ALT+Q")
         self.assertEqual(settings.ocr_keybind, "CMD+O")
+        self.assertFalse(hasattr(settings, "quick_keybind"))
+        self.assertNotIn("quick_keybind", settings.to_dict())
 
     def test_validate_rejects_invalid_threshold(self) -> None:
         with self.assertRaises(ValidationError):

@@ -349,10 +349,6 @@ def run_settings_app() -> int:
     hotkey_manager = GlobalHotkeyManager(
         callbacks={
             "live": live_controller.toggle,
-            "quick": lambda: tray.showMessage(
-                "GlanceQuick Ask keybind is saved, but Quick Ask isn't "
-                "available yet.",
-            ),
             "ocr": ocr_controller.start,
         })
     runtime_refresh_timer = QTimer(app)
@@ -514,10 +510,6 @@ def _build_tray_icon(
     live_action.triggered.connect(live_controller.toggle)
     menu.addAction(live_action)
 
-    quick_action = QAction("Quick: --", menu)
-    quick_action.setEnabled(False)
-    menu.addAction(quick_action)
-
     ocr_action = QAction("OCR: --", menu)
     ocr_action.triggered.connect(ocr_callback)
     menu.addAction(ocr_action)
@@ -525,7 +517,6 @@ def _build_tray_icon(
     def update_keybind_actions() -> None:
         settings = controller.settings
         live_action.setText(f"Live: {settings.get('live_keybind', '--')}")
-        quick_action.setText(f"Quick: {settings.get('quick_keybind', '--')}")
         ocr_action.setText(f"OCR: {settings.get('ocr_keybind', '--')}")
 
     update_keybind_actions()

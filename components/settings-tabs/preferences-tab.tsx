@@ -158,13 +158,6 @@ export function PreferencesTab({
       active: state.bindingField === "live_keybind",
     },
     {
-      id: "quick_keybind",
-      title: "Quick Ask",
-      icon: "bot",
-      value: String(state.settings.quick_keybind || "-"),
-      active: state.bindingField === "quick_keybind",
-    },
-    {
       id: "ocr_keybind",
       title: "Read Screen",
       icon: "capture",

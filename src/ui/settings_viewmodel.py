@@ -55,7 +55,6 @@ class SettingsViewModel(QObject):
             "llm_api_key",
             "llm_model_name",
             "live_keybind",
-            "quick_keybind",
             "ocr_keybind",
             "tts_base_url",
             "tts_api_key",
@@ -370,7 +369,7 @@ class SettingsViewModel(QObject):
 
     @Slot(str)
     def startKeybindCapture(self, field_name: str) -> None:
-        if field_name not in {"live_keybind", "quick_keybind", "ocr_keybind"}:
+        if field_name not in {"live_keybind", "ocr_keybind"}:
             return
         self._binding_field = field_name
         self.bindingChanged.emit()
@@ -412,7 +411,7 @@ class SettingsViewModel(QObject):
 
     @Slot(str, str)
     def assignKeybind(self, field_name: str, keybind: str) -> None:
-        if field_name not in {"live_keybind", "quick_keybind", "ocr_keybind"}:
+        if field_name not in {"live_keybind", "ocr_keybind"}:
             return
         try:
             normalized_keybind = normalize_keybind(keybind)
@@ -641,7 +640,6 @@ class SettingsViewModel(QObject):
         self._require_text(payload, "tts_model", errors)
         self._require_text(payload, "tts_voice_id", errors)
         self._require_text(payload, "live_keybind", errors)
-        self._require_text(payload, "quick_keybind", errors)
         self._require_text(payload, "ocr_keybind", errors)
         self._require_text(payload, "transcription_model_name", errors)
         self._coerce_bool(payload, "llm_reasoning_enabled")
@@ -676,7 +674,7 @@ class SettingsViewModel(QObject):
         self._coerce_theme(payload, "theme_preference", errors)
         self._coerce_hex_color(payload, "accent_color", errors)
 
-        for keybind_field in ("live_keybind", "quick_keybind", "ocr_keybind"):
+        for keybind_field in ("live_keybind", "ocr_keybind"):
             if keybind_field not in errors:
                 try:
                     payload[keybind_field] = normalize_keybind(
@@ -688,13 +686,11 @@ class SettingsViewModel(QObject):
         if not errors and not keybinds_are_unique(
             [
                 payload["live_keybind"],
-                payload["quick_keybind"],
                 payload["ocr_keybind"],
             ]
         ):
             duplicate_message = "Each keybind must be unique."
             errors["live_keybind"] = duplicate_message
-            errors["quick_keybind"] = duplicate_message
             errors["ocr_keybind"] = duplicate_message
 
         if errors:
@@ -849,7 +845,7 @@ class SettingsViewModel(QObject):
     def _find_keybind_conflict(
         self, current_field: str, value: str
     ) -> str | None:
-        for field_name in ("live_keybind", "quick_keybind", "ocr_keybind"):
+        for field_name in ("live_keybind", "ocr_keybind"):
             if field_name == current_field:
                 continue
             if (
@@ -863,7 +859,6 @@ class SettingsViewModel(QObject):
     def _binding_label(field_name: str) -> str:
         labels = {
             "live_keybind": "Live",
-            "quick_keybind": "Quick Ask",
             "ocr_keybind": "Read Screen",
         }
         return labels.get(field_name, field_name)

@@ -9,41 +9,24 @@ class ConsoleUI:
 
     def run(self) -> None:
         print("Glance console shell")
-        print("1. Quick Ask")
-        print("2. Read Screen")
-        print("3. Live")
-        print("4. View history")
-        print("5. Exit")
+        print("1. Read Screen")
+        print("2. Live")
+        print("3. View history")
+        print("4. Exit")
 
         while True:
             choice = input("Select an option: ").strip()
             if choice == "1":
-                self._run_quick_mode()
-            elif choice == "2":
                 self._run_ocr_mode()
-            elif choice == "3":
+            elif choice == "2":
                 self._run_live_mode()
-            elif choice == "4":
+            elif choice == "3":
                 self._show_history()
-            elif choice == "5":
+            elif choice == "4":
                 print("Goodbye.")
                 return
             else:
                 print("Invalid option.")
-
-    def _run_quick_mode(self) -> None:
-        image_path = input("Image path: ").strip()
-        question = input("Optional question: ").strip()
-        try:
-            interaction = self._orchestrator.run_mode(
-                "quick",
-                image_path=image_path,
-                question=question,
-            )
-        except GlanceError as exc:
-            print(f"Quick Ask failed: {exc}")
-            return
-        print(interaction.answer)
 
     def _run_ocr_mode(self) -> None:
         image_path = input("Image path: ").strip()

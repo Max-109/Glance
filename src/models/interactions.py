@@ -78,7 +78,7 @@ class QuickInteraction(BaseInteraction):
         self.image_path = self.require_text(self.image_path, "image_path")
 
     def summary(self) -> str:
-        return f"Quick: {self.question}"
+        return f"Legacy: {self.question}"
 
     def to_dict(self) -> dict:
         return {

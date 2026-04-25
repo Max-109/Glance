@@ -13,7 +13,6 @@ from src.services.clipboard import ClipboardService
 from src.strategies.live_strategy import LiveStrategy
 from src.strategies.mode_strategy import ModeStrategy
 from src.strategies.ocr_strategy import OCRStrategy
-from src.strategies.quick_strategy import QuickStrategy
 
 
 class ModeStrategyFactory:
@@ -32,12 +31,6 @@ class ModeStrategyFactory:
         settings: AppSettings | None = None,
     ) -> ModeStrategy:
         normalized_mode = mode.strip().lower()
-        if normalized_mode == "quick":
-            return QuickStrategy(
-                screen_capture_agent=screen_capture_agent,
-                llm_agent=llm_agent,
-                tts_agent=tts_agent,
-            )
         if normalized_mode == "ocr":
             return OCRStrategy(
                 screen_capture_agent=screen_capture_agent,

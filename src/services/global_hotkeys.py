@@ -80,7 +80,6 @@ class GlobalHotkeyManager:
     ) -> list[tuple[str, Callable[[], None]]]:
         mapping = {
             settings.live_keybind: self._callbacks.get("live"),
-            settings.quick_keybind: self._callbacks.get("quick"),
             settings.ocr_keybind: self._callbacks.get("ocr"),
         }
         return [

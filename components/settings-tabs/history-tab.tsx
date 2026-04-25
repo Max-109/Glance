@@ -245,7 +245,7 @@ export function HistoryTab({
               Nothing here yet
             </strong>
             <span className="mt-1 block text-sm text-muted-foreground">
-              Sessions show up after you use Live, Quick Ask, or Read Screen.
+              Sessions show up after you use Live or Read Screen.
             </span>
           </div>
         )}

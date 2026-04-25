@@ -35,7 +35,7 @@ class SessionDirectoryRepositoryTests(unittest.TestCase):
 
             self.assertEqual(len(loaded), 1)
             self.assertEqual(
-                loaded[0].interactions[0].summary(), "Quick: Question"
+                loaded[0].interactions[0].summary(), "Legacy: Question"
             )
             self.assertEqual(len(session_dirs), 1)
             self.assertTrue((session_dirs[0] / "session.json").exists())

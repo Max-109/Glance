@@ -4,6 +4,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from src.core.orchestrator import Orchestrator
+from src.exceptions.app_exceptions import ValidationError
 from src.factories.strategy_factory import ModeStrategyFactory
 from src.models.settings import AppSettings
 from src.services.app_paths import AppPaths
@@ -41,9 +42,7 @@ class FakeLLMAgent:
         transcript=None,
         match_user_language=False,
     ):
-        if transcript:
-            return f"live:{transcript}:{len(image_paths or [])}"
-        return f"quick:{user_prompt}:{len(image_paths or [])}"
+        return f"reply:{user_prompt}:{len(image_paths or [])}"
 
     def prepare_speech_text(self, *, text, session_id=None):
         return LiveSpeechReply(
@@ -153,17 +152,13 @@ class OrchestratorFlowTests(unittest.TestCase):
     def tearDown(self) -> None:
         self.temp_dir.cleanup()
 
-    def test_quick_mode_records_history(self) -> None:
-        interaction = self.orchestrator.run_mode(
-            "quick",
-            image_path="sample.png",
-            question="Explain this",
-        )
-
-        self.assertEqual(interaction.answer, "quick:Explain this:1")
-        self.assertTrue(interaction.speech_path.endswith(".wav"))
-        self.assertEqual(self.tts_agent.calls[0][0], "quick:Explain this:1...")
-        self.assertEqual(len(self.orchestrator.list_history()), 1)
+    def test_quick_mode_is_removed(self) -> None:
+        with self.assertRaises(ValidationError):
+            self.orchestrator.run_mode(
+                "quick",
+                image_path="sample.png",
+                question="Explain this",
+            )
 
     def test_ocr_mode_copies_text(self) -> None:
         interaction = self.orchestrator.run_mode(

@@ -46,7 +46,6 @@ const EMPTY_RUNTIME_STATUS: RuntimeStatusPayload = {
 const EMPTY_STATE: BridgeState = {
   settings: {
     live_keybind: "CMD+L",
-    quick_keybind: "CMD+SHIFT+Q",
     ocr_keybind: "CMD+SHIFT+O",
     llm_base_url: "",
     llm_api_key: "",
