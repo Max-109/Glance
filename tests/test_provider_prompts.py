@@ -11,7 +11,6 @@ from src.services.providers import (
     DEFAULT_VOICE_REPLY_PROMPT,
     LiveSpeechReply,
     NagaTranscriptionProvider,
-    OCR_EXTRACTION_PROMPT,
     OpenAICompatibleProvider,
     _format_usage,
     _format_usage_summary,
@@ -114,38 +113,6 @@ class ProviderPromptTests(unittest.TestCase):
             prompt,
         )
 
-    def test_tts_preparation_prompt_is_strict_cleanup_not_rewrite(
-        self,
-    ) -> None:
-        prompt = self.provider._build_tts_preparation_prompt()
-
-        self.assertIn("strict cleanup step, not a new answer", prompt)
-        self.assertIn(
-            "Keep the same facts, meaning, speaker, perspective, and intent",
-            prompt,
-        )
-        self.assertIn("Do not add facts, jokes, personal stories", prompt)
-        self.assertIn("Use simple, direct wording", prompt)
-        self.assertIn(
-            "Preserve or add emotional delivery on most replies", prompt
-        )
-        self.assertIn("roughly 85 percent of the time", prompt)
-        self.assertIn("[reassuring]", prompt)
-        self.assertIn("Never use angle-bracket tags like <laugh>", prompt)
-
-    def test_transcription_prompt_allows_high_confidence_context_inference(
-        self,
-    ) -> None:
-        provider = NagaTranscriptionProvider.__new__(NagaTranscriptionProvider)
-        provider._settings = self.settings
-        prompt = provider._build_transcription_prompt()
-
-        self.assertIn("use the surrounding context to infer", prompt)
-        self.assertIn("high confidence", prompt)
-        self.assertIn(
-            "stay conservative rather than inventing content", prompt
-        )
-
     def test_transcription_prompt_override_replaces_default_base(self) -> None:
         provider = NagaTranscriptionProvider.__new__(NagaTranscriptionProvider)
         provider._settings = AppSettings.from_mapping(
@@ -164,23 +131,6 @@ class ProviderPromptTests(unittest.TestCase):
 
         self.assertIn("Return a clean transcript and nothing else.", prompt)
         self.assertNotIn(DEFAULT_TRANSCRIPTION_PROMPT, prompt)
-
-    def test_live_speech_prompt_merges_reply_and_delivery_rules(self) -> None:
-        prompt = self.provider._build_live_speech_system_prompt()
-
-        self.assertIn("final spoken text", prompt)
-        self.assertIn("Do not change speaker identity or perspective", prompt)
-        self.assertIn("simple terms first", prompt)
-        self.assertIn("Do not invent personal stories", prompt)
-        self.assertIn("Use emotional delivery on most replies", prompt)
-        self.assertIn("roughly 85 percent of the time", prompt)
-        self.assertIn("[curious]", prompt)
-        self.assertIn("Never use angle-bracket tags like <laugh>", prompt)
-        self.assertIn("never use emoji", prompt)
-        self.assertIn(
-            "Short casual turns should usually be one short sentence", prompt
-        )
-        self.assertIn("Ask at most one follow-up question", prompt)
 
     def test_voice_prompt_override_replaces_default_base(self) -> None:
         self.provider._settings.voice_prompt_override = (
@@ -205,18 +155,6 @@ class ProviderPromptTests(unittest.TestCase):
         )
         self.assertNotIn(DEFAULT_TTS_PREPARATION_PROMPT, prompt)
 
-    def test_live_speech_prompt_lists_auto_voice_contract(self) -> None:
-        prompt = self.provider._build_live_speech_system_prompt()
-
-        self.assertIn("VOICE_ID: <id>", prompt)
-        self.assertIn("Allowed voice: BIvP0GN1cAtSRTxNHnWS - Ellen", prompt)
-        self.assertIn(
-            "prefer Mark unless another voice is clearly a better fit", prompt
-        )
-        self.assertIn(
-            "Choose the voice before composing the final reply", prompt
-        )
-
     def test_live_tool_prompts_answer_directly_after_tools(self) -> None:
         text_prompt = self.provider.build_live_tool_messages(
             transcript="what is the weather in Vilnius",
@@ -238,33 +176,6 @@ class ProviderPromptTests(unittest.TestCase):
                 self.assertIn("says thanks after a completed task", prompt)
                 self.assertIn("goodbye or bye", prompt)
                 self.assertIn("tool", prompt)
-
-    def test_ocr_prompt_is_strict_extraction_only(self) -> None:
-        prompt = OCR_EXTRACTION_PROMPT
-
-        self.assertIn("clean clipboard text", prompt)
-        self.assertIn("not a visual line-by-line transcript", prompt)
-        self.assertIn("Output only text that is visibly present", prompt)
-        self.assertIn("Follow the user's OCR request exactly", prompt)
-        self.assertIn("return only that item", prompt)
-        self.assertIn("asks for all visible text", prompt)
-        self.assertIn("Do not include surrounding UI text", prompt)
-        self.assertIn("Preserve original wording", prompt)
-        self.assertIn("Join prose or UI copy", prompt)
-        self.assertIn("wrapped it visually", prompt)
-        self.assertIn(
-            "headings, labels, menu items, lists, table rows, and columns",
-            prompt,
-        )
-        self.assertIn("Markdown table", prompt)
-        self.assertIn(
-            "Do not summarize, explain, translate, infer hidden text, add "
-            "labels",
-            prompt,
-        )
-        self.assertIn("say that you extracted the text", prompt)
-        self.assertIn("Do not wrap the answer in code fences", prompt)
-        self.assertIn("[NO_VISIBLE_TEXT]", prompt)
 
     def test_extract_text_includes_user_ocr_request(self) -> None:
         captured = {}

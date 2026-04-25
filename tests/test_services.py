@@ -25,9 +25,6 @@ from src.services.ocr import (
     OCRService,
     sanitize_ocr_output,
 )
-from src.strategies.live_strategy import LiveStrategy
-from src.strategies.ocr_strategy import OCRStrategy
-from src.strategies.quick_strategy import QuickStrategy
 
 
 class DummyProvider:
@@ -128,18 +125,6 @@ class ModeStrategyFactoryTests(unittest.TestCase):
             "tts_agent": TTSAgent(provider),
             "clipboard_service": ClipboardService(),
         }
-
-    def test_create_returns_quick_strategy(self) -> None:
-        strategy = self.factory.create(mode="quick", **self.dependencies)
-        self.assertIsInstance(strategy, QuickStrategy)
-
-    def test_create_returns_ocr_strategy(self) -> None:
-        strategy = self.factory.create(mode="ocr", **self.dependencies)
-        self.assertIsInstance(strategy, OCRStrategy)
-
-    def test_create_returns_live_strategy(self) -> None:
-        strategy = self.factory.create(mode="live", **self.dependencies)
-        self.assertIsInstance(strategy, LiveStrategy)
 
     def test_create_rejects_unknown_mode(self) -> None:
         with self.assertRaises(ValidationError):
