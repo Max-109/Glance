@@ -15,7 +15,11 @@ from src.models.interactions import (
     SessionRecord,
     ToolCallRecord,
 )
-from src.models.settings import AppSettings
+from src.models.settings import (
+    AUTO_TTS_VOICE_ID,
+    AppSettings,
+    DEFAULT_FIXED_TTS_VOICE,
+)
 from src.services.clipboard import ClipboardService
 from src.services.ocr import OCRService
 from src.agents.tts_agent import TTSAgent
@@ -53,6 +57,7 @@ class LiveStrategy(ModeStrategy):
         ocr_agent: OCRAgent | None = None,
         clipboard_service: ClipboardService | None = None,
         settings: AppSettings | None = None,
+        static_speech_dir: Path | None = None,
     ) -> None:
         self._transcription_agent = transcription_agent
         self._llm_agent = llm_agent
@@ -61,6 +66,7 @@ class LiveStrategy(ModeStrategy):
         self._ocr_agent = ocr_agent
         self._clipboard_service = clipboard_service
         self._settings = settings
+        self._static_speech_dir = static_speech_dir
 
     def execute(self, context: dict) -> LiveInteraction:
         status_callback = context.get("status_callback")
@@ -96,7 +102,11 @@ class LiveStrategy(ModeStrategy):
                     speech_path="",
                     tool_calls=tool_records,
                 )
-            live_reply = self._llm_agent.parse_live_speech_reply(final_text)
+            live_reply = _local_speech_reply(final_text, self._settings)
+            if live_reply is None:
+                live_reply = self._llm_agent.parse_live_speech_reply(
+                    final_text
+                )
             transcript = ""
         elif tools_enabled:
             _emit_stage_status(
@@ -123,11 +133,13 @@ class LiveStrategy(ModeStrategy):
                     speech_path="",
                     tool_calls=tool_records,
                 )
-            live_reply = self._llm_agent.prepare_speech_text(
-                text=final_text,
-                session_id=session_id,
-            )
-            live_reply = _guard_speech_prep_drift(final_text, live_reply)
+            live_reply = _local_speech_reply(final_text, self._settings)
+            if live_reply is None:
+                live_reply = self._llm_agent.prepare_speech_text(
+                    text=final_text,
+                    session_id=session_id,
+                )
+                live_reply = _guard_speech_prep_drift(final_text, live_reply)
         elif multimodal:
             _emit_stage_status(
                 status_callback,
@@ -155,13 +167,28 @@ class LiveStrategy(ModeStrategy):
                 conversation_history=conversation_history,
                 session_id=session_id,
             )
+        _emit_stage_status(status_callback, "speaking", "Preparing speech...")
+        static_speech_path = _local_static_speech_path(
+            live_reply,
+            self._static_speech_dir,
+        )
+        if static_speech_path is not None:
+            generated_speech_path = str(static_speech_path)
+            return LiveInteraction(
+                mode="live",
+                recording_path=recording_path,
+                transcript=transcript,
+                response=live_reply.text,
+                speech_path=generated_speech_path,
+                tool_calls=tool_records,
+            )
+
         temp_file = tempfile.NamedTemporaryFile(
             prefix="glance-live-reply-",
             suffix=".wav",
             delete=False,
         )
         temp_file.close()
-        _emit_stage_status(status_callback, "speaking", "Preparing speech...")
         generated_speech_path = self._tts_agent.run(
             text=force_pause_at_end_for_tts(live_reply.text),
             output_path=temp_file.name,
@@ -426,6 +453,12 @@ class LiveStrategy(ModeStrategy):
 
 
 @dataclass
+class _LocalSpeechReply:
+    voice_id: str
+    text: str
+
+
+@dataclass
 class ToolNoticeContext:
     user_context: str = ""
     last_notice_kind: str = ""
@@ -649,6 +682,53 @@ def _local_end_live_session(
     )
     _emit_stage_status(status_callback, "idle", status)
     return status, [record], True
+
+
+def _local_speech_reply(
+    text: str,
+    settings: AppSettings | None,
+) -> _LocalSpeechReply | None:
+    if text not in _LOCAL_SPEECH_TEXTS:
+        return None
+    voice_id = (
+        DEFAULT_FIXED_TTS_VOICE
+        if settings is None or settings.tts_voice_id == AUTO_TTS_VOICE_ID
+        else settings.tts_voice_id
+    )
+    return _LocalSpeechReply(voice_id=voice_id, text=text)
+
+
+def static_live_speech_file_name(text: str, voice_id: str) -> str:
+    if text == _OCR_CONFIRMATION_TEXT:
+        return f"live-ocr-confirmation-{_safe_file_part(voice_id)}.wav"
+    if text == _OCR_NO_TEXT_TEXT:
+        return f"live-ocr-no-text-{_safe_file_part(voice_id)}.wav"
+    if text == _OCR_FAILURE_TEXT:
+        return f"live-ocr-failure-{_safe_file_part(voice_id)}.wav"
+    return ""
+
+
+def _local_static_speech_path(
+    reply: _LocalSpeechReply,
+    static_speech_dir: Path | None,
+) -> Path | None:
+    if static_speech_dir is None:
+        return None
+    file_name = static_live_speech_file_name(reply.text, reply.voice_id)
+    if not file_name:
+        return None
+    speech_path = static_speech_dir / file_name
+    if not speech_path.exists() or speech_path.stat().st_size <= 0:
+        return None
+    return speech_path
+
+
+def _safe_file_part(value: object) -> str:
+    safe_value = "".join(
+        character if character.isalnum() or character in {"-", "_"} else "-"
+        for character in str(value).strip().lower()
+    ).strip("-")
+    return safe_value or "default"
 
 
 def _should_end_live_from_transcript(
@@ -928,4 +1008,10 @@ _DECLINE_MORE_HELP_REPLIES = {
     "alright",
     "sure",
     "sure thing",
+}
+
+_LOCAL_SPEECH_TEXTS = {
+    _OCR_CONFIRMATION_TEXT,
+    _OCR_NO_TEXT_TEXT,
+    _OCR_FAILURE_TEXT,
 }

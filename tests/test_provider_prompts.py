@@ -168,6 +168,16 @@ class ProviderPromptTests(unittest.TestCase):
                 self.assertIn("answer with the result directly", prompt)
                 self.assertIn("OCR is a clipboard action", prompt)
                 self.assertIn(
+                    "copy, read, extract, grab, transcribe, or get visible "
+                    "text",
+                    prompt,
+                )
+                self.assertIn("The user does not need to say OCR", prompt)
+                self.assertIn(
+                    "Do not use take_screenshot for text extraction requests",
+                    prompt,
+                )
+                self.assertIn(
                     "Never turn OCR output into the spoken final answer",
                     prompt,
                 )

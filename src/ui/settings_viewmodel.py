@@ -859,7 +859,7 @@ class SettingsViewModel(QObject):
     def _binding_label(field_name: str) -> str:
         labels = {
             "live_keybind": "Live",
-            "ocr_keybind": "Read Screen",
+            "ocr_keybind": "OCR",
         }
         return labels.get(field_name, field_name)
 

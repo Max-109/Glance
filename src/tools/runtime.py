@@ -151,9 +151,14 @@ class RuntimeToolRegistry:
                 description=(
                     "Capture the user's current primary screen, extract the "
                     "exact text requested by the user, and copy that OCR "
-                    "result to the clipboard. Always pass the user's specific "
-                    "extraction goal in instruction, for example: 'Extract "
-                    "only the YouTube video headline.'"
+                    "result to the clipboard. Use this when the user asks to "
+                    "copy, read, extract, grab, transcribe, or get visible "
+                    "text from the screen, an image, a screenshot, a web "
+                    "page, a video frame, a document, a table, a label, or "
+                    "any UI element. The user does not need to say OCR. "
+                    "Always pass the user's specific extraction goal in "
+                    "instruction, for example: 'Extract only the YouTube "
+                    "video headline.'"
                 ),
                 parameters_schema={
                     "type": "object",
@@ -162,6 +167,9 @@ class RuntimeToolRegistry:
                             "type": "string",
                             "description": (
                                 "The user's exact OCR extraction goal. Use "
+                                "their natural request, such as 'copy this "
+                                "text from the image' or 'read only the "
+                                "headline from the screen'. Use "
                                 "this to target a specific item, or ask for "
                                 "all visible text only when the user asked "
                                 "for all text."

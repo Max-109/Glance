@@ -159,7 +159,7 @@ export function PreferencesTab({
     },
     {
       id: "ocr_keybind",
-      title: "Read Screen",
+      title: "OCR",
       icon: "capture",
       value: String(state.settings.ocr_keybind || "-"),
       active: state.bindingField === "ocr_keybind",

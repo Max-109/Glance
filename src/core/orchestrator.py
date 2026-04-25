@@ -127,7 +127,9 @@ def build_orchestrator_with_dependencies(
     return Orchestrator(
         settings=settings,
         history_manager=history_manager,
-        strategy_factory=ModeStrategyFactory(),
+        strategy_factory=ModeStrategyFactory(
+            static_speech_dir=paths.audio_feedback_dir
+        ),
         screen_capture_agent=ScreenCaptureAgent(),
         screen_diff_agent=ScreenDiffAgent(),
         audio_capture_agent=AudioCaptureAgent(),

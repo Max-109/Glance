@@ -52,7 +52,7 @@ function modeMeta(mode: string) {
   }
   if (normalizedMode === "ocr") {
     return {
-      label: "Read Screen",
+      label: "OCR",
       icon: "capture",
       tone: "text-emerald-300",
       rail: "bg-emerald-300",

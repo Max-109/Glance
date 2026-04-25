@@ -9,7 +9,7 @@ class ConsoleUI:
 
     def run(self) -> None:
         print("Glance console shell")
-        print("1. Read Screen")
+        print("1. OCR")
         print("2. Live")
         print("3. View history")
         print("4. Exit")
@@ -35,7 +35,7 @@ class ConsoleUI:
                 "ocr", image_path=image_path
             )
         except GlanceError as exc:
-            print(f"Read Screen failed: {exc}")
+            print(f"OCR failed: {exc}")
             return
         print(interaction.extracted_text)
 

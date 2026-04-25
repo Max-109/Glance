@@ -183,6 +183,32 @@ class RuntimeToolTests(unittest.TestCase):
             "Extract only the invoice total.",
         )
 
+    def test_ocr_tool_description_covers_copy_text_from_image_requests(
+        self,
+    ) -> None:
+        registry = RuntimeToolRegistry(_tool_settings())
+        descriptions = {
+            definition.name: definition.description
+            for definition in registry.enabled_definitions
+        }
+        ocr_payload = next(
+            definition.provider_payload()
+            for definition in registry.enabled_definitions
+            if definition.name == "ocr_screen"
+        )
+        instruction_description = ocr_payload["function"]["parameters"][
+            "properties"
+        ]["instruction"]["description"]
+
+        self.assertIn("copy, read, extract", descriptions["ocr_screen"])
+        self.assertIn("image", descriptions["ocr_screen"])
+        self.assertIn("screenshot", descriptions["ocr_screen"])
+        self.assertIn(
+            "The user does not need to say OCR",
+            descriptions["ocr_screen"],
+        )
+        self.assertIn("copy this text from the image", instruction_description)
+
     def test_ocr_tool_rejects_missing_instruction_before_capture(self) -> None:
         screen_capture_agent = FakeScreenCaptureAgent()
         clipboard_service = FakeClipboardService()

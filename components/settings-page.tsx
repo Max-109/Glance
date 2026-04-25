@@ -211,10 +211,10 @@ function footerStatusForState(state: BridgeState, bridgeError: string): string {
     return "Not connected";
   }
   if (state.saving) {
-    return "Saving provider changes";
+    return "Saving changes";
   }
   if (state.manualSaveDirty) {
-    return "Provider changes not saved";
+    return "Changes not saved";
   }
   if (hasValidationErrors(state)) {
     return "Fix highlighted fields";
@@ -832,9 +832,7 @@ export function SettingsPage() {
 
   const footerStatus = footerStatusForState(liveState, bridgeError);
 
-  const discardLabel = liveState.manualSaveDirty
-    ? "Discard provider changes"
-    : "Discard changes";
+  const discardLabel = "Discard changes";
 
   return (
     <GlanceAppShell

@@ -10,6 +10,7 @@ from src.strategies.live_strategy import (
     LiveStrategy,
     ToolNoticeContext,
     compose_tool_notice,
+    static_live_speech_file_name,
 )
 from src.tools import ToolCallRequest
 
@@ -528,23 +529,67 @@ class LiveStrategyTests(unittest.TestCase):
             ["Extract only the YouTube video headline."],
         )
         self.assertEqual(len(llm_agent.message_snapshots), 1)
-        self.assertEqual(
-            llm_agent.prepare_inputs,
-            ["Done, I copied it to your clipboard. Anything else?"],
-        )
+        self.assertEqual(llm_agent.prepare_inputs, [])
         self.assertEqual(
             tts_agent.calls[0][0],
-            "spoken:Done, I copied it to your clipboard. Anything else?...",
+            "Done, I copied it to your clipboard. Anything else?...",
         )
+        self.assertEqual(tts_agent.calls[0][2], "UgBBYS2sOqTuMpoF3BR0")
         self.assertEqual(notices, [])
         self.assertIn(("idle", "OCR copied text to clipboard."), stages)
         self.assertEqual(interaction.tool_calls[0].tool_name, "ocr_screen")
         self.assertEqual(interaction.tool_calls[0].status, "success")
         self.assertEqual(
             interaction.response,
-            "spoken:Done, I copied it to your clipboard. Anything else?",
+            "Done, I copied it to your clipboard. Anything else?",
         )
         self.assertTrue(interaction.speech_path.endswith(".wav"))
+
+    def test_ocr_confirmation_uses_static_speech_file_when_available(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            static_speech_dir = Path(temp_dir)
+            static_path = (
+                static_speech_dir
+                / static_live_speech_file_name(
+                    "Done, I copied it to your clipboard. Anything else?",
+                    "UgBBYS2sOqTuMpoF3BR0",
+                )
+            )
+            static_path.write_bytes(b"RIFFstatic-confirmation")
+            llm_agent = FakeToolLLMAgent(
+                [
+                    _tool_turn(
+                        tool_calls=[
+                            _tool_call(
+                                "ocr_screen",
+                                {"instruction": "Extract the headline."},
+                            )
+                        ]
+                    )
+                ]
+            )
+            tts_agent = FakeTTSAgent()
+            strategy = LiveStrategy(
+                transcription_agent=FakeTranscriptionAgent(),
+                llm_agent=llm_agent,
+                tts_agent=tts_agent,
+                screen_capture_agent=FakeToolScreenCaptureAgent(),
+                ocr_agent=FakeOCRAgent("Headline"),
+                clipboard_service=FakeClipboardService(),
+                settings=_tool_settings(),
+                static_speech_dir=static_speech_dir,
+            )
+
+            interaction = strategy.execute({"recording_path": "input.wav"})
+
+        self.assertEqual(tts_agent.calls, [])
+        self.assertEqual(interaction.speech_path, str(static_path))
+        self.assertEqual(
+            interaction.response,
+            "Done, I copied it to your clipboard. Anything else?",
+        )
 
     def test_end_live_session_tool_returns_terminal_live_turn(self) -> None:
         llm_agent = FakeToolLLMAgent(

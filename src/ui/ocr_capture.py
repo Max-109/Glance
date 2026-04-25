@@ -24,6 +24,7 @@ _MIN_SELECTION_SIZE = 8
 
 
 class OCRCaptureController(QObject):
+    _start_requested = Signal()
     _completed = Signal(str)
     _failed = Signal(str)
     _canceled = Signal(str)
@@ -40,6 +41,7 @@ class OCRCaptureController(QObject):
         self._on_message = on_message
         self._overlay: OCRSelectionOverlay | None = None
         self._busy = False
+        self._start_requested.connect(self._start)
         self._completed.connect(
             lambda message: self._finish(message, "success")
         )
@@ -49,6 +51,9 @@ class OCRCaptureController(QObject):
         )
 
     def start(self) -> None:
+        self._start_requested.emit()
+
+    def _start(self) -> None:
         if self._busy:
             self._on_message("OCR is already running.", "neutral")
             return
