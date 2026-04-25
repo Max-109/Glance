@@ -38,4 +38,6 @@ class ClipboardService:
                 check=True,
             )
         except (OSError, subprocess.CalledProcessError) as exc:
-            raise ProviderError("Clipboard copy failed on this platform.") from exc
+            raise ProviderError(
+                "Clipboard copy failed on this platform."
+            ) from exc

@@ -67,6 +67,7 @@ const EMPTY_STATE: BridgeState = {
     history_length: 50,
     tools_enabled: false,
     tool_take_screenshot_policy: "allow",
+    tool_ocr_policy: "allow",
     tool_web_search_policy: "allow",
     tool_web_fetch_policy: "allow",
     screenshot_interval: 1.5,

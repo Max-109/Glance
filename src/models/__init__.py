@@ -1,1 +1,1 @@
-"""Domain models for Glance."""
+"Domain models for Glance."

@@ -21,13 +21,17 @@ class TranscriptionProviderTests(unittest.TestCase):
         )
         provider = NagaTranscriptionProvider.__new__(NagaTranscriptionProvider)
         provider._settings = settings
-        transcriptions_create = Mock(return_value=SimpleNamespace(text="hello there"))
+        transcriptions_create = Mock(
+            return_value=SimpleNamespace(text="hello there")
+        )
         provider._client = SimpleNamespace(
             audio=SimpleNamespace(
                 transcriptions=SimpleNamespace(create=transcriptions_create)
             ),
             chat=SimpleNamespace(
-                completions=SimpleNamespace(create=Mock(side_effect=AssertionError))
+                completions=SimpleNamespace(
+                    create=Mock(side_effect=AssertionError)
+                )
             ),
         )
 
@@ -56,19 +60,24 @@ class TranscriptionProviderTests(unittest.TestCase):
         )
         provider = NagaTranscriptionProvider.__new__(NagaTranscriptionProvider)
         provider._settings = settings
-        transcriptions_create = Mock(return_value=SimpleNamespace(text="hello there"))
+        transcriptions_create = Mock(
+            return_value=SimpleNamespace(text="hello there")
+        )
         provider._client = SimpleNamespace(
             audio=SimpleNamespace(
                 transcriptions=SimpleNamespace(create=transcriptions_create)
             ),
             chat=SimpleNamespace(
-                completions=SimpleNamespace(create=Mock(side_effect=AssertionError))
+                completions=SimpleNamespace(
+                    create=Mock(side_effect=AssertionError)
+                )
             ),
         )
 
-        with tempfile.NamedTemporaryFile(suffix=".wav") as wav_file, tempfile.NamedTemporaryFile(
-            suffix=".mp3"
-        ) as mp3_file:
+        with (
+            tempfile.NamedTemporaryFile(suffix=".wav") as wav_file,
+            tempfile.NamedTemporaryFile(suffix=".mp3") as mp3_file,
+        ):
             wav_file.write(b"wav-audio")
             wav_file.flush()
             mp3_file.write(b"mp3-audio")
@@ -84,7 +93,9 @@ class TranscriptionProviderTests(unittest.TestCase):
         uploaded_file = transcriptions_create.call_args.kwargs["file"]
         self.assertTrue(uploaded_file.name.endswith(".mp3"))
 
-    def test_chat_transcription_uses_mp3_input_audio_format_when_available(self) -> None:
+    def test_chat_transcription_uses_mp3_input_audio_format_when_available(
+        self,
+    ) -> None:
         settings = AppSettings.from_mapping(
             {
                 "llm_base_url": "https://api.example.com/v1",
@@ -98,21 +109,28 @@ class TranscriptionProviderTests(unittest.TestCase):
         provider._settings = settings
         completions_create = Mock(
             return_value=SimpleNamespace(
-                choices=[SimpleNamespace(message=SimpleNamespace(content="hello there"))]
+                choices=[
+                    SimpleNamespace(
+                        message=SimpleNamespace(content="hello there")
+                    )
+                ]
             )
         )
         provider._client = SimpleNamespace(
             audio=SimpleNamespace(
-                transcriptions=SimpleNamespace(create=Mock(side_effect=AssertionError))
+                transcriptions=SimpleNamespace(
+                    create=Mock(side_effect=AssertionError)
+                )
             ),
             chat=SimpleNamespace(
                 completions=SimpleNamespace(create=completions_create)
             ),
         )
 
-        with tempfile.NamedTemporaryFile(suffix=".wav") as wav_file, tempfile.NamedTemporaryFile(
-            suffix=".mp3"
-        ) as mp3_file:
+        with (
+            tempfile.NamedTemporaryFile(suffix=".wav") as wav_file,
+            tempfile.NamedTemporaryFile(suffix=".mp3") as mp3_file,
+        ):
             wav_file.write(b"wav-audio")
             wav_file.flush()
             mp3_file.write(b"mp3-audio")
@@ -125,7 +143,9 @@ class TranscriptionProviderTests(unittest.TestCase):
                 result = provider.transcribe(wav_file.name)
 
         self.assertEqual(result, "hello there")
-        audio_part = completions_create.call_args.kwargs["messages"][1]["content"][1]
+        audio_part = completions_create.call_args.kwargs["messages"][1][
+            "content"
+        ][1]
         self.assertEqual(audio_part["input_audio"]["format"], "mp3")
 
 

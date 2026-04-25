@@ -9,7 +9,10 @@ from threading import Event
 from time import perf_counter
 from typing import Any
 
-from src.exceptions.app_exceptions import PermissionDeniedError, ValidationError
+from src.exceptions.app_exceptions import (
+    PermissionDeniedError,
+    ValidationError,
+)
 from src.models.settings import AppSettings
 from src.services.audio_devices import AudioDeviceService
 
@@ -26,8 +29,8 @@ except ImportError:  # pragma: no cover - optional runtime dependency.
 
 logger = logging.getLogger("glance.audio")
 SPEECH_DETECTION_SETUP_MESSAGE = (
-    "Speech detection is unavailable. Run `python -m pip install -r requirements.txt`, "
-    "then restart Glance."
+    "Speech detection is unavailable. Run `python -m pip install -r "
+    "requirements.txt`, then restart Glance."
 )
 
 
@@ -47,12 +50,18 @@ class TenVadEngine:
         try:
             from ten_vad import TenVad
         except Exception as exc:  # pragma: no cover - optional dependency.
-            raise PermissionDeniedError(SPEECH_DETECTION_SETUP_MESSAGE) from exc
+            raise PermissionDeniedError(
+                SPEECH_DETECTION_SETUP_MESSAGE
+            ) from exc
 
         try:
             self._vad = TenVad(hop_size, threshold)
-        except Exception as exc:  # pragma: no cover - native library dependent.
-            raise PermissionDeniedError(SPEECH_DETECTION_SETUP_MESSAGE) from exc
+        except (
+            Exception
+        ) as exc:  # pragma: no cover - native library dependent.
+            raise PermissionDeniedError(
+                SPEECH_DETECTION_SETUP_MESSAGE
+            ) from exc
 
     def process(self, frame) -> VadFrameDecision:
         probability, speech_flag = self._vad.process(frame)
@@ -104,7 +113,9 @@ class TenVadAudioRecorder:
             self._endpoint_windows(settings.audio_endpoint_patience)
         )
 
-    def capture_turn(self, output_path: str, stop_event: Event | None = None) -> str:
+    def capture_turn(
+        self, output_path: str, stop_event: Event | None = None
+    ) -> str:
         self._ensure_available()
         target_path = Path(output_path)
         target_path.parent.mkdir(parents=True, exist_ok=True)
@@ -114,7 +125,12 @@ class TenVadAudioRecorder:
 
         vad = self._vad_factory()
         pre_roll_limit = (
-            max(1, int(self._preroll_seconds * self._sample_rate / self._hop_size))
+            max(
+                1,
+                int(
+                    self._preroll_seconds * self._sample_rate / self._hop_size
+                ),
+            )
             if self._preroll_enabled
             else 0
         )
@@ -133,7 +149,14 @@ class TenVadAudioRecorder:
         overflowed_chunks = 0
 
         max_record_frames = (
-            max(1, int(self._max_record_seconds * self._sample_rate / self._hop_size))
+            max(
+                1,
+                int(
+                    self._max_record_seconds
+                    * self._sample_rate
+                    / self._hop_size
+                ),
+            )
             if self._max_record_enabled
             else None
         )
@@ -164,7 +187,8 @@ class TenVadAudioRecorder:
                             and elapsed_wait >= self._max_wait_seconds
                         ):
                             logger.info(
-                                "Live TEN VAD wait expired after %.2f s with %d overflowed chunks",
+                                "Live TEN VAD wait expired after %.2f s with "
+                                "%d overflowed chunks",
                                 elapsed_wait,
                                 overflowed_chunks,
                             )
@@ -184,12 +208,16 @@ class TenVadAudioRecorder:
                             pending_speech_frames.clear()
                             pending_speech_decisions.clear()
 
-                        if len(pending_speech_frames) >= self._speech_confirmation_frames:
+                        if (
+                            len(pending_speech_frames)
+                            >= self._speech_confirmation_frames
+                        ):
                             started = True
                             frames.extend(pre_roll_frames)
                             frames.extend(pending_speech_frames)
                             speech_probabilities.extend(
-                                item.probability for item in pending_speech_decisions
+                                item.probability
+                                for item in pending_speech_decisions
                             )
                             trailing_silence_frames = 0
                             continue
@@ -199,7 +227,8 @@ class TenVadAudioRecorder:
                             and elapsed_wait >= self._max_wait_seconds
                         ):
                             logger.info(
-                                "Live TEN VAD wait expired after %.2f s with %d overflowed chunks",
+                                "Live TEN VAD wait expired after %.2f s with "
+                                "%d overflowed chunks",
                                 elapsed_wait,
                                 overflowed_chunks,
                             )
@@ -213,9 +242,13 @@ class TenVadAudioRecorder:
                     else:
                         trailing_silence_frames += 1
 
-                    speech_seconds = len(frames) * self._hop_size / self._sample_rate
+                    speech_seconds = (
+                        len(frames) * self._hop_size / self._sample_rate
+                    )
                     silence_seconds = (
-                        trailing_silence_frames * self._hop_size / self._sample_rate
+                        trailing_silence_frames
+                        * self._hop_size
+                        / self._sample_rate
                     )
                     endpoint_seconds = self._endpoint_seconds(
                         speech_seconds,
@@ -223,11 +256,17 @@ class TenVadAudioRecorder:
                     )
                     if silence_seconds >= endpoint_seconds:
                         break
-                    if max_record_frames is not None and len(frames) >= max_record_frames:
+                    if (
+                        max_record_frames is not None
+                        and len(frames) >= max_record_frames
+                    ):
                         break
-        except OSError as exc:  # pragma: no cover - depends on device permissions.
+        except (
+            OSError
+        ) as exc:  # pragma: no cover - depends on device permissions.
             raise PermissionDeniedError(
-                "Microphone capture failed. Check microphone permission and device access."
+                "Microphone capture failed. Check microphone permission and "
+                "device access."
             ) from exc
 
         if not frames:
@@ -260,7 +299,8 @@ class TenVadAudioRecorder:
     def _ensure_available(self) -> None:
         if sd is None or np is None:
             raise PermissionDeniedError(
-                "Audio capture requires the 'sounddevice' and 'numpy' packages."
+                "Audio capture requires the 'sounddevice' and 'numpy' "
+                "packages."
             )
 
     @staticmethod

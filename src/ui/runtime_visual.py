@@ -25,7 +25,9 @@ def default_runtime_status() -> dict[str, Any]:
 
 def coerce_runtime_status(status: dict[str, Any]) -> dict[str, Any]:
     normalized = default_runtime_status()
-    normalized["runtimeState"] = str(status.get("runtimeState", "")).strip() or "idle"
+    normalized["runtimeState"] = (
+        str(status.get("runtimeState", "")).strip() or "idle"
+    )
     normalized["runtimeMessage"] = (
         str(status.get("runtimeMessage", "")).strip() or "Live is idle."
     )
@@ -43,7 +45,13 @@ def coerce_runtime_status(status: dict[str, Any]) -> dict[str, Any]:
 
 
 def normalize_runtime_state(state: str) -> str:
-    if state in {"listening", "transcribing", "generating", "speaking", "error"}:
+    if state in {
+        "listening",
+        "transcribing",
+        "generating",
+        "speaking",
+        "error",
+    }:
         return state
     if state == "processing":
         return "transcribing"
@@ -58,13 +66,17 @@ def state_blink_interval_ms(state: str) -> int:
     return int(RUNTIME_BLINK_INTERVAL_MS.get(state, 0))
 
 
-def effective_visual_state(*, base_state: str, error_flash_until_ms: int, now_ms: int) -> str:
+def effective_visual_state(
+    *, base_state: str, error_flash_until_ms: int, now_ms: int
+) -> str:
     if error_flash_until_ms > now_ms:
         return "error"
     return base_state
 
 
-def frame_for_phase(*, phase_started_at_ms: int, blink_interval_ms: int, now_ms: int) -> int:
+def frame_for_phase(
+    *, phase_started_at_ms: int, blink_interval_ms: int, now_ms: int
+) -> int:
     if blink_interval_ms <= 0 or phase_started_at_ms <= 0:
         return 0
     elapsed_ms = max(0, now_ms - phase_started_at_ms)

@@ -11,6 +11,7 @@ from src.services.providers import (
     DEFAULT_VOICE_REPLY_PROMPT,
     LiveSpeechReply,
     NagaTranscriptionProvider,
+    OCR_EXTRACTION_PROMPT,
     OpenAICompatibleProvider,
     _format_usage,
     _format_usage_summary,
@@ -25,19 +26,28 @@ class ProviderPromptTests(unittest.TestCase):
                 "llm_base_url": "https://api.example.com/v1",
                 "llm_model_name": "model-a",
                 "tts_base_url": "https://tts.example.com/v1",
-                "system_prompt_override": "Be extra attentive to follow-up questions.",
+                "system_prompt_override": (
+                    "Be extra attentive to follow-up questions."
+                ),
             },
             validate=False,
         )
-        self.provider = OpenAICompatibleProvider.__new__(OpenAICompatibleProvider)
+        self.provider = OpenAICompatibleProvider.__new__(
+            OpenAICompatibleProvider
+        )
         self.provider._settings = self.settings
 
-    def test_system_prompt_keeps_base_identity_and_appends_override(self) -> None:
+    def test_system_prompt_keeps_base_identity_and_appends_override(
+        self,
+    ) -> None:
         prompt = self.provider._build_system_prompt(match_user_language=False)
 
-        self.assertIn("You are Glance, a live desktop voice assistant.", prompt)
         self.assertIn(
-            "Additional instructions: Be extra attentive to follow-up questions.",
+            "You are Glance, a live desktop voice assistant.", prompt
+        )
+        self.assertIn(
+            "Additional instructions: Be extra attentive to follow-up "
+            "questions.",
             prompt,
         )
 
@@ -51,53 +61,74 @@ class ProviderPromptTests(unittest.TestCase):
             tzinfo=timezone(timedelta(hours=3), "EEST"),
         )
 
-        with patch(
-            "src.services.providers._current_local_datetime",
-            return_value=moment,
-        ), patch(
-            "src.services.providers._detect_user_country",
-            return_value="Lithuania",
+        with (
+            patch(
+                "src.services.providers._current_local_datetime",
+                return_value=moment,
+            ),
+            patch(
+                "src.services.providers._detect_user_country",
+                return_value="Lithuania",
+            ),
         ):
-            prompt = self.provider._build_system_prompt(match_user_language=False)
+            prompt = self.provider._build_system_prompt(
+                match_user_language=False
+            )
 
         self.assertTrue(
             prompt.startswith(
-                "Current day and time: Saturday, April 25, 2026, 12:34 EEST (UTC+03:00).\n"
-                "User country: Lithuania.\n"
-                "Use the current day, date, time, year, timezone, and user country above as the source of truth.\n\n"
+                "Current day and time: Saturday, April 25, 2026, 12:34 EEST "
+                "(UTC+03:00).\nUser country: Lithuania.\nUse the current day, "
+                "date, time, year, timezone, and user country above as the "
+                "source of truth.\n\n"
             )
         )
 
     def test_text_prompt_override_replaces_default_base(self) -> None:
-        self.provider._settings.text_prompt_override = "You are a terse text assistant."
+        self.provider._settings.text_prompt_override = (
+            "You are a terse text assistant."
+        )
 
         prompt = self.provider._build_system_prompt(match_user_language=False)
 
         self.assertIn("You are a terse text assistant.", prompt)
         self.assertNotIn(DEFAULT_TEXT_REPLY_PROMPT, prompt)
 
-    def test_system_prompt_matches_user_language_and_supports_immediate_switch(self) -> None:
+    def test_system_prompt_matches_user_language_and_supports_immediate_switch(
+        self,
+    ) -> None:
         prompt = self.provider._build_system_prompt(match_user_language=False)
 
-        self.assertIn("Reply in the same language as the user's request", prompt)
+        self.assertIn(
+            "Reply in the same language as the user's request", prompt
+        )
         self.assertNotIn("Reply in en", prompt)
         self.assertIn(
-            "If they ask for another language, answer in that language immediately in the same reply.",
+            "If they ask for another language, answer in that language "
+            "immediately in the same reply.",
             prompt,
         )
         self.assertIn(
-            "Do not claim you are limited to English or cannot speak a requested language",
+            "Do not claim you are limited to English or cannot speak a "
+            "requested language",
             prompt,
         )
 
-    def test_tts_preparation_prompt_is_strict_cleanup_not_rewrite(self) -> None:
+    def test_tts_preparation_prompt_is_strict_cleanup_not_rewrite(
+        self,
+    ) -> None:
         prompt = self.provider._build_tts_preparation_prompt()
 
         self.assertIn("strict cleanup step, not a new answer", prompt)
-        self.assertIn("Keep the same facts, meaning, speaker, perspective, and intent", prompt)
+        self.assertIn(
+            "Keep the same facts, meaning, speaker, perspective, and intent",
+            prompt,
+        )
         self.assertIn("Do not add facts, jokes, personal stories", prompt)
         self.assertIn("Use simple, direct wording", prompt)
-        self.assertIn("Preserve or add emotional delivery on most replies", prompt)
+        self.assertIn(
+            "Preserve or add emotional delivery on most replies", prompt
+        )
         self.assertIn("roughly 85 percent of the time", prompt)
         self.assertIn("[reassuring]", prompt)
         self.assertIn("Never use angle-bracket tags like <laugh>", prompt)
@@ -111,7 +142,9 @@ class ProviderPromptTests(unittest.TestCase):
 
         self.assertIn("use the surrounding context to infer", prompt)
         self.assertIn("high confidence", prompt)
-        self.assertIn("stay conservative rather than inventing content", prompt)
+        self.assertIn(
+            "stay conservative rather than inventing content", prompt
+        )
 
     def test_transcription_prompt_override_replaces_default_base(self) -> None:
         provider = NagaTranscriptionProvider.__new__(NagaTranscriptionProvider)
@@ -120,7 +153,9 @@ class ProviderPromptTests(unittest.TestCase):
                 "llm_base_url": "https://api.example.com/v1",
                 "llm_model_name": "model-a",
                 "tts_base_url": "https://tts.example.com/v1",
-                "transcription_prompt_override": "Return a clean transcript and nothing else.",
+                "transcription_prompt_override": (
+                    "Return a clean transcript and nothing else."
+                ),
             },
             validate=False,
         )
@@ -148,7 +183,9 @@ class ProviderPromptTests(unittest.TestCase):
         self.assertIn("Ask at most one follow-up question", prompt)
 
     def test_voice_prompt_override_replaces_default_base(self) -> None:
-        self.provider._settings.voice_prompt_override = "Speak with dry, understated clarity."
+        self.provider._settings.voice_prompt_override = (
+            "Speak with dry, understated clarity."
+        )
 
         prompt = self.provider._build_live_speech_system_prompt()
 
@@ -176,7 +213,9 @@ class ProviderPromptTests(unittest.TestCase):
         self.assertIn(
             "prefer Mark unless another voice is clearly a better fit", prompt
         )
-        self.assertIn("Choose the voice before composing the final reply", prompt)
+        self.assertIn(
+            "Choose the voice before composing the final reply", prompt
+        )
 
     def test_live_tool_prompts_answer_directly_after_tools(self) -> None:
         text_prompt = self.provider.build_live_tool_messages(
@@ -189,9 +228,64 @@ class ProviderPromptTests(unittest.TestCase):
             with self.subTest(prompt=prompt[:40]):
                 self.assertIn("Do not narrate the tool work", prompt)
                 self.assertIn("answer with the result directly", prompt)
+                self.assertIn("OCR is a clipboard action", prompt)
+                self.assertIn(
+                    "Never turn OCR output into the spoken final answer",
+                    prompt,
+                )
+                self.assertIn("Call end_live_session", prompt)
                 self.assertIn("tool", prompt)
 
-    def test_parse_live_speech_reply_uses_fixed_voice_when_not_auto(self) -> None:
+    def test_ocr_prompt_is_strict_extraction_only(self) -> None:
+        prompt = OCR_EXTRACTION_PROMPT
+
+        self.assertIn("clean clipboard text", prompt)
+        self.assertIn("not a visual line-by-line transcript", prompt)
+        self.assertIn("Output only text that is visibly present", prompt)
+        self.assertIn("Follow the user's OCR request exactly", prompt)
+        self.assertIn("return only that item", prompt)
+        self.assertIn("asks for all visible text", prompt)
+        self.assertIn("Do not include surrounding UI text", prompt)
+        self.assertIn("Preserve original wording", prompt)
+        self.assertIn("Join prose or UI copy", prompt)
+        self.assertIn("wrapped it visually", prompt)
+        self.assertIn(
+            "headings, labels, menu items, lists, table rows, and columns",
+            prompt,
+        )
+        self.assertIn("Markdown table", prompt)
+        self.assertIn(
+            "Do not summarize, explain, translate, infer hidden text, add "
+            "labels",
+            prompt,
+        )
+        self.assertIn("say that you extracted the text", prompt)
+        self.assertIn("Do not wrap the answer in code fences", prompt)
+        self.assertIn("[NO_VISIBLE_TEXT]", prompt)
+
+    def test_extract_text_includes_user_ocr_request(self) -> None:
+        captured = {}
+
+        def fake_generate_reply(**kwargs):
+            captured.update(kwargs)
+            return "headline"
+
+        self.provider.generate_reply = fake_generate_reply
+
+        text = self.provider.extract_text(
+            "screen.png",
+            instruction="Extract only the YouTube video headline.",
+        )
+
+        self.assertEqual(text, "headline")
+        self.assertIn(
+            "User OCR request: Extract only the YouTube video headline.",
+            captured["user_prompt"],
+        )
+
+    def test_parse_live_speech_reply_uses_fixed_voice_when_not_auto(
+        self,
+    ) -> None:
         self.provider._settings.tts_voice_id = "UgBBYS2sOqTuMpoF3BR0"
 
         reply = self.provider._parse_live_speech_reply("[happy] Hello there!")
@@ -220,7 +314,9 @@ class ProviderPromptTests(unittest.TestCase):
         )
 
     def test_preview_text_normalizes_whitespace_and_truncates(self) -> None:
-        preview = _preview_text("Hello\n\nthere   general   kenobi" * 40, limit=40)
+        preview = _preview_text(
+            "Hello\n\nthere   general   kenobi" * 40, limit=40
+        )
 
         self.assertNotIn("\n", preview)
         self.assertLessEqual(len(preview), 40)
@@ -256,7 +352,8 @@ class ProviderPromptTests(unittest.TestCase):
 
         self.assertEqual(
             usage,
-            "prompt_tokens=120,completion_tokens=25,total_tokens=145,prompt_tokens_details.cached_tokens=96",
+            "prompt_tokens=120,completion_tokens=25,total_tokens=145,prompt_t"
+            "okens_details.cached_tokens=96",
         )
 
     def test_format_usage_includes_cache_write_details(self) -> None:
@@ -279,7 +376,9 @@ class ProviderPromptTests(unittest.TestCase):
         self.assertIn("cached=96", summary)
         self.assertIn("cache_write=24", summary)
 
-    def test_live_reply_request_includes_prior_conversation_history(self) -> None:
+    def test_live_reply_request_includes_prior_conversation_history(
+        self,
+    ) -> None:
         self.provider._settings.tts_voice_id = "UgBBYS2sOqTuMpoF3BR0"
         messages_create = Mock(
             return_value=SimpleNamespace(
@@ -292,7 +391,9 @@ class ProviderPromptTests(unittest.TestCase):
             )
         )
         self.provider._client = SimpleNamespace(
-            chat=SimpleNamespace(completions=SimpleNamespace(create=messages_create))
+            chat=SimpleNamespace(
+                completions=SimpleNamespace(create=messages_create)
+            )
         )
 
         reply = self.provider.generate_live_speech_reply(
@@ -305,10 +406,13 @@ class ProviderPromptTests(unittest.TestCase):
 
         self.assertEqual(reply.text, "[curious] Got it.")
         request_messages = messages_create.call_args.kwargs["messages"]
-        self.assertEqual(request_messages[1]["content"], "Remember this detail.")
+        self.assertEqual(
+            request_messages[1]["content"], "Remember this detail."
+        )
         self.assertEqual(request_messages[2]["content"], "I will remember it.")
         self.assertEqual(
-            request_messages[3], {"role": "user", "content": "What was I just asking?"}
+            request_messages[3],
+            {"role": "user", "content": "What was I just asking?"},
         )
 
 

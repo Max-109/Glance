@@ -38,7 +38,9 @@ class SessionDirectoryRepository(AbstractRepository[SessionRecord]):
             try:
                 payload = json.loads(session_file.read_text(encoding="utf-8"))
             except json.JSONDecodeError as exc:
-                raise StorageError(f"Invalid session file: {session_file}") from exc
+                raise StorageError(
+                    f"Invalid session file: {session_file}"
+                ) from exc
             resolved_payload = _resolve_session_payload(payload, session_dir)
             session = SessionRecord.from_dict(resolved_payload)
             sessions.append(session)
@@ -56,13 +58,19 @@ class SessionDirectoryRepository(AbstractRepository[SessionRecord]):
             for session in entities:
                 previous_dir = self._session_dirs.get(session.entity_id)
                 target_dir = self._sessions_dir / _session_folder_name(session)
-                if previous_dir is not None and previous_dir.exists() and previous_dir != target_dir:
+                if (
+                    previous_dir is not None
+                    and previous_dir.exists()
+                    and previous_dir != target_dir
+                ):
                     previous_dir.replace(target_dir)
                 target_dir.mkdir(parents=True, exist_ok=True)
                 self._ingest_session_artifacts(
                     session,
                     session_dir=target_dir,
-                    previous_dir=previous_dir if previous_dir != target_dir else None,
+                    previous_dir=previous_dir
+                    if previous_dir != target_dir
+                    else None,
                 )
                 payload = _serialize_session_payload(session, target_dir)
                 (target_dir / self._SESSION_FILE_NAME).write_text(
@@ -92,7 +100,9 @@ class SessionDirectoryRepository(AbstractRepository[SessionRecord]):
 
     def remove(self, entity_id: str) -> None:
         sessions = [
-            session for session in self.list_all() if session.entity_id != entity_id
+            session
+            for session in self.list_all()
+            if session.entity_id != entity_id
         ]
         if len(sessions) == len(self.list_all()):
             raise NotFoundError(f"Session '{entity_id}' was not found.")
@@ -108,12 +118,18 @@ class SessionDirectoryRepository(AbstractRepository[SessionRecord]):
         session_dir: Path,
         previous_dir: Path | None,
     ) -> None:
-        for turn_index, interaction in enumerate(session.interactions, start=1):
+        for turn_index, interaction in enumerate(
+            session.interactions, start=1
+        ):
             turn_prefix = f"turn-{turn_index:03d}"
             if isinstance(interaction, QuickInteraction):
                 interaction.image_path = _store_artifact(
                     interaction.image_path,
-                    target_path=session_dir / f"{turn_prefix}-image{_path_suffix(interaction.image_path, '.png')}",
+                    target_path=session_dir /
+                    f"{turn_prefix}-image{
+                        _path_suffix(
+                            interaction.image_path,
+                            '.png')}",
                     move_source=False,
                     previous_dir=previous_dir,
                     session_dir=session_dir,
@@ -122,7 +138,9 @@ class SessionDirectoryRepository(AbstractRepository[SessionRecord]):
                     interaction.speech_path = _store_artifact(
                         interaction.speech_path,
                         target_path=session_dir
-                        / f"{turn_prefix}-assistant{_path_suffix(interaction.speech_path, '.mp3')}",
+                        / f"{turn_prefix}-assistant{
+                            _path_suffix(interaction.speech_path, '.mp3')
+                        }",
                         move_source=True,
                         previous_dir=previous_dir,
                         session_dir=session_dir,
@@ -131,7 +149,11 @@ class SessionDirectoryRepository(AbstractRepository[SessionRecord]):
             if isinstance(interaction, OCRInteraction):
                 interaction.image_path = _store_artifact(
                     interaction.image_path,
-                    target_path=session_dir / f"{turn_prefix}-image{_path_suffix(interaction.image_path, '.png')}",
+                    target_path=session_dir /
+                    f"{turn_prefix}-image{
+                        _path_suffix(
+                            interaction.image_path,
+                            '.png')}",
                     move_source=False,
                     previous_dir=previous_dir,
                     session_dir=session_dir,
@@ -141,7 +163,9 @@ class SessionDirectoryRepository(AbstractRepository[SessionRecord]):
                 interaction.recording_path = _store_artifact(
                     interaction.recording_path,
                     target_path=session_dir
-                    / f"{turn_prefix}-user{_path_suffix(interaction.recording_path, '.wav')}",
+                    / f"{turn_prefix}-user{
+                        _path_suffix(interaction.recording_path, '.wav')
+                    }",
                     move_source=True,
                     previous_dir=previous_dir,
                     session_dir=session_dir,
@@ -150,7 +174,9 @@ class SessionDirectoryRepository(AbstractRepository[SessionRecord]):
                     interaction.speech_path = _store_artifact(
                         interaction.speech_path,
                         target_path=session_dir
-                        / f"{turn_prefix}-assistant{_path_suffix(interaction.speech_path, '.mp3')}",
+                        / f"{turn_prefix}-assistant{
+                            _path_suffix(interaction.speech_path, '.mp3')
+                        }",
                         move_source=True,
                         previous_dir=previous_dir,
                         session_dir=session_dir,
@@ -186,7 +212,9 @@ class SessionDirectoryRepository(AbstractRepository[SessionRecord]):
                             record.result_path = _store_artifact(
                                 record.result_path,
                                 target_path=session_dir
-                                / f"{tool_prefix}-result{_path_suffix(record.result_path, '.txt')}",
+                                / f"{tool_prefix}-result{
+                                    _path_suffix(record.result_path, '.txt')
+                                }",
                                 move_source=True,
                                 previous_dir=previous_dir,
                                 session_dir=session_dir,
@@ -197,8 +225,11 @@ class SessionDirectoryRepository(AbstractRepository[SessionRecord]):
                                     artifact_path,
                                     target_path=session_dir
                                     / (
-                                        f"{tool_prefix}-artifact-{artifact_index:02d}"
-                                        f"{_path_suffix(artifact_path, '.bin')}"
+                                        f"{tool_prefix}-artifact-{
+                                            artifact_index:02d}"
+                                        f"{
+                                            _path_suffix(artifact_path, '.bin')
+                                        }"
                                     ),
                                     move_source=True,
                                     previous_dir=previous_dir,
@@ -224,7 +255,9 @@ def _format_session_timestamp(created_at: str) -> str:
     return moment.strftime("%Y-%m-%d_%H-%M-%S_%f")
 
 
-def _serialize_session_payload(session: SessionRecord, session_dir: Path) -> dict:
+def _serialize_session_payload(
+    session: SessionRecord, session_dir: Path
+) -> dict:
     payload = session.to_dict()
     payload["interactions"] = [
         _serialize_interaction_payload(interaction, session_dir)
@@ -285,7 +318,9 @@ def _serialize_tool_call_payload(payload: dict, session_dir: Path) -> dict:
     serialized = dict(payload)
     result_path = serialized.get("result_path")
     if isinstance(result_path, str) and result_path:
-        serialized["result_path"] = _relative_artifact_path(result_path, session_dir)
+        serialized["result_path"] = _relative_artifact_path(
+            result_path, session_dir
+        )
     artifact_paths = serialized.get("artifact_paths")
     if isinstance(artifact_paths, list):
         serialized["artifact_paths"] = [
@@ -299,7 +334,9 @@ def _resolve_tool_call_payload(payload: dict, session_dir: Path) -> dict:
     resolved = dict(payload)
     result_path = resolved.get("result_path")
     if isinstance(result_path, str) and result_path:
-        resolved["result_path"] = _resolve_artifact_path(result_path, session_dir)
+        resolved["result_path"] = _resolve_artifact_path(
+            result_path, session_dir
+        )
     artifact_paths = resolved.get("artifact_paths")
     if isinstance(artifact_paths, list):
         resolved["artifact_paths"] = [
@@ -384,7 +421,9 @@ def _safe_artifact_stem(value: str) -> str:
     return safe or "tool"
 
 
-def _build_conversation_markdown(session: SessionRecord, session_dir: Path) -> str:
+def _build_conversation_markdown(
+    session: SessionRecord, session_dir: Path
+) -> str:
     lines = [
         f"# {session.mode.title()} session",
         "",
@@ -396,19 +435,25 @@ def _build_conversation_markdown(session: SessionRecord, session_dir: Path) -> s
         if isinstance(interaction, LiveInteraction):
             lines.extend(
                 [
-                    "",
                     "User transcript:",
                     interaction.transcript or "(multimodal audio turn)",
-                    "",
                     "Assistant reply:",
                     interaction.response,
                     "",
-                    f"User audio: {_relative_artifact_path(interaction.recording_path, session_dir)}",
+                    f"User audio: {
+                        _relative_artifact_path(
+                            interaction.recording_path, session_dir
+                        )
+                    }",
                 ]
             )
             if interaction.speech_path:
                 lines.append(
-                    f"Assistant audio: {_relative_artifact_path(interaction.speech_path, session_dir)}"
+                    f"Assistant audio: {
+                        _relative_artifact_path(
+                            interaction.speech_path, session_dir
+                        )
+                    }"
                 )
             if interaction.tool_calls:
                 lines.extend(["", "Tool calls:"])
@@ -423,41 +468,56 @@ def _build_conversation_markdown(session: SessionRecord, session_dir: Path) -> s
                         lines.append(f"  Error: {record.error}")
                     if record.result_path:
                         lines.append(
-                            f"  Result: {_relative_artifact_path(record.result_path, session_dir)}"
+                            f"  Result: {
+                                _relative_artifact_path(
+                                    record.result_path, session_dir
+                                )
+                            }"
                         )
                     if record.artifact_paths:
                         relative_artifacts = [
                             _relative_artifact_path(path, session_dir)
                             for path in record.artifact_paths
                         ]
-                        lines.append(f"  Artifacts: {', '.join(relative_artifacts)}")
+                        lines.append(
+                            f"  Artifacts: {', '.join(relative_artifacts)}"
+                        )
             continue
         if isinstance(interaction, QuickInteraction):
             lines.extend(
                 [
-                    "",
                     "Question:",
                     interaction.question,
-                    "",
                     "Assistant reply:",
                     interaction.answer,
                     "",
-                    f"Image: {_relative_artifact_path(interaction.image_path, session_dir)}",
+                    f"Image: {
+                        _relative_artifact_path(
+                            interaction.image_path, session_dir
+                        )
+                    }",
                 ]
             )
             if interaction.speech_path:
                 lines.append(
-                    f"Assistant audio: {_relative_artifact_path(interaction.speech_path, session_dir)}"
+                    f"Assistant audio: {
+                        _relative_artifact_path(
+                            interaction.speech_path, session_dir
+                        )
+                    }"
                 )
             continue
         if isinstance(interaction, OCRInteraction):
             lines.extend(
                 [
-                    "",
                     "Extracted text:",
                     interaction.extracted_text,
                     "",
-                    f"Image: {_relative_artifact_path(interaction.image_path, session_dir)}",
+                    f"Image: {
+                        _relative_artifact_path(
+                            interaction.image_path, session_dir
+                        )
+                    }",
                 ]
             )
     lines.append("")
@@ -474,7 +534,9 @@ class JsonSettingsStore:
         try:
             return json.loads(self._file_path.read_text(encoding="utf-8"))
         except json.JSONDecodeError as exc:
-            raise StorageError(f"Invalid config file: {self._file_path}") from exc
+            raise StorageError(
+                f"Invalid config file: {self._file_path}"
+            ) from exc
 
     def save(self, settings: AppSettings) -> None:
         try:
@@ -484,4 +546,6 @@ class JsonSettingsStore:
                 encoding="utf-8",
             )
         except OSError as exc:
-            raise StorageError(f"Could not save config to {self._file_path}") from exc
+            raise StorageError(
+                f"Could not save config to {self._file_path}"
+            ) from exc

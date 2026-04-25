@@ -57,15 +57,19 @@ class AudioMonitorService:
                     if overflowed:
                         continue
                     on_level(self._normalized_level(block))
-        except OSError as exc:  # pragma: no cover - depends on device permissions.
+        except (
+            OSError
+        ) as exc:  # pragma: no cover - depends on device permissions.
             raise PermissionDeniedError(
-                "Microphone monitoring failed. Check microphone permission and device access."
+                "Microphone monitoring failed. Check microphone permission "
+                "and device access."
             ) from exc
 
     def _ensure_available(self) -> None:
         if sd is None or np is None:
             raise PermissionDeniedError(
-                "Microphone monitoring requires the 'sounddevice' and 'numpy' packages."
+                "Microphone monitoring requires the 'sounddevice' and 'numpy' "
+                "packages."
             )
 
     @staticmethod

@@ -1,1 +1,1 @@
-"""Glance source package."""
+"Glance source package."

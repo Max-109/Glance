@@ -1,1 +1,1 @@
-"""Custom application exceptions."""
+"Custom application exceptions."

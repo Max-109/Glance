@@ -8,12 +8,22 @@ from pathlib import Path
 import tempfile
 
 from src.agents.llm_agent import LLMAgent
+from src.agents.ocr_agent import OCRAgent
 from src.agents.screen_capture_agent import ScreenCaptureAgent
-from src.models.interactions import LiveInteraction, SessionRecord, ToolCallRecord
+from src.models.interactions import (
+    LiveInteraction,
+    SessionRecord,
+    ToolCallRecord,
+)
 from src.models.settings import AppSettings
+from src.services.clipboard import ClipboardService
+from src.services.ocr import OCRService
 from src.agents.tts_agent import TTSAgent
 from src.agents.transcription_agent import TranscriptionAgent
-from src.strategies.mode_strategy import ModeStrategy, force_pause_at_end_for_tts
+from src.strategies.mode_strategy import (
+    ModeStrategy,
+    force_pause_at_end_for_tts,
+)
 from src.tools import (
     RuntimeToolRegistry,
     ToolCallRequest,
@@ -27,6 +37,10 @@ from src.tools import (
 logger = logging.getLogger("glance.live_strategy")
 _MAX_TOOL_STEPS_PER_LIVE_TURN = 4
 _MAX_TOOL_CALLS_PER_LIVE_TURN = 6
+_TERMINAL_TOOL_NAMES = {"end_live_session"}
+_OCR_CONFIRMATION_TEXT = "Done, I copied it to your clipboard. Anything else?"
+_OCR_NO_TEXT_TEXT = "I didn't find any visible text. Anything else?"
+_OCR_FAILURE_TEXT = "I couldn't copy the text this time. Anything else?"
 
 
 class LiveStrategy(ModeStrategy):
@@ -36,12 +50,16 @@ class LiveStrategy(ModeStrategy):
         llm_agent: LLMAgent,
         tts_agent: TTSAgent,
         screen_capture_agent: ScreenCaptureAgent | None = None,
+        ocr_agent: OCRAgent | None = None,
+        clipboard_service: ClipboardService | None = None,
         settings: AppSettings | None = None,
     ) -> None:
         self._transcription_agent = transcription_agent
         self._llm_agent = llm_agent
         self._tts_agent = tts_agent
         self._screen_capture_agent = screen_capture_agent
+        self._ocr_agent = ocr_agent
+        self._clipboard_service = clipboard_service
         self._settings = settings
 
     def execute(self, context: dict) -> LiveInteraction:
@@ -55,33 +73,56 @@ class LiveStrategy(ModeStrategy):
             self._settings is not None
             and getattr(self._settings, "multimodal_live_enabled", False)
         )
-        tools_enabled = bool(
-            self._settings is not None
-            and getattr(self._settings, "tools_enabled", False)
-        )
+        tools_enabled = self._settings is not None
         tool_records = []
         if tools_enabled and multimodal:
             _emit_stage_status(
                 status_callback, "generating", "Listening and checking..."
             )
-            final_text, tool_records = self._generate_multimodal_tool_reply(
-                audio_path=recording_path,
-                conversation_history=conversation_history,
-                context=context,
-                session_id=session_id,
+            final_text, tool_records, terminal_tool = (
+                self._generate_multimodal_tool_reply(
+                    audio_path=recording_path,
+                    conversation_history=conversation_history,
+                    context=context,
+                    session_id=session_id,
+                )
             )
+            if terminal_tool:
+                return LiveInteraction(
+                    mode="live",
+                    recording_path=recording_path,
+                    transcript="",
+                    response=final_text,
+                    speech_path="",
+                    tool_calls=tool_records,
+                )
             live_reply = self._llm_agent.parse_live_speech_reply(final_text)
             transcript = ""
         elif tools_enabled:
-            _emit_stage_status(status_callback, "transcribing", "Transcribing...")
-            transcript = self._transcription_agent.run(audio_path=recording_path)
-            _emit_stage_status(status_callback, "generating", "Checking...")
-            final_text, tool_records = self._generate_tool_reply(
-                transcript=transcript,
-                conversation_history=conversation_history,
-                context=context,
-                session_id=session_id,
+            _emit_stage_status(
+                status_callback, "transcribing", "Transcribing..."
             )
+            transcript = self._transcription_agent.run(
+                audio_path=recording_path
+            )
+            _emit_stage_status(status_callback, "generating", "Checking...")
+            final_text, tool_records, terminal_tool = (
+                self._generate_tool_reply(
+                    transcript=transcript,
+                    conversation_history=conversation_history,
+                    context=context,
+                    session_id=session_id,
+                )
+            )
+            if terminal_tool:
+                return LiveInteraction(
+                    mode="live",
+                    recording_path=recording_path,
+                    transcript=transcript,
+                    response=final_text,
+                    speech_path="",
+                    tool_calls=tool_records,
+                )
             live_reply = self._llm_agent.prepare_speech_text(
                 text=final_text,
                 session_id=session_id,
@@ -89,7 +130,9 @@ class LiveStrategy(ModeStrategy):
             live_reply = _guard_speech_prep_drift(final_text, live_reply)
         elif multimodal:
             _emit_stage_status(
-                status_callback, "generating", "Listening and writing a reply..."
+                status_callback,
+                "generating",
+                "Listening and writing a reply...",
             )
             live_reply = self._llm_agent.generate_live_speech_reply_from_audio(
                 audio_path=recording_path,
@@ -98,9 +141,15 @@ class LiveStrategy(ModeStrategy):
             )
             transcript = ""
         else:
-            _emit_stage_status(status_callback, "transcribing", "Transcribing...")
-            transcript = self._transcription_agent.run(audio_path=recording_path)
-            _emit_stage_status(status_callback, "generating", "Writing a reply...")
+            _emit_stage_status(
+                status_callback, "transcribing", "Transcribing..."
+            )
+            transcript = self._transcription_agent.run(
+                audio_path=recording_path
+            )
+            _emit_stage_status(
+                status_callback, "generating", "Writing a reply..."
+            )
             live_reply = self._llm_agent.generate_live_speech_reply(
                 transcript=transcript,
                 conversation_history=conversation_history,
@@ -134,12 +183,14 @@ class LiveStrategy(ModeStrategy):
         conversation_history: list[dict[str, str]],
         context: dict,
         session_id: str | None,
-    ) -> tuple[str, list]:
+    ) -> tuple[str, list, bool]:
         if self._settings is None:
             raise RuntimeError("Tool mode requires settings.")
         registry = RuntimeToolRegistry(
             self._settings,
             screen_capture_agent=self._screen_capture_agent,
+            ocr_service=self._build_ocr_service(),
+            include_live_control_tools=True,
         )
         executor = ToolExecutor(registry)
         enabled_tools = registry.enabled_definitions
@@ -147,7 +198,9 @@ class LiveStrategy(ModeStrategy):
             transcript=transcript,
             conversation_history=conversation_history,
         )
-        tool_payloads = [definition.provider_payload() for definition in enabled_tools]
+        tool_payloads = [
+            definition.provider_payload() for definition in enabled_tools
+        ]
         return self._run_tool_reply_loop(
             messages=messages,
             registry=registry,
@@ -166,12 +219,14 @@ class LiveStrategy(ModeStrategy):
         conversation_history: list[dict[str, str]],
         context: dict,
         session_id: str | None,
-    ) -> tuple[str, list]:
+    ) -> tuple[str, list, bool]:
         if self._settings is None:
             raise RuntimeError("Tool mode requires settings.")
         registry = RuntimeToolRegistry(
             self._settings,
             screen_capture_agent=self._screen_capture_agent,
+            ocr_service=self._build_ocr_service(),
+            include_live_control_tools=True,
         )
         executor = ToolExecutor(registry)
         enabled_tools = registry.enabled_definitions
@@ -179,7 +234,9 @@ class LiveStrategy(ModeStrategy):
             audio_path=audio_path,
             conversation_history=conversation_history,
         )
-        tool_payloads = [definition.provider_payload() for definition in enabled_tools]
+        tool_payloads = [
+            definition.provider_payload() for definition in enabled_tools
+        ]
         return self._run_tool_reply_loop(
             messages=messages,
             registry=registry,
@@ -202,7 +259,7 @@ class LiveStrategy(ModeStrategy):
         session_id: str | None,
         turn_runner,
         user_context: str,
-    ) -> tuple[str, list]:
+    ) -> tuple[str, list, bool]:
         tool_records = []
         tool_call_count = 0
         status_callback = context.get("status_callback")
@@ -217,7 +274,7 @@ class LiveStrategy(ModeStrategy):
             messages.append(turn.assistant_message)
             if not turn.tool_calls:
                 if turn.content:
-                    return turn.content, tool_records
+                    return turn.content, tool_records, False
                 break
 
             image_messages: list[dict] = []
@@ -246,6 +303,22 @@ class LiveStrategy(ModeStrategy):
                     tool_call_count += 1
                     notice_context.record_result(call, record, result)
                 tool_records.append(record)
+                if call.name == "ocr_screen":
+                    status = _ocr_tool_status(record, result)
+                    _emit_stage_status(status_callback, "idle", status)
+                    return (
+                        _ocr_followup_text(record, result),
+                        tool_records,
+                        False,
+                    )
+                if _is_terminal_tool(call.name):
+                    terminal_status = _terminal_tool_status(
+                        call, record, result
+                    )
+                    _emit_stage_status(
+                        status_callback, "idle", terminal_status
+                    )
+                    return terminal_status, tool_records, True
                 messages.append(_tool_result_message(call, result))
                 image_messages.extend(_image_context_messages(call, result))
             messages.extend(image_messages)
@@ -254,21 +327,22 @@ class LiveStrategy(ModeStrategy):
             {
                 "role": "user",
                 "content": (
-                    "No more tool calls are available for this live turn. Give the "
-                    "best concise final answer now."
-                ),
-            }
-        )
+                    "No more tool calls are available for this live turn. "
+                    "Give the "
+                    "best concise final answer now."),
+            })
         final_turn = turn_runner(
             messages=messages,
             tools=[],
             session_id=session_id,
         )
         if final_turn.content:
-            return final_turn.content, tool_records
+            return final_turn.content, tool_records, False
         return (
-            "I tried to use the enabled tools, but I could not produce a clear answer.",
+            "I tried to use the enabled tools, but I could not produce a "
+            "clear answer.",
             tool_records,
+            False,
         )
 
     def _emit_tool_notice(
@@ -301,7 +375,9 @@ class LiveStrategy(ModeStrategy):
                 output_path=notice_path,
             )
             audio_callback(generated_notice_path)
-        except Exception as exc:  # pragma: no cover - defensive runtime behavior.
+        except (
+            Exception
+        ) as exc:  # pragma: no cover - defensive runtime behavior.
             logger.warning("Tool notice playback failed: %s", exc)
         finally:
             for path_value in {notice_path, generated_notice_path}:
@@ -322,8 +398,15 @@ class LiveStrategy(ModeStrategy):
             if not isinstance(interaction, LiveInteraction):
                 continue
             history.append({"role": "user", "content": interaction.transcript})
-            history.append({"role": "assistant", "content": interaction.response})
+            history.append(
+                {"role": "assistant", "content": interaction.response}
+            )
         return history
+
+    def _build_ocr_service(self) -> OCRService | None:
+        if self._ocr_agent is None or self._clipboard_service is None:
+            return None
+        return OCRService(self._ocr_agent, self._clipboard_service)
 
 
 @dataclass
@@ -383,9 +466,8 @@ def compose_tool_notice(
         return ""
     kind = _notice_kind(call.name)
     subject = _notice_subject(call)
-    if (
-        kind == context.last_notice_kind
-        and (subject == context.last_notice_subject or subject == "generic")
+    if kind == context.last_notice_kind and (
+        subject == context.last_notice_subject or subject == "generic"
     ):
         return ""
     if (
@@ -412,9 +494,17 @@ def _compose_search_notice(
     if location:
         return f"I'm checking the weather in {location}."
     lowered = query.lower()
-    if any(term in lowered for term in ("latest", "current", "today", "now", "price")):
+    if any(
+        term in lowered
+        for term in ("latest", "current", "today", "now", "price")
+    ):
         return "I'm checking the latest information."
-    if any(term in lowered for term in ("who", "what", "when", "where", "why", "how", "is ", "are ")):
+    if any(
+        term in lowered
+        for term in (
+            "who", "what", "when", "where", "why", "how", "is ", "are ",
+        )
+    ):
         return "I'm checking that."
     return "I'm looking that up."
 
@@ -437,9 +527,17 @@ def _compose_fetch_notice(
 
 def _compose_screenshot_notice(call: ToolCallRequest) -> str:
     reason = _squash_notice_text(str(call.arguments.get("reason", ""))).lower()
-    if any(term in reason for term in ("code", "function", "file", "editor", "terminal", "log")):
+    if any(
+        term in reason
+        for term in ("code", "function", "file", "editor", "terminal", "log")
+    ):
         return "I'll take a quick screenshot of your code."
-    if any(term in reason for term in ("error", "exception", "traceback", "warning", "bug", "failure")):
+    if any(
+        term in reason
+        for term in (
+            "error", "exception", "traceback", "warning", "bug", "failure",
+        )
+    ):
         return "I'll take a quick screenshot of the error."
     if any(term in reason for term in ("screen", "window", "app", "page")):
         return "I'll take a quick screenshot of your screen."
@@ -489,18 +587,52 @@ def _notice_kind(tool_name: str) -> str:
         return "fetch"
     if tool_name == "take_screenshot":
         return "screenshot"
+    if tool_name == "ocr_screen":
+        return "ocr"
     return tool_name
 
 
 def _notice_subject(call: ToolCallRequest) -> str:
     if call.name == "web_search":
-        query = _squash_notice_text(str(call.arguments.get("query", ""))).lower()
+        query = _squash_notice_text(
+            str(call.arguments.get("query", ""))
+        ).lower()
         return query or "generic"
     if call.name == "web_fetch":
         return str(call.arguments.get("url", "")).strip().lower() or "generic"
     if call.name == "take_screenshot":
         return _compose_screenshot_notice(call)
     return "generic"
+
+
+def _is_terminal_tool(tool_name: str) -> bool:
+    return tool_name in _TERMINAL_TOOL_NAMES
+
+
+def _ocr_tool_status(record: ToolCallRecord, result: ToolResult) -> str:
+    if record.status == "success":
+        if result.content.strip():
+            return "OCR copied text to clipboard."
+        return "OCR found no visible text. Clipboard cleared."
+    return f"OCR failed: {record.error or result.content}"
+
+
+def _ocr_followup_text(record: ToolCallRecord, result: ToolResult) -> str:
+    if record.status == "success" and result.content.strip():
+        return _OCR_CONFIRMATION_TEXT
+    if record.status == "success":
+        return _OCR_NO_TEXT_TEXT
+    return _OCR_FAILURE_TEXT
+
+
+def _terminal_tool_status(
+    call: ToolCallRequest,
+    record: ToolCallRecord,
+    result: ToolResult,
+) -> str:
+    if call.name == "end_live_session" and record.status == "success":
+        return "Live ended."
+    return f"{call.name} failed: {record.error or result.content}"
 
 
 def _is_speakable_source(source: str) -> bool:
@@ -515,7 +647,9 @@ def _squash_notice_text(value: str) -> str:
     return re.sub(r"\s+", " ", value).strip(" .,:;!?")
 
 
-def _tool_limit_result(call: ToolCallRequest) -> tuple[ToolCallRecord, ToolResult]:
+def _tool_limit_result(
+    call: ToolCallRequest,
+) -> tuple[ToolCallRecord, ToolResult]:
     message = "Tool call limit reached for this live turn."
     timestamp = datetime.now(timezone.utc).isoformat()
     record = ToolCallRecord(
@@ -532,14 +666,17 @@ def _tool_limit_result(call: ToolCallRequest) -> tuple[ToolCallRecord, ToolResul
 
 
 def _tool_result_message(call: ToolCallRequest, result: ToolResult) -> dict:
+    content = result.content
     return {
         "role": "tool",
         "tool_call_id": call.call_id,
-        "content": result.content,
+        "content": content,
     }
 
 
-def _image_context_messages(call: ToolCallRequest, result: ToolResult) -> list[dict]:
+def _image_context_messages(
+    call: ToolCallRequest, result: ToolResult
+) -> list[dict]:
     messages: list[dict] = []
     for image in result.images:
         messages.append(
@@ -549,13 +686,16 @@ def _image_context_messages(call: ToolCallRequest, result: ToolResult) -> list[d
                     {
                         "type": "text",
                         "text": (
-                            f"Visual context returned by {call.name}. Use the image "
+                            f"Visual context returned by {call.name}. Use "
+                            "the image "
                             "to answer the user's live request."
                         ),
                     },
                     {
                         "type": "image_url",
-                        "image_url": {"url": file_to_data_url(Path(image.path))},
+                        "image_url": {
+                            "url": file_to_data_url(Path(image.path))
+                        },
                     },
                 ],
             }
@@ -587,7 +727,8 @@ def _guard_speech_prep_drift(
     if not _speech_prep_drifted(original_text, prepared_text):
         return prepared_reply
     logger.warning(
-        "Speech prep changed the final answer too much; using the original answer text."
+        "Speech prep changed the final answer too much; using the original "
+        "answer text."
     )
     return type(prepared_reply)(
         voice_id=prepared_reply.voice_id,
@@ -603,7 +744,9 @@ def _speech_prep_drifted(original_text: str, prepared_text: str) -> bool:
     if not prepared_words:
         return True
 
-    coverage = len(set(original_words) & set(prepared_words)) / len(set(original_words))
+    coverage = len(set(original_words) & set(prepared_words)) / len(
+        set(original_words)
+    )
     if len(set(original_words)) <= 4:
         return coverage < 0.75
     return coverage < 0.55
@@ -619,34 +762,6 @@ def _meaning_words(text: str) -> list[str]:
 
 
 _DRIFT_STOPWORDS = {
-    "the",
-    "and",
-    "for",
-    "that",
-    "this",
-    "you",
-    "your",
-    "are",
-    "was",
-    "were",
-    "with",
-    "from",
-    "but",
-    "not",
-    "can",
-    "just",
-    "its",
-    "it's",
-    "i'm",
-    "i",
-    "me",
-    "my",
-    "we",
-    "our",
-    "they",
-    "them",
-    "there",
-    "here",
-    "looks",
-    "like",
+    "theandforthatthisyouyourarewaswerewithfrombutnotcanjustitsit'si'mimemywe"
+    "ourtheythemthereherelookslike",
 }

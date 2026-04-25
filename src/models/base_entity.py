@@ -26,4 +26,4 @@ class BaseEntity(ABC):
 
     @abstractmethod
     def to_dict(self) -> dict:
-        """Serialize the entity to a dictionary."""
+        "Serialize the entity to a dictionary."

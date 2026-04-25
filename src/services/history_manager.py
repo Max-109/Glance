@@ -53,7 +53,9 @@ class HistoryManager:
             retention_enabled=self._retention_enabled,
         )
 
-    def set_history_policy(self, history_limit: int, retention_enabled: bool) -> None:
+    def set_history_policy(
+        self, history_limit: int, retention_enabled: bool
+    ) -> None:
         self._history_limit = max(1, int(history_limit))
         self._retention_enabled = bool(retention_enabled)
         self._sessions = self._apply_retention(
@@ -68,8 +70,11 @@ class HistoryManager:
         persist: bool = False,
     ) -> list[SessionRecord]:
         retained_sessions = list(sessions)
-        if self._retention_enabled and len(retained_sessions) > self._history_limit:
-            retained_sessions = retained_sessions[-self._history_limit :]
+        if (
+            self._retention_enabled
+            and len(retained_sessions) > self._history_limit
+        ):
+            retained_sessions = retained_sessions[-self._history_limit:]
         if persist and len(retained_sessions) != len(sessions):
             self._repository.save(retained_sessions)
         return retained_sessions

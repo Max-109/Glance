@@ -43,37 +43,43 @@ class SettingsManagerTests(unittest.TestCase):
             temp_path = Path(temp_dir)
             store = JsonSettingsStore(temp_path / "config.json")
             (temp_path / "config.json").write_text(
-                "{\n"
-                '  "llm_base_url": "https://persisted.example/v1",\n'
-                '  "llm_model_name": "claude-opus-4.6",\n'
-                '  "tts_base_url": "https://speech.example/v1",\n'
-                '  "tts_api_key": "speech-secret"\n'
-                "}",
+                "{\n  \"llm_base_url\": \"https://persisted.example/v1\","
+                "\n  "
+                "\"llm_model_name\": \"claude-opus-4.6\",\n  "
+                "\"tts_base_url\": "
+                "\"https://speech.example/v1\",\n  \"tts_api_key\": "
+                "\"speech-secret\"\n}",
                 encoding="utf-8",
             )
 
             manager = SettingsManager(store=store)
             settings = manager.load()
 
-        self.assertEqual(settings.transcription_base_url, "https://speech.example/v1")
+        self.assertEqual(
+            settings.transcription_base_url, "https://speech.example/v1"
+        )
         self.assertEqual(settings.transcription_api_key, "speech-secret")
 
     def test_load_creates_defaults_without_validation(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
             config_path = temp_path / "config.json"
-            manager = SettingsManager(
-                store=JsonSettingsStore(config_path)
-            )
+            manager = SettingsManager(store=JsonSettingsStore(config_path))
 
             settings = manager.load()
             saved_payload = json.loads(config_path.read_text(encoding="utf-8"))
 
         self.assertEqual(settings.llm_base_url, "")
-        self.assertEqual(settings.transcription_base_url, "https://api.naga.ac/v1")
+        self.assertEqual(
+            settings.transcription_base_url, "https://api.naga.ac/v1"
+        )
         self.assertEqual(settings.tts_base_url, "https://api.naga.ac/v1")
-        self.assertEqual(saved_payload["text_prompt_override"], DEFAULT_TEXT_REPLY_PROMPT)
-        self.assertEqual(saved_payload["voice_prompt_override"], DEFAULT_VOICE_REPLY_PROMPT)
+        self.assertEqual(
+            saved_payload["text_prompt_override"], DEFAULT_TEXT_REPLY_PROMPT
+        )
+        self.assertEqual(
+            saved_payload["voice_prompt_override"], DEFAULT_VOICE_REPLY_PROMPT
+        )
         self.assertEqual(
             saved_payload["voice_polish_prompt_override"],
             DEFAULT_TTS_PREPARATION_PROMPT,
@@ -107,8 +113,12 @@ class SettingsManagerTests(unittest.TestCase):
             settings = manager.load()
             saved_payload = json.loads(config_path.read_text(encoding="utf-8"))
 
-        self.assertEqual(settings.text_prompt_override, DEFAULT_TEXT_REPLY_PROMPT)
-        self.assertEqual(settings.voice_prompt_override, DEFAULT_VOICE_REPLY_PROMPT)
+        self.assertEqual(
+            settings.text_prompt_override, DEFAULT_TEXT_REPLY_PROMPT
+        )
+        self.assertEqual(
+            settings.voice_prompt_override, DEFAULT_VOICE_REPLY_PROMPT
+        )
         self.assertEqual(
             settings.voice_polish_prompt_override,
             DEFAULT_TTS_PREPARATION_PROMPT,
@@ -117,8 +127,12 @@ class SettingsManagerTests(unittest.TestCase):
             settings.transcription_prompt_override,
             DEFAULT_TRANSCRIPTION_PROMPT,
         )
-        self.assertEqual(saved_payload["text_prompt_override"], DEFAULT_TEXT_REPLY_PROMPT)
-        self.assertEqual(saved_payload["voice_prompt_override"], DEFAULT_VOICE_REPLY_PROMPT)
+        self.assertEqual(
+            saved_payload["text_prompt_override"], DEFAULT_TEXT_REPLY_PROMPT
+        )
+        self.assertEqual(
+            saved_payload["voice_prompt_override"], DEFAULT_VOICE_REPLY_PROMPT
+        )
         self.assertEqual(
             saved_payload["voice_polish_prompt_override"],
             DEFAULT_TTS_PREPARATION_PROMPT,

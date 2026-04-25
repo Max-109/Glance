@@ -6,7 +6,10 @@ try:
     from PySide6.QtCore import QCoreApplication, Qt
     from src.services.history_manager import HistoryManager
     from src.services.settings_manager import SettingsManager
-    from src.storage.json_storage import JsonSettingsStore, SessionDirectoryRepository
+    from src.storage.json_storage import (
+        JsonSettingsStore,
+        SessionDirectoryRepository,
+    )
     from src.ui.settings_viewmodel import SettingsViewModel
     from src.services.audio_devices import AudioDeviceOption
 except ImportError:  # pragma: no cover - optional GUI dependency.
@@ -46,11 +49,13 @@ class KeybindUtilityTests(unittest.TestCase):
         self.assertEqual(keybind, "CMD+SHIFT+L")
 
     @unittest.skipIf(Qt is None, "PySide6 is not installed")
-    def test_qt_event_to_keybind_prefers_physical_letter_over_alt_text(self) -> None:
+    def test_qt_event_to_keybind_prefers_physical_letter_over_alt_text(
+        self,
+    ) -> None:
         keybind = qt_event_to_keybind(
             Qt.Key_L,
             Qt.AltModifier.value,
-            "∆",
+            "\u2206",
         )
         self.assertEqual(keybind, "ALT+L")
 
@@ -105,7 +110,9 @@ class SettingsViewModelKeybindTests(unittest.TestCase):
             "l",
         )
 
-        self.assertEqual(self.viewmodel.settings["live_keybind"], "CMD+SHIFT+L")
+        self.assertEqual(
+            self.viewmodel.settings["live_keybind"], "CMD+SHIFT+L"
+        )
         self.assertFalse(self.viewmodel.bindingActive)
 
     def test_capture_keybind_rejects_duplicate_shortcut(self) -> None:
@@ -127,7 +134,9 @@ class SettingsViewModelKeybindTests(unittest.TestCase):
 
         self.viewmodel.captureKeybind(Qt.Key_K, Qt.AltModifier.value, "k")
 
-        self.assertEqual(self.settings_manager.reload().quick_keybind, "CMD+SHIFT+Q")
+        self.assertEqual(
+            self.settings_manager.reload().quick_keybind, "CMD+SHIFT+Q"
+        )
         self.assertTrue(self.viewmodel.dirty)
 
     def test_assign_keybind_updates_without_persisting_shortcut(self) -> None:
@@ -136,7 +145,9 @@ class SettingsViewModelKeybindTests(unittest.TestCase):
         self.viewmodel.assignKeybind("quick_keybind", "alt+k")
 
         self.assertEqual(self.viewmodel.settings["quick_keybind"], "ALT+K")
-        self.assertEqual(self.settings_manager.reload().quick_keybind, "CMD+SHIFT+Q")
+        self.assertEqual(
+            self.settings_manager.reload().quick_keybind, "CMD+SHIFT+Q"
+        )
         self.assertFalse(self.viewmodel.bindingActive)
         self.assertTrue(self.viewmodel.dirty)
 
@@ -151,16 +162,22 @@ class SettingsViewModelKeybindTests(unittest.TestCase):
         )
         self.assertTrue(self.viewmodel.bindingActive)
 
-    def test_escape_cancels_capture_without_changing_saved_keybind(self) -> None:
+    def test_escape_cancels_capture_without_changing_saved_keybind(
+        self,
+    ) -> None:
         emitted = []
-        self.viewmodel.savedSettingsChanged.connect(lambda: emitted.append(True))
+        self.viewmodel.savedSettingsChanged.connect(
+            lambda: emitted.append(True)
+        )
         original_keybind = self.settings_manager.reload().live_keybind
         self.viewmodel.startKeybindCapture("live_keybind")
 
         self.viewmodel.captureKeybind(Qt.Key_Escape, 0, "")
 
         self.assertFalse(self.viewmodel.bindingActive)
-        self.assertEqual(self.settings_manager.reload().live_keybind, original_keybind)
+        self.assertEqual(
+            self.settings_manager.reload().live_keybind, original_keybind
+        )
         self.assertEqual(emitted, [])
 
     def test_save_allows_unset_llm_base_url(self) -> None:
@@ -182,7 +199,9 @@ class SettingsViewModelKeybindTests(unittest.TestCase):
         self.assertTrue(self.viewmodel.dirty)
 
     def test_invalid_save_keeps_last_valid_config(self) -> None:
-        original_threshold = self.settings_manager.reload().screen_change_threshold
+        original_threshold = (
+            self.settings_manager.reload().screen_change_threshold
+        )
 
         self.viewmodel.setField("screen_change_threshold", "1.2")
         self.viewmodel.save()
@@ -214,14 +233,19 @@ class SettingsViewModelKeybindTests(unittest.TestCase):
         )
         self.assertFalse(self.viewmodel.dirty)
 
-    def test_build_history_preview_uses_latest_interaction_summary_and_answer(self) -> None:
+    def test_build_history_preview_uses_latest_interaction_summary_and_answer(
+        self,
+    ) -> None:
         session = self.viewmodel._history_manager.start_session("quick")
         self.viewmodel._history_manager.save_interaction(
             session,
             QuickInteraction(
                 mode="quick",
                 question="What changed on the screen?",
-                answer="A modal opened with the new deployment summary.\nIt also shows two warnings.",
+                answer=(
+                    "A modal opened with the new deployment summary.\n"
+                    "It also shows two warnings."
+                ),
                 image_path="capture.png",
             ),
         )
@@ -231,10 +255,13 @@ class SettingsViewModelKeybindTests(unittest.TestCase):
         self.assertEqual(len(preview), 1)
         self.assertEqual(preview[0]["mode"], "quick")
         self.assertEqual(preview[0]["interactionCount"], 1)
-        self.assertEqual(preview[0]["title"], "Quick: What changed on the screen?")
+        self.assertEqual(
+            preview[0]["title"], "Quick: What changed on the screen?"
+        )
         self.assertEqual(
             preview[0]["excerpt"],
-            "A modal opened with the new deployment summary. It also shows two warnings.",
+            "A modal opened with the new deployment summary. It also shows "
+            "two warnings.",
         )
 
     def test_reset_audio_defaults_uses_transient_status_for_noop(self) -> None:
@@ -284,7 +311,7 @@ class SettingsViewModelKeybindTests(unittest.TestCase):
             "Value cannot be negative.",
         )
 
-    def test_audio_device_refresh_exposes_labels_and_preserves_missing_saved_value(
+    def test_audio_device_refresh_exposes_labels_and_preserves_missing_value(
         self,
     ) -> None:
         self.viewmodel.setField("audio_input_device", "input:99")

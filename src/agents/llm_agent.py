@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 from src.agents.base_agent import BaseAgent
-from src.services.providers import NagaTranscriptionProvider, OpenAICompatibleProvider
+from src.services.providers import (
+    NagaTranscriptionProvider,
+    OpenAICompatibleProvider,
+)
 
 
 class LLMAgent(BaseAgent):
@@ -93,7 +96,9 @@ class LLMAgent(BaseAgent):
                 session_id=session_id,
                 client=self._transcription_provider.client,
                 model_name=self._transcription_provider.model_name,
-                reasoning_kwargs=self._transcription_provider.reasoning_kwargs(),
+                reasoning_kwargs=(
+                    self._transcription_provider.reasoning_kwargs()
+                ),
                 reasoning_label=self._transcription_provider.reasoning_label(),
             )
         return self._provider.run_tool_turn(
@@ -119,7 +124,9 @@ class LLMAgent(BaseAgent):
                 session_id=session_id,
                 client=self._transcription_provider.client,
                 model_name=self._transcription_provider.model_name,
-                reasoning_kwargs=self._transcription_provider.reasoning_kwargs(),
+                reasoning_kwargs=(
+                    self._transcription_provider.reasoning_kwargs()
+                ),
                 reasoning_label=self._transcription_provider.reasoning_label(),
             )
         return self._provider.generate_live_speech_reply_from_audio(

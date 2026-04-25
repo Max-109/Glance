@@ -29,7 +29,14 @@ def find_electron_binary(project_root: Path) -> Path | None:
         str(project_root / "node_modules" / ".bin" / "electron"),
         shutil.which("electron"),
         "/Applications/Electron.app/Contents/MacOS/Electron",
-        str(Path.home() / "Applications" / "Electron.app" / "Contents" / "MacOS" / "Electron"),
+        str(
+            Path.home()
+            / "Applications"
+            / "Electron.app"
+            / "Contents"
+            / "MacOS"
+            / "Electron"
+        ),
     ]
     for candidate in candidates:
         if not candidate:
@@ -67,7 +74,8 @@ class ElectronShellController(QObject):
             )
         if self._electron_binary is None:
             raise ElectronUnavailableError(
-                "No Electron binary was found. Install Electron locally or set GLANCE_ELECTRON_BIN."
+                "No Electron binary was found. Install Electron locally or "
+                "set GLANCE_ELECTRON_BIN."
             )
 
         self._visible = False
@@ -215,7 +223,11 @@ class ElectronShellController(QObject):
 
     def _send_command(self, payload: dict[str, Any]) -> None:
         process = self._process
-        if process is None or process.stdin is None or process.poll() is not None:
+        if (
+            process is None
+            or process.stdin is None
+            or process.poll() is not None
+        ):
             return
         with self._stdin_lock:
             process.stdin.write(json.dumps(payload) + "\n")
@@ -271,7 +283,9 @@ class ElectronShellController(QObject):
             self._set_visible(False)
             return
         if event_type == "error":
-            self._logger.error("Electron shell error: %s", event.get("message", ""))
+            self._logger.error(
+                "Electron shell error: %s", event.get("message", "")
+            )
 
 
 def _looks_like_electron_error(line: str) -> bool:
@@ -282,7 +296,9 @@ def _looks_like_electron_error(line: str) -> bool:
     )
 
 
-def _coerce_window_dimension(value: object, fallback: int, minimum: int) -> int:
+def _coerce_window_dimension(
+    value: object, fallback: int, minimum: int
+) -> int:
     try:
         coerced = int(value)
     except (TypeError, ValueError):

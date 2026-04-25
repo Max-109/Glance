@@ -36,7 +36,9 @@ from src.models.settings import (
 
 try:
     from openai import OpenAI
-except ImportError:  # pragma: no cover - exercised only without optional dependency.
+except (
+    ImportError
+):  # pragma: no cover - exercised only without optional dependency.
     OpenAI = None
 
 
@@ -68,6 +70,26 @@ _COUNTRY_BY_REGION_CODE = {
     "UA": "Ukraine",
     "US": "United States",
 }
+OCR_EXTRACTION_PROMPT = """You are an OCR engine. Return clean clipboard text
+from the image, not a visual line-by-line transcript.
+
+Rules:
+- Output only text that is visibly present in the image.
+- Follow the user's OCR request exactly. If they ask for a specific item,
+  return only that item.
+- If the user's OCR request asks for all visible text, return clean clipboard
+  text for the whole image.
+- Do not include surrounding UI text unless it is needed to identify the
+  requested item.
+- Preserve original wording, spelling, capitalization, and punctuation.
+- Join prose or UI copy that is only split across lines because the interface
+  wrapped it visually.
+- Preserve headings, labels, menu items, lists, table rows, and columns.
+- If table or grid text is visible, return it as a Markdown table.
+- Do not summarize, explain, translate, infer hidden text, add labels.
+- Do not say that you extracted the text.
+- Do not wrap the answer in code fences.
+- If no text is visible, output exactly [NO_VISIBLE_TEXT]."""
 
 
 @dataclass(frozen=True)
@@ -101,7 +123,9 @@ class OpenAICompatibleProvider:
     @staticmethod
     def _build_client(base_url: str, api_key: str):
         if OpenAI is None:
-            raise ProviderError("The 'openai' package is required for provider access.")
+            raise ProviderError(
+                "The 'openai' package is required for provider access."
+            )
         if not api_key:
             raise ProviderError("Missing LLM API key.")
         return OpenAI(
@@ -110,7 +134,9 @@ class OpenAICompatibleProvider:
             default_headers={"Accept-Encoding": "identity"},
         )
 
-    def _resolve_prompt_override(self, field_name: str, default_prompt: str) -> str:
+    def _resolve_prompt_override(
+        self, field_name: str, default_prompt: str
+    ) -> str:
         override = str(getattr(self._settings, field_name, "")).strip()
         return override or default_prompt
 
@@ -134,7 +160,9 @@ class OpenAICompatibleProvider:
                 }
             )
         if transcript:
-            content.append({"type": "text", "text": f"User transcript: {transcript}"})
+            content.append(
+                {"type": "text", "text": f"User transcript: {transcript}"}
+            )
 
         system_prompt = self._build_system_prompt(match_user_language)
         started_at = perf_counter()
@@ -150,7 +178,9 @@ class OpenAICompatibleProvider:
                     ]
                 ),
             )
-        except Exception as exc:  # pragma: no cover - depends on external service.
+        except (
+            Exception
+        ) as exc:  # pragma: no cover - depends on external service.
             logger.exception(
                 "LLM request failed after %.1f ms [model=%s reasoning=%s]",
                 _elapsed_ms(started_at),
@@ -163,12 +193,16 @@ class OpenAICompatibleProvider:
         if not text:
             raise ProviderError("LLM response was empty.")
         logger.info(
-            "llm reply completed\nmodel      %s\nreasoning  %s\ntime       %.1f ms\nusage      %s\nreply      %s",
+            "llm reply completed\nmodel      %s\nreasoning  %s\ntime       "
+            "%.1f "
+            "ms\nusage      %s\nreply      %s",
             self._settings.llm_model_name,
             self._llm_reasoning_label(),
             _elapsed_ms(started_at),
             _format_usage_summary(response),
-            _preview_text(text, limit=140),
+            _preview_text(
+                text,
+                limit=140),
         )
         logger.debug(
             "LLM reply details [model=%s reasoning=%s usage=%s output=%s]",
@@ -199,9 +233,12 @@ class OpenAICompatibleProvider:
                     )
                 ),
             )
-        except Exception as exc:  # pragma: no cover - depends on external service.
+        except (
+            Exception
+        ) as exc:  # pragma: no cover - depends on external service.
             logger.exception(
-                "Live reply request failed after %.1f ms [model=%s reasoning=%s]",
+                "Live reply request failed after %.1f ms [model=%s "
+                "reasoning=%s]",
                 _elapsed_ms(started_at),
                 self._settings.llm_model_name,
                 self._llm_reasoning_label(),
@@ -213,21 +250,28 @@ class OpenAICompatibleProvider:
             raise ProviderError("Live reply response was empty.")
         live_reply = self._parse_live_speech_reply(text)
         logger.info(
-            "llm reply completed\nmodel      %s\nreasoning  %s\nvoice      %s\ntime       %.1f ms\nusage      %s\nreply      %s",
+            "llm reply completed\nmodel      %s\nreasoning  %s\nvoice      "
+            "%s\ntime       %.1f ms\nusage      %s\nreply      %s",
             self._settings.llm_model_name,
             self._llm_reasoning_label(),
-            get_tts_voice_label(live_reply.voice_id),
+            get_tts_voice_label(
+                live_reply.voice_id),
             _elapsed_ms(started_at),
             _format_usage_summary(response),
-            _preview_text(live_reply.text, limit=140),
+            _preview_text(
+                live_reply.text,
+                limit=140),
         )
         logger.debug(
-            "Live reply details [model=%s reasoning=%s usage=%s voice=%s output=%s]",
+            "Live reply details [model=%s reasoning=%s usage=%s voice=%s "
+            "output=%s]",
             self._settings.llm_model_name,
             self._llm_reasoning_label(),
             _format_usage(response),
-            get_tts_voice_label(live_reply.voice_id),
-            _preview_text(live_reply.text),
+            get_tts_voice_label(
+                live_reply.voice_id),
+            _preview_text(
+                live_reply.text),
         )
         return live_reply
 
@@ -272,24 +316,25 @@ class OpenAICompatibleProvider:
                 }
             ]
             messages.extend(_normalize_chat_messages(conversation_history))
-            messages.append(
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": (
-                                "Listen to the user's spoken audio below and reply with the "
-                                "final spoken text following all the system instructions."
-                            ),
-                        },
-                        {
-                            "type": "input_audio",
-                            "input_audio": _input_audio_payload_from_path(upload_path),
-                        },
-                    ],
-                }
-            )
+            messages.append({
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": (
+                            "Listen to the user's spoken audio below and "
+                            "reply with the final spoken text following all "
+                            "the system instructions."
+                        ),
+                    },
+                    {
+                        "type": "input_audio",
+                        "input_audio": _input_audio_payload_from_path(
+                            upload_path
+                        ),
+                    },
+                ],
+            })
 
             response = active_client.chat.completions.create(
                 model=active_model,
@@ -297,9 +342,12 @@ class OpenAICompatibleProvider:
                 **self._openrouter_request_options(session_id=session_id),
                 messages=self._cacheable_messages(messages),
             )
-        except Exception as exc:  # pragma: no cover - depends on external service.
+        except (
+            Exception
+        ) as exc:  # pragma: no cover - depends on external service.
             logger.exception(
-                "Multimodal live reply request failed after %.1f ms [model=%s reasoning=%s]",
+                "Multimodal live reply request failed after %.1f ms "
+                "[model=%s reasoning=%s]",
                 _elapsed_ms(started_at),
                 active_model,
                 active_reasoning_label,
@@ -315,13 +363,18 @@ class OpenAICompatibleProvider:
             raise ProviderError("Multimodal live reply response was empty.")
         live_reply = self._parse_live_speech_reply(text)
         logger.info(
-            "llm multimodal reply completed\nmodel      %s\nreasoning  %s\nvoice      %s\ntime       %.1f ms\nusage      %s\nreply      %s",
+            "llm multimodal reply completed\nmodel      %s\nreasoning  "
+            "%s\nvoice      %s\ntime       %.1f ms\nusage      %s\nreply      "
+            "%s",
             active_model,
             active_reasoning_label,
-            get_tts_voice_label(live_reply.voice_id),
+            get_tts_voice_label(
+                live_reply.voice_id),
             _elapsed_ms(started_at),
             _format_usage_summary(response),
-            _preview_text(live_reply.text, limit=140),
+            _preview_text(
+                live_reply.text,
+                limit=140),
         )
         return live_reply
 
@@ -339,22 +392,24 @@ class OpenAICompatibleProvider:
             }
         ]
         messages.extend(_normalize_chat_messages(conversation_history))
-        messages.append(
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "text",
-                        "text": (
-                            "Listen to the user's spoken audio below. Decide whether to call "
-                            "an enabled tool or give the final spoken answer. If no tool is "
-                            "needed, answer directly with the final speech text."
-                        ),
-                    },
-                    audio_part,
-                ],
-            }
-        )
+        messages.append({
+            "role": "user",
+            "content": [
+                {
+                    "type": "text",
+                    "text": (
+                        "Listen to the user's spoken audio below. Decide "
+                        "whether to call an enabled tool or give the final "
+                        "spoken answer. If no tool is needed, answer directly "
+                        "with the final speech text. Call end_live_session "
+                        "when the user clearly says they are done, says no to "
+                        "more help, says goodbye, or asks Glance to stop "
+                        "listening."
+                    ),
+                },
+                audio_part,
+            ],
+        })
         return messages
 
     def _build_live_speech_messages(
@@ -381,12 +436,19 @@ class OpenAICompatibleProvider:
     ) -> list[dict]:
         system_prompt = self._build_system_prompt(match_user_language=True)
         system_prompt += (
-            " You are running inside Glance Live mode with runtime tools available. "
-            "Use a tool only when it materially helps answer the user's spoken request. "
-            "Do not expose tool call names, JSON, arguments, raw fetched text, or screenshot "
-            "metadata to the user. When you have enough information, give only the final "
-            "natural answer text. Do not narrate the tool work in the final answer; answer "
-            "with the result directly."
+            " You are running inside Glance Live mode with runtime tools "
+            "available. Use a tool only when it materially helps answer the "
+            "user's spoken request. Do not expose tool call names, JSON, "
+            "arguments, raw fetched text, or screenshot metadata to the "
+            "user. OCR is a clipboard action: when the user asks you to "
+            "extract screen text, call ocr_screen with the user's exact "
+            "extraction instruction, then let Glance confirm that the result "
+            "was copied. Never turn OCR output into the spoken final answer. "
+            "Call end_live_session when the user clearly says they are done, "
+            "says no to more help, says goodbye, or asks Glance to stop "
+            "listening. When you have enough information, give only the final "
+            "natural answer text. Do not narrate the tool work in the final "
+            "answer; answer with the result directly."
         )
         messages: list[dict] = [{"role": "system", "content": system_prompt}]
         messages.extend(_normalize_chat_messages(conversation_history))
@@ -431,14 +493,19 @@ class OpenAICompatibleProvider:
             kwargs["tool_choice"] = "auto"
         try:
             response = active_client.chat.completions.create(**kwargs)
-        except Exception as exc:  # pragma: no cover - depends on external service.
+        except (
+            Exception
+        ) as exc:  # pragma: no cover - depends on external service.
             logger.exception(
-                "Tool-capable live request failed after %.1f ms [model=%s reasoning=%s]",
+                "Tool-capable live request failed after %.1f ms [model=%s "
+                "reasoning=%s]",
                 _elapsed_ms(started_at),
                 active_model,
                 active_reasoning_label,
             )
-            raise ProviderError(f"Tool-capable live request failed: {exc}") from exc
+            raise ProviderError(
+                f"Tool-capable live request failed: {exc}"
+            ) from exc
 
         message = response.choices[0].message
         content = _extract_text_content(getattr(message, "content", ""))
@@ -453,13 +520,17 @@ class OpenAICompatibleProvider:
                 for tool_call in getattr(message, "tool_calls", []) or []
             ]
         logger.info(
-            "llm tool turn completed\nmodel      %s\nreasoning  %s\ntime       %.1f ms\nusage      %s\ntools      %s\nreply      %s",
+            "llm tool turn completed\nmodel      %s\nreasoning  %s\ntime      "
+            "%.1f ms\nusage      %s\ntools      %s\nreply      %s",
             active_model,
             active_reasoning_label,
             _elapsed_ms(started_at),
             _format_usage_summary(response),
-            ", ".join(call.name for call in tool_calls) or "none",
-            _preview_text(content, limit=140),
+            ", ".join(
+                call.name for call in tool_calls) or "none",
+            _preview_text(
+                content,
+                limit=140),
         )
         return ProviderToolTurn(
             content=content.strip(),
@@ -467,9 +538,15 @@ class OpenAICompatibleProvider:
             assistant_message=assistant_message,
         )
 
-    def extract_text(self, image_path: str) -> str:
-        prompt = "Extract all visible text exactly as written. Preserve line breaks where useful."
-        return self.generate_reply(user_prompt=prompt, image_paths=[image_path])
+    def extract_text(self, image_path: str, *, instruction: str = "") -> str:
+        prompt = OCR_EXTRACTION_PROMPT
+        normalized_instruction = str(instruction).strip()
+        if normalized_instruction:
+            prompt += f"\n\nUser OCR request: {normalized_instruction}"
+        return self.generate_reply(
+            user_prompt=prompt,
+            image_paths=[image_path],
+        )
 
     def prepare_speech_text(
         self,
@@ -493,35 +570,51 @@ class OpenAICompatibleProvider:
                     ]
                 ),
             )
-        except Exception as exc:  # pragma: no cover - depends on external service.
+        except (
+            Exception
+        ) as exc:  # pragma: no cover - depends on external service.
             logger.exception(
-                "Speech text preparation failed after %.1f ms [model=%s reasoning=%s]",
+                "Speech text preparation failed after %.1f ms [model=%s "
+                "reasoning=%s]",
                 _elapsed_ms(started_at),
                 self._settings.llm_model_name,
                 self._llm_reasoning_label(),
             )
-            raise ProviderError(f"Speech text preparation failed: {exc}") from exc
+            raise ProviderError(
+                f"Speech text preparation failed: {exc}"
+            ) from exc
 
-        prepared_text = _extract_text_content(response.choices[0].message.content)
+        prepared_text = _extract_text_content(
+            response.choices[0].message.content
+        )
         if not prepared_text:
-            raise ProviderError("Speech text preparation returned empty output.")
+            raise ProviderError(
+                "Speech text preparation returned empty output."
+            )
         prepared_reply = self._parse_live_speech_reply(prepared_text)
         logger.info(
-            "speech text prepared\nmodel      %s\nreasoning  %s\nvoice      %s\ntime       %.1f ms\nusage      %s\nreply      %s",
+            "speech text prepared\nmodel      %s\nreasoning  %s\nvoice      "
+            "%s\ntime       %.1f ms\nusage      %s\nreply      %s",
             self._settings.llm_model_name,
             self._llm_reasoning_label(),
-            get_tts_voice_label(prepared_reply.voice_id),
+            get_tts_voice_label(
+                prepared_reply.voice_id),
             _elapsed_ms(started_at),
             _format_usage_summary(response),
-            _preview_text(prepared_reply.text, limit=140),
+            _preview_text(
+                prepared_reply.text,
+                limit=140),
         )
         logger.debug(
-            "Speech prep details [model=%s reasoning=%s usage=%s voice=%s output=%s]",
+            "Speech prep details [model=%s reasoning=%s usage=%s voice=%s "
+            "output=%s]",
             self._settings.llm_model_name,
             self._llm_reasoning_label(),
             _format_usage(response),
-            get_tts_voice_label(prepared_reply.voice_id),
-            _preview_text(prepared_reply.text),
+            get_tts_voice_label(
+                prepared_reply.voice_id),
+            _preview_text(
+                prepared_reply.text),
         )
         return prepared_reply
 
@@ -546,21 +639,30 @@ class OpenAICompatibleProvider:
             prompt += f" Additional instructions: {override}"
         prompt += _language_reply_instruction()
         prompt += (
-            " Keep the delivery conversational and pleasant, without sounding forced, overly "
-            "cheerful, or theatrical."
+            " Keep the delivery conversational and pleasant, without "
+            "sounding forced, overly cheerful, or theatrical."
         )
         return prompt
 
     def _build_live_tool_speech_system_prompt(self) -> str:
         prompt = self._build_live_speech_system_prompt()
         prompt += (
-            " Runtime tools are available in this live turn. Use a tool only when it materially "
-            "helps answer the user's spoken request. If you need a tool, call the tool instead "
-            "of giving a final answer. Tool calls, tool names, JSON, arguments, raw fetched text, "
-            "and screenshot metadata are private runtime details; never say them to the user. "
-            "When you have enough information, give only the final spoken answer and follow all "
-            "voice, emotion, and VOICE_ID rules above. Do not narrate the tool work in the final "
-            "answer; answer with the result directly."
+            " Runtime tools are available in this live turn. Use a tool only "
+            "when it materially helps answer the user's spoken request. If "
+            "you need a tool, call the tool instead of giving a final "
+            "answer. Tool calls, tool names, JSON, arguments, raw fetched "
+            "text, and screenshot metadata are private runtime details; "
+            "never say them to the user. OCR is a clipboard action: when the "
+            "user asks you to extract screen text, call ocr_screen with the "
+            "user's exact extraction instruction, then let Glance confirm "
+            "that the result was copied. Never turn OCR output into the "
+            "spoken final answer. Call end_live_session when the user "
+            "clearly says they are done, says no to more help, says goodbye, "
+            "or asks Glance to stop listening. When you have enough "
+            "information, "
+            "give only the final spoken answer and follow all voice, "
+            "emotion, and VOICE_ID rules above. Do not narrate the tool work "
+            "in the final answer; answer with the result directly."
         )
         return prompt
 
@@ -576,26 +678,33 @@ class OpenAICompatibleProvider:
         prompt += _language_reply_instruction()
         if self._settings.tts_voice_id == AUTO_TTS_VOICE_ID:
             prompt += (
-                " Auto voice selection is active. First choose the single best voice ID from the "
-                "allowed list below, based on the emotional shape and style of your answer. Output "
-                "the first line exactly as `VOICE_ID: <id>`, then leave one blank line, then output "
-                "only the final speech text. Never output any voice ID outside this list. Do not "
-                "default to the same upbeat voice for every positive or generic answer. For ordinary "
-                "everyday conversation and casual back-and-forth, prefer Mark unless another voice is "
-                "clearly a better fit. Choose the voice before composing the final reply."
+                " Auto voice selection is active. First choose the single "
+                "best voice ID from the allowed list below, based on the "
+                "emotional shape and style of your answer. Output the first "
+                "line exactly as `VOICE_ID: <id>`, then leave one blank "
+                "line, then output only the final speech text. Never output "
+                "any voice ID outside this list. Do not default to the same "
+                "upbeat voice for every positive or generic answer. For "
+                "ordinary everyday conversation and casual back-and-forth, "
+                "prefer Mark unless another voice is clearly a better fit. "
+                "Choose the voice before composing the final reply."
             )
             for voice in ELEVEN_V3_VOICES:
                 prompt += (
-                    f" Allowed voice: {voice.id} - {voice.name} - {voice.title} - "
+                    f" Allowed voice: {voice.id} - {voice.name} - "
+                    f"{voice.title} - "
                     f"{voice.prompt_summary}."
                 )
         else:
             voice = get_tts_voice(self._settings.tts_voice_id)
             if voice is not None:
                 prompt += (
-                    f" The active voice is fixed to {voice.name} ({voice.title}). Shape the final "
-                    f"speech text so it suits this voice's strengths: {voice.prompt_summary}. Do "
-                    "not output a VOICE_ID header when a fixed voice is already selected."
+                    f" The active voice is fixed to {voice.name} "
+                    f"({voice.title}). Shape the final speech text so it "
+                    f"suits this voice's strengths: {voice.prompt_summary}. "
+                    "Do "
+                    "not output a VOICE_ID header when a fixed voice is "
+                    "already selected."
                 )
         return prompt
 
@@ -610,16 +719,18 @@ class OpenAICompatibleProvider:
         match = re.match(r"^VOICE_ID:\s*(\S+)\s*(?:\n+|$)", stripped_text)
         if match is None:
             logger.warning(
-                "Auto voice reply was missing a VOICE_ID header; falling back to %s.",
+                "Auto voice reply was missing a VOICE_ID header; falling "
+                "back to %s.",
                 get_tts_voice_label(DEFAULT_FIXED_TTS_VOICE),
             )
             return LiveSpeechReply(DEFAULT_FIXED_TTS_VOICE, stripped_text)
 
         parsed_voice_id = match.group(1).strip()
-        remaining_text = stripped_text[match.end() :].strip()
+        remaining_text = stripped_text[match.end():].strip()
         if parsed_voice_id not in {voice.id for voice in ELEVEN_V3_VOICES}:
             logger.warning(
-                "Auto voice reply chose unknown voice id %s; falling back to %s.",
+                "Auto voice reply chose unknown voice id %s; falling back to "
+                "%s.",
                 parsed_voice_id,
                 get_tts_voice_label(DEFAULT_FIXED_TTS_VOICE),
             )
@@ -639,23 +750,29 @@ class OpenAICompatibleProvider:
         )
         if self._settings.tts_voice_id == AUTO_TTS_VOICE_ID:
             prompt += (
-                " Auto voice selection is active. First choose the single best voice ID from the "
-                "allowed list below, based on the emotional shape and style of the reply. Output "
-                "the first line exactly as `VOICE_ID: <id>`, then leave one blank line, then output "
-                "only the final speech text. Never output any voice ID outside this list."
+                " Auto voice selection is active. First choose the single "
+                "best voice ID from the allowed list below, based on the "
+                "emotional shape and style of the reply. Output the first "
+                "line exactly as `VOICE_ID: <id>`, then leave one blank "
+                "line, then output only the final speech text. Never output "
+                "any voice ID outside this list."
             )
             for voice in ELEVEN_V3_VOICES:
                 prompt += (
-                    f" Allowed voice: {voice.id} - {voice.name} - {voice.title} - "
+                    f" Allowed voice: {voice.id} - {voice.name} - "
+                    f"{voice.title} - "
                     f"{voice.prompt_summary}."
                 )
         else:
             voice = get_tts_voice(self._settings.tts_voice_id)
             if voice is not None:
                 prompt += (
-                    f" The active voice is fixed to {voice.name} ({voice.title}). Shape the final "
-                    f"speech text so it suits this voice's strengths: {voice.prompt_summary}. Do "
-                    "not output a VOICE_ID header when a fixed voice is already selected."
+                    f" The active voice is fixed to {voice.name} "
+                    f"({voice.title}). Shape the final speech text so it "
+                    f"suits this voice's strengths: {voice.prompt_summary}. "
+                    "Do "
+                    "not output a VOICE_ID header when a fixed voice is "
+                    "already selected."
                 )
         return prompt
 
@@ -664,13 +781,17 @@ class OpenAICompatibleProvider:
         host = parsed.netloc.lower()
         return host == "openrouter.ai" or host.endswith(".openrouter.ai")
 
-    def _openrouter_request_options(self, *, session_id: str | None = None) -> dict:
+    def _openrouter_request_options(
+        self, *, session_id: str | None = None
+    ) -> dict:
         if not self._is_openrouter():
             return {}
         options: dict = {"extra_body": {"usage": {"include": True}}}
         normalized_session_id = (session_id or "").strip()
         if normalized_session_id:
-            options["extra_headers"] = {"x-session-affinity": normalized_session_id}
+            options["extra_headers"] = {
+                "x-session-affinity": normalized_session_id
+            }
             options["extra_body"].update(
                 {
                     "session_id": normalized_session_id,
@@ -682,7 +803,9 @@ class OpenAICompatibleProvider:
     def _cacheable_messages(self, messages: list[dict]) -> list[dict]:
         if not self._is_openrouter():
             return messages
-        return [_mark_cacheable_system_message(message) for message in messages]
+        return [
+            _mark_cacheable_system_message(message) for message in messages
+        ]
 
 
 class NagaTranscriptionProvider:
@@ -764,9 +887,9 @@ class NagaTranscriptionProvider:
                                 {
                                     "type": "input_audio",
                                     "input_audio": {
-                                        "data": base64.b64encode(audio_bytes).decode(
-                                            "ascii"
-                                        ),
+                                        "data": base64.b64encode(
+                                            audio_bytes
+                                        ).decode("ascii"),
                                         "format": audio_format,
                                     },
                                 },
@@ -774,14 +897,19 @@ class NagaTranscriptionProvider:
                         },
                     ],
                 )
-        except Exception as exc:  # pragma: no cover - depends on external service.
+        except (
+            Exception
+        ) as exc:  # pragma: no cover - depends on external service.
             logger.exception(
-                "Transcription request failed after %.1f ms [model=%s reasoning=%s]",
+                "Transcription request failed after %.1f ms [model=%s "
+                "reasoning=%s]",
                 _elapsed_ms(started_at),
                 self._settings.transcription_model_name,
                 self._transcription_reasoning_label(),
             )
-            raise ProviderError(f"Transcription request failed: {exc}") from exc
+            raise ProviderError(
+                f"Transcription request failed: {exc}"
+            ) from exc
         finally:
             cleanup_upload()
 
@@ -792,12 +920,15 @@ class NagaTranscriptionProvider:
         if not text:
             raise ProviderError("Transcription response was empty.")
         logger.info(
-            "transcription completed\nmodel      %s\nreasoning  %s\ntime       %.1f ms\nusage      %s\nheard      %s",
+            "transcription completed\nmodel      %s\nreasoning  %s\ntime      "
+            "%.1f ms\nusage      %s\nheard      %s",
             self._settings.transcription_model_name,
             self._transcription_reasoning_label(),
             _elapsed_ms(started_at),
             _format_usage_summary(response),
-            _preview_text(text, limit=140),
+            _preview_text(
+                text,
+                limit=140),
         )
         logger.debug(
             "Transcription details [model=%s reasoning=%s usage=%s output=%s]",
@@ -837,7 +968,9 @@ class NagaSpeechProvider:
     @staticmethod
     def _build_client(base_url: str, api_key: str):
         if OpenAI is None:
-            raise ProviderError("The 'openai' package is required for TTS access.")
+            raise ProviderError(
+                "The 'openai' package is required for TTS access."
+            )
         if not api_key:
             raise ProviderError("Missing TTS API key.")
         return OpenAI(
@@ -872,7 +1005,9 @@ class NagaSpeechProvider:
                 requested_format,
                 content_type=content_type,
             )
-        except Exception as exc:  # pragma: no cover - depends on external service.
+        except (
+            Exception
+        ) as exc:  # pragma: no cover - depends on external service.
             logger.exception(
                 "TTS request failed after %.1f ms [model=%s voice=%s]",
                 _elapsed_ms(started_at),
@@ -881,11 +1016,14 @@ class NagaSpeechProvider:
             )
             raise ProviderError(f"TTS request failed: {exc}") from exc
         logger.info(
-            "speech synthesis completed\nmodel      %s\nvoice      %s\ntime       %.1f ms\nspoken     %s",
+            "speech synthesis completed\nmodel      %s\nvoice      %s\n"
+            "time      %.1f ms\nspoken     %s",
             self._settings.tts_model,
             get_tts_voice_label(resolved_voice_id),
             _elapsed_ms(started_at),
-            _preview_text(text, limit=140),
+            _preview_text(
+                text,
+                limit=140),
         )
         logger.debug(
             "Speech synthesis details [model=%s voice=%s input=%s]",
@@ -1018,7 +1156,8 @@ def _convert_audio_to_wav(output_path: Path) -> Path | None:
     ffmpeg_path = shutil.which("ffmpeg")
     if ffmpeg_path is None:
         logger.warning(
-            "ffmpeg is unavailable, keeping synthesized audio in its original format."
+            "ffmpeg is unavailable, keeping synthesized audio in its original "
+            "format."
         )
         return None
 
@@ -1043,7 +1182,9 @@ def _convert_audio_to_wav(output_path: Path) -> Path | None:
             text=True,
         )
     except (OSError, subprocess.CalledProcessError) as exc:
-        logger.warning("ffmpeg WAV conversion failed for %s: %s", output_path.name, exc)
+        logger.warning(
+            "ffmpeg WAV conversion failed for %s: %s", output_path.name, exc
+        )
         try:
             converted_path.unlink(missing_ok=True)
         except OSError:
@@ -1055,7 +1196,9 @@ def _convert_audio_to_wav(output_path: Path) -> Path | None:
     return output_path
 
 
-def _prepare_audio_upload_path(source_path: Path) -> tuple[Path, Callable[[], None]]:
+def _prepare_audio_upload_path(
+    source_path: Path,
+) -> tuple[Path, Callable[[], None]]:
     if source_path.suffix.lower() == ".mp3":
         return source_path, _noop_cleanup
 
@@ -1085,21 +1228,9 @@ def _convert_audio_to_mp3(source_path: Path) -> Path | None:
         subprocess.run(
             [
                 ffmpeg_path,
-                "-y",
-                "-hide_banner",
-                "-loglevel",
-                "error",
-                "-i",
+                "-y-hide_banner-loglevelerror-i",
                 str(source_path),
-                "-vn",
-                "-acodec",
-                "libmp3lame",
-                "-b:a",
-                "32k",
-                "-ac",
-                "1",
-                "-ar",
-                "16000",
+                "-vn-acodeclibmp3lame-b:a32k-ac1-ar16000",
                 str(converted_path),
             ],
             check=True,
@@ -1107,7 +1238,9 @@ def _convert_audio_to_mp3(source_path: Path) -> Path | None:
             text=True,
         )
     except (OSError, subprocess.CalledProcessError) as exc:
-        logger.warning("ffmpeg MP3 conversion failed for %s: %s", source_path.name, exc)
+        logger.warning(
+            "ffmpeg MP3 conversion failed for %s: %s", source_path.name, exc
+        )
         _cleanup_temp_audio_file(converted_path)
         return None
 
@@ -1131,9 +1264,11 @@ def _with_runtime_context(prompt: str) -> str:
 
 def _runtime_context_prompt() -> str:
     return (
-        f"Current day and time: {_format_runtime_datetime(_current_local_datetime())}.\n"
+        "Current day and time: "
+        f"{_format_runtime_datetime(_current_local_datetime())}.\n"
         f"User country: {_detect_user_country()}.\n"
-        "Use the current day, date, time, year, timezone, and user country above as the source of truth."
+        "Use the current day, date, time, year, timezone, and user country "
+        "above as the source of truth."
     )
 
 
@@ -1195,8 +1330,7 @@ def _local_timezone_name() -> str:
 def _locale_region_code() -> str:
     locale_names: list[str | None] = [locale.getlocale()[0]]
     locale_names.extend(
-        os.environ.get(name)
-        for name in ("LC_ALL", "LC_MESSAGES", "LANG")
+        os.environ.get(name) for name in ("LC_ALL", "LC_MESSAGES", "LANG")
     )
     for locale_name in locale_names:
         if not locale_name:
@@ -1240,10 +1374,11 @@ def _input_audio_payload_from_path(audio_path: Path) -> dict[str, str]:
 
 def _language_reply_instruction() -> str:
     return (
-        " Reply in the same language as the user's request, unless the user explicitly asks "
-        "you to use another language. If they ask for another language, answer in that "
-        "language immediately in the same reply. Do not claim you are limited to English "
-        "or cannot speak a requested language; attempt the requested language directly."
+        " Reply in the same language as the user's request, unless the user "
+        "explicitly asks you to use another language. If they ask for "
+        "another language, answer in that language immediately in the same "
+        "reply. Do not claim you are limited to English or cannot speak a "
+        "requested language; attempt the requested language directly."
     )
 
 
@@ -1439,9 +1574,29 @@ def _format_usage_summary(response) -> str:
         ("total", ("total_tokens",)),
         ("prompt", ("prompt_tokens", "input_tokens")),
         ("completion", ("completion_tokens", "output_tokens")),
-        ("reasoning", ("reasoning_tokens", "output_tokens_details.reasoning_tokens")),
-        ("cached", ("cached_tokens", "prompt_tokens_details.cached_tokens", "input_tokens_details.cached_tokens")),
-        ("cache_write", ("cache_write_tokens", "cache_creation_input_tokens", "prompt_tokens_details.cache_write_tokens", "prompt_tokens_details.cache_creation_input_tokens", "input_tokens_details.cache_write_tokens", "input_tokens_details.cache_creation_input_tokens")),
+        (
+            "reasoning",
+            ("reasoning_tokens", "output_tokens_details.reasoning_tokens"),
+        ),
+        (
+            "cached",
+            (
+                "cached_tokens",
+                "prompt_tokens_details.cached_tokens",
+                "input_tokens_details.cached_tokens",
+            ),
+        ),
+        (
+            "cache_write",
+            (
+                "cache_write_tokens",
+                "cache_creation_input_tokens",
+                "prompt_tokens_details.cache_write_tokens",
+                "prompt_tokens_details.cache_creation_input_tokens",
+                "input_tokens_details.cache_write_tokens",
+                "input_tokens_details.cache_creation_input_tokens",
+            ),
+        ),
         ("cost", ("cost",)),
     ):
         for key in keys:
@@ -1495,7 +1650,8 @@ def _normalize_usage_payload(value):
     if not public_attributes:
         return value
     return {
-        key: _normalize_usage_payload(item) for key, item in public_attributes.items()
+        key: _normalize_usage_payload(item)
+        for key, item in public_attributes.items()
     }
 
 

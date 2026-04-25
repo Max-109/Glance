@@ -46,7 +46,9 @@ class ProviderReasoningToggleTests(unittest.TestCase):
         self.assertEqual(provider._llm_reasoning_kwargs(), {})
         self.assertEqual(provider._llm_reasoning_label(), "off")
 
-    def test_transcription_reasoning_kwargs_are_omitted_when_toggle_is_off(self) -> None:
+    def test_transcription_reasoning_kwargs_are_omitted_when_toggle_is_off(
+        self,
+    ) -> None:
         settings = AppSettings.from_mapping(
             {
                 "llm_base_url": "https://api.example.com/v1",
@@ -100,7 +102,9 @@ class ProviderToolTurnTests(unittest.TestCase):
             )
         )
         provider._client = SimpleNamespace(
-            chat=SimpleNamespace(completions=SimpleNamespace(create=completions_create))
+            chat=SimpleNamespace(
+                completions=SimpleNamespace(create=completions_create)
+            )
         )
 
         turn = provider.run_tool_turn(
@@ -118,12 +122,18 @@ class ProviderToolTurnTests(unittest.TestCase):
         )
 
         self.assertEqual(turn.tool_calls[0].name, "web_search")
-        self.assertEqual(turn.tool_calls[0].arguments, {"query": "latest news"})
         self.assertEqual(
-            completions_create.call_args.kwargs["tools"][0]["function"]["name"],
+            turn.tool_calls[0].arguments, {"query": "latest news"}
+        )
+        self.assertEqual(
+            completions_create.call_args.kwargs["tools"][0]["function"][
+                "name"
+            ],
             "web_search",
         )
-        self.assertEqual(completions_create.call_args.kwargs["tool_choice"], "auto")
+        self.assertEqual(
+            completions_create.call_args.kwargs["tool_choice"], "auto"
+        )
 
     def test_openrouter_tool_turn_adds_cache_and_session_options(self) -> None:
         settings = AppSettings.from_mapping(
@@ -147,7 +157,9 @@ class ProviderToolTurnTests(unittest.TestCase):
             )
         )
         provider._client = SimpleNamespace(
-            chat=SimpleNamespace(completions=SimpleNamespace(create=completions_create))
+            chat=SimpleNamespace(
+                completions=SimpleNamespace(create=completions_create)
+            )
         )
 
         provider.run_tool_turn(
@@ -160,15 +172,22 @@ class ProviderToolTurnTests(unittest.TestCase):
         )
 
         kwargs = completions_create.call_args.kwargs
-        self.assertEqual(kwargs["extra_headers"]["x-session-affinity"], "session-123")
+        self.assertEqual(
+            kwargs["extra_headers"]["x-session-affinity"], "session-123"
+        )
         self.assertEqual(kwargs["extra_body"]["session_id"], "session-123")
-        self.assertEqual(kwargs["extra_body"]["prompt_cache_key"], "session-123")
+        self.assertEqual(
+            kwargs["extra_body"]["prompt_cache_key"], "session-123"
+        )
         self.assertEqual(kwargs["extra_body"]["usage"], {"include": True})
         self.assertEqual(
             kwargs["messages"][0]["content"][0]["cache_control"],
             {"type": "ephemeral"},
         )
-        self.assertEqual(kwargs["messages"][0]["content"][0]["text"], "stable live tool prompt")
+        self.assertEqual(
+            kwargs["messages"][0]["content"][0]["text"],
+            "stable live tool prompt",
+        )
         self.assertEqual(kwargs["messages"][1]["content"], "look at this")
 
     def test_non_openrouter_tool_turn_leaves_cache_options_out(self) -> None:
@@ -193,7 +212,9 @@ class ProviderToolTurnTests(unittest.TestCase):
             )
         )
         provider._client = SimpleNamespace(
-            chat=SimpleNamespace(completions=SimpleNamespace(create=completions_create))
+            chat=SimpleNamespace(
+                completions=SimpleNamespace(create=completions_create)
+            )
         )
 
         provider.run_tool_turn(
@@ -224,16 +245,22 @@ class ProviderToolTurnTests(unittest.TestCase):
                 usage=None,
                 choices=[
                     SimpleNamespace(
-                        message=SimpleNamespace(content="audio answer", tool_calls=[])
+                        message=SimpleNamespace(
+                            content="audio answer", tool_calls=[]
+                        )
                     )
                 ],
             )
         )
         provider._client = SimpleNamespace(
-            chat=SimpleNamespace(completions=SimpleNamespace(create=text_create))
+            chat=SimpleNamespace(
+                completions=SimpleNamespace(create=text_create)
+            )
         )
         audio_client = SimpleNamespace(
-            chat=SimpleNamespace(completions=SimpleNamespace(create=audio_create))
+            chat=SimpleNamespace(
+                completions=SimpleNamespace(create=audio_create)
+            )
         )
 
         turn = provider.run_tool_turn(
@@ -255,7 +282,9 @@ class ProviderToolTurnTests(unittest.TestCase):
 
 
 class ProviderAudioUploadTests(unittest.TestCase):
-    def test_multimodal_live_uses_mp3_audio_format_when_available(self) -> None:
+    def test_multimodal_live_uses_mp3_audio_format_when_available(
+        self,
+    ) -> None:
         settings = AppSettings.from_mapping(
             {
                 "llm_base_url": "https://api.example.com/v1",
@@ -269,16 +298,23 @@ class ProviderAudioUploadTests(unittest.TestCase):
         provider._settings = settings
         completions_create = unittest.mock.Mock(
             return_value=SimpleNamespace(
-                choices=[SimpleNamespace(message=SimpleNamespace(content="hello there"))]
+                choices=[
+                    SimpleNamespace(
+                        message=SimpleNamespace(content="hello there")
+                    )
+                ]
             )
         )
         provider._client = SimpleNamespace(
-            chat=SimpleNamespace(completions=SimpleNamespace(create=completions_create))
+            chat=SimpleNamespace(
+                completions=SimpleNamespace(create=completions_create)
+            )
         )
 
-        with tempfile.NamedTemporaryFile(suffix=".wav") as wav_file, tempfile.NamedTemporaryFile(
-            suffix=".mp3"
-        ) as mp3_file:
+        with (
+            tempfile.NamedTemporaryFile(suffix=".wav") as wav_file,
+            tempfile.NamedTemporaryFile(suffix=".mp3") as mp3_file,
+        ):
             wav_file.write(b"wav-audio")
             wav_file.flush()
             mp3_file.write(b"mp3-audio")
@@ -293,10 +329,14 @@ class ProviderAudioUploadTests(unittest.TestCase):
                 )
 
         self.assertEqual(reply.text, "hello there")
-        audio_part = completions_create.call_args.kwargs["messages"][1]["content"][1]
+        audio_part = completions_create.call_args.kwargs["messages"][1][
+            "content"
+        ][1]
         self.assertEqual(audio_part["input_audio"]["format"], "mp3")
 
-    def test_multimodal_tool_messages_include_audio_and_speech_tool_prompt(self) -> None:
+    def test_multimodal_tool_messages_include_audio_and_speech_tool_prompt(
+        self,
+    ) -> None:
         settings = AppSettings.from_mapping(
             {
                 "llm_base_url": "https://api.example.com/v1",
@@ -309,9 +349,10 @@ class ProviderAudioUploadTests(unittest.TestCase):
         provider = OpenAICompatibleProvider.__new__(OpenAICompatibleProvider)
         provider._settings = settings
 
-        with tempfile.NamedTemporaryFile(suffix=".wav") as wav_file, tempfile.NamedTemporaryFile(
-            suffix=".mp3"
-        ) as mp3_file:
+        with (
+            tempfile.NamedTemporaryFile(suffix=".wav") as wav_file,
+            tempfile.NamedTemporaryFile(suffix=".mp3") as mp3_file,
+        ):
             wav_file.write(b"wav-audio")
             wav_file.flush()
             mp3_file.write(b"mp3-audio")
@@ -323,12 +364,16 @@ class ProviderAudioUploadTests(unittest.TestCase):
             ):
                 messages = provider.build_live_tool_messages_from_audio(
                     audio_path=wav_file.name,
-                    conversation_history=[{"role": "assistant", "content": "previous"}],
+                    conversation_history=[
+                        {"role": "assistant", "content": "previous"}
+                    ],
                 )
 
         self.assertIn("Runtime tools are available", messages[0]["content"])
         self.assertIn("VOICE_ID", messages[0]["content"])
-        self.assertEqual(messages[1], {"role": "assistant", "content": "previous"})
+        self.assertEqual(
+            messages[1], {"role": "assistant", "content": "previous"}
+        )
         audio_part = messages[2]["content"][1]
         self.assertEqual(audio_part["type"], "input_audio")
         self.assertEqual(audio_part["input_audio"]["format"], "mp3")

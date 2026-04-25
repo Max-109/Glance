@@ -49,14 +49,18 @@ class FakeLLMAgent:
     def prepare_speech_text(
         self, *, text: str
     ) -> str:  # pragma: no cover - regression guard.
-        raise AssertionError("live strategy should not call prepare_speech_text")
+        raise AssertionError(
+            "live strategy should not call prepare_speech_text"
+        )
 
 
 class FakeTTSAgent:
     def __init__(self) -> None:
         self.calls: list[tuple[str, str, str | None]] = []
 
-    def run(self, *, text: str, output_path: str, voice_id: str | None = None) -> str:
+    def run(
+        self, *, text: str, output_path: str, voice_id: str | None = None
+    ) -> str:
         self.calls.append((text, output_path, voice_id))
         return output_path
 
@@ -76,14 +80,18 @@ class FakeToolLLMAgent:
         self.prepare_inputs: list[str] = []
         self.prepared_reply_text = prepared_reply_text
 
-    def build_live_tool_messages(self, *, transcript, conversation_history=None):
+    def build_live_tool_messages(
+        self, *, transcript, conversation_history=None
+    ):
         return [
             {"role": "system", "content": "tool system"},
             *list(conversation_history or []),
             {"role": "user", "content": transcript},
         ]
 
-    def build_live_tool_messages_from_audio(self, *, audio_path, conversation_history=None):
+    def build_live_tool_messages_from_audio(
+        self, *, audio_path, conversation_history=None
+    ):
         self.audio_paths.append(audio_path)
         return [
             {"role": "system", "content": "multimodal tool system"},
@@ -92,7 +100,10 @@ class FakeToolLLMAgent:
                 "role": "user",
                 "content": [
                     {"type": "text", "text": "listen and use tools"},
-                    {"type": "input_audio", "input_audio": {"data": "audio", "format": "wav"}},
+                    {
+                        "type": "input_audio",
+                        "input_audio": {"data": "audio", "format": "wav"},
+                    },
                 ],
             },
         ]
@@ -104,7 +115,9 @@ class FakeToolLLMAgent:
 
     def run_multimodal_tool_turn(self, *, messages, tools, session_id=None):
         self.multimodal_turn_count += 1
-        return self.run_tool_turn(messages=messages, tools=tools, session_id=session_id)
+        return self.run_tool_turn(
+            messages=messages, tools=tools, session_id=session_id
+        )
 
     def prepare_speech_text(self, *, text, session_id=None):
         self.prepare_inputs.append(text)
@@ -134,6 +147,26 @@ class FakeToolScreenCaptureAgent:
         return str(path)
 
 
+class FakeOCRAgent:
+    def __init__(self, text: str = "Screen text") -> None:
+        self.text = text
+        self.image_paths: list[str] = []
+        self.instructions: list[str] = []
+
+    def run(self, *, image_path, instruction=""):
+        self.image_paths.append(image_path)
+        self.instructions.append(instruction)
+        return self.text
+
+
+class FakeClipboardService:
+    def __init__(self) -> None:
+        self.last_copied_text = ""
+
+    def copy_text(self, text: str) -> None:
+        self.last_copied_text = text
+
+
 def _tool_settings(**overrides) -> AppSettings:
     values = {
         "llm_base_url": "https://api.example.com/v1",
@@ -158,11 +191,15 @@ def _tool_turn(*, content: str = "", tool_calls=None) -> SimpleNamespace:
 
 
 def _tool_call(name: str, arguments: dict) -> SimpleNamespace:
-    return SimpleNamespace(call_id=f"call-{name}", name=name, arguments=arguments)
+    return SimpleNamespace(
+        call_id=f"call-{name}", name=name, arguments=arguments
+    )
 
 
 def _notice_call(name: str, arguments: dict) -> ToolCallRequest:
-    return ToolCallRequest(call_id=f"call-{name}", name=name, arguments=arguments)
+    return ToolCallRequest(
+        call_id=f"call-{name}", name=name, arguments=arguments
+    )
 
 
 class LiveStrategyTests(unittest.TestCase):
@@ -197,7 +234,9 @@ class LiveStrategyTests(unittest.TestCase):
         self.assertEqual(interaction.response, "[curious] Hello there!")
         self.assertTrue(interaction.speech_path.endswith(".wav"))
 
-    def test_execute_replays_prior_live_turns_into_conversation_history(self) -> None:
+    def test_execute_replays_prior_live_turns_into_conversation_history(
+        self,
+    ) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             llm_agent = FakeLLMAgent()
             strategy = LiveStrategy(
@@ -216,7 +255,9 @@ class LiveStrategyTests(unittest.TestCase):
                 )
             )
 
-            strategy.execute({"recording_path": "input.wav", "session": session})
+            strategy.execute(
+                {"recording_path": "input.wav", "session": session}
+            )
 
         self.assertEqual(
             llm_agent.calls[0]["conversation_history"],
@@ -226,7 +267,9 @@ class LiveStrategyTests(unittest.TestCase):
             ],
         )
 
-    def test_execute_emits_stage_updates_for_transcribe_reply_and_voice(self) -> None:
+    def test_execute_emits_stage_updates_for_transcribe_reply_and_voice(
+        self,
+    ) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             stages: list[tuple[str, str]] = []
             strategy = LiveStrategy(
@@ -253,14 +296,16 @@ class LiveStrategyTests(unittest.TestCase):
             ],
         )
 
-    def test_multimodal_tool_mode_uses_audio_runs_screenshot_and_sends_image_to_model(
+    def test_multimodal_tool_uses_audio_screenshot_and_sends_image(
         self,
     ) -> None:
         llm_agent = FakeToolLLMAgent(
             [
                 _tool_turn(
                     tool_calls=[
-                        _tool_call("take_screenshot", {"reason": "inspect code"})
+                        _tool_call(
+                            "take_screenshot", {"reason": "inspect code"}
+                        )
                     ]
                 ),
                 _tool_turn(content="The screen shows a Python function."),
@@ -283,7 +328,9 @@ class LiveStrategyTests(unittest.TestCase):
             {
                 "recording_path": "input.wav",
                 "tool_notice_callback": notices.append,
-                "status_callback": lambda state, message: stages.append((state, message)),
+                "status_callback": lambda state, message: stages.append(
+                    (state, message)
+                ),
             }
         )
 
@@ -300,11 +347,17 @@ class LiveStrategyTests(unittest.TestCase):
         )
         self.assertNotIn(("transcribing", "Transcribing..."), stages)
         self.assertTrue(screen_capture_agent.called)
-        self.assertEqual(notices, ["I'll take a quick screenshot of your code."])
+        self.assertEqual(
+            notices, ["I'll take a quick screenshot of your code."]
+        )
         self.assertEqual(llm_agent.prepare_inputs, [])
-        self.assertEqual(interaction.response, "The screen shows a Python function.")
+        self.assertEqual(
+            interaction.response, "The screen shows a Python function."
+        )
         self.assertEqual(interaction.tool_calls[0].status, "success")
-        self.assertEqual(interaction.tool_calls[0].tool_name, "take_screenshot")
+        self.assertEqual(
+            interaction.tool_calls[0].tool_name, "take_screenshot"
+        )
         self.assertEqual(
             tts_agent.calls[0][0],
             "The screen shows a Python function....",
@@ -312,7 +365,9 @@ class LiveStrategyTests(unittest.TestCase):
         second_turn_messages = llm_agent.message_snapshots[1]
         self.assertTrue(_messages_include_image(second_turn_messages))
 
-    def test_text_tool_mode_still_transcribes_when_multimodal_is_off(self) -> None:
+    def test_text_tool_mode_still_transcribes_when_multimodal_is_off(
+        self,
+    ) -> None:
         llm_agent = FakeToolLLMAgent([_tool_turn(content="No tool needed.")])
         transcription_agent = FakeTranscriptionAgent()
         strategy = LiveStrategy(
@@ -330,10 +385,12 @@ class LiveStrategyTests(unittest.TestCase):
         self.assertEqual(interaction.transcript, "transcript for input.wav")
         self.assertEqual(interaction.response, "spoken:No tool needed.")
 
-    def test_tool_mode_uses_original_answer_when_speech_prep_drifts(self) -> None:
+    def test_tool_mode_uses_original_answer_when_speech_prep_drifts(
+        self,
+    ) -> None:
         final_answer = (
-            "You're working in a text editor. It looks like you're looking at log files "
-            "for a python3 main.py script."
+            "You're working in a text editor. It looks like you're looking "
+            "at log files for a python3 main.py script."
         )
         llm_agent = FakeToolLLMAgent(
             [
@@ -348,8 +405,8 @@ class LiveStrategyTests(unittest.TestCase):
                 _tool_turn(content=final_answer),
             ],
             prepared_reply_text=(
-                "[chuckles] You caught me deep in the weeds here. I was tracking "
-                "down a stubborn latency spike."
+                "[chuckles] You caught me deep in the weeds here. I was "
+                "tracking down a stubborn latency spike."
             ),
         )
         tts_agent = FakeTTSAgent()
@@ -376,6 +433,7 @@ class LiveStrategyTests(unittest.TestCase):
             screen_capture_agent=FakeToolScreenCaptureAgent(),
             settings=_tool_settings(
                 tool_take_screenshot_policy="deny",
+                tool_ocr_policy="deny",
                 tool_web_search_policy="allow",
                 tool_web_fetch_policy="deny",
             ),
@@ -384,9 +442,147 @@ class LiveStrategyTests(unittest.TestCase):
         strategy.execute({"recording_path": "input.wav"})
 
         tool_names = [
-            payload["function"]["name"] for payload in llm_agent.tool_payloads[0]
+            payload["function"]["name"]
+            for payload in llm_agent.tool_payloads[0]
         ]
-        self.assertEqual(tool_names, ["web_search"])
+        self.assertEqual(tool_names, ["web_search", "end_live_session"])
+
+    def test_live_control_tool_is_available_when_runtime_tools_are_off(
+        self,
+    ) -> None:
+        llm_agent = FakeToolLLMAgent([_tool_turn(content="No tool needed.")])
+        strategy = LiveStrategy(
+            transcription_agent=FakeTranscriptionAgent(),
+            llm_agent=llm_agent,
+            tts_agent=FakeTTSAgent(),
+            settings=_tool_settings(tools_enabled=False),
+        )
+
+        strategy.execute({"recording_path": "input.wav"})
+
+        tool_names = [
+            payload["function"]["name"]
+            for payload in llm_agent.tool_payloads[0]
+        ]
+        self.assertEqual(tool_names, ["end_live_session"])
+
+    def test_tool_mode_ocr_tool_captures_extracts_and_copies_screen_text(
+        self,
+    ) -> None:
+        screen_capture_agent = FakeToolScreenCaptureAgent()
+        ocr_agent = FakeOCRAgent("Here is the extracted text:\nRead me")
+        clipboard_service = FakeClipboardService()
+        notices: list[str] = []
+        stages: list[tuple[str, str]] = []
+        llm_agent = FakeToolLLMAgent(
+            [
+                _tool_turn(
+                    tool_calls=[
+                        _tool_call(
+                            "ocr_screen",
+                            {
+                                "instruction": (
+                                    "Extract only the YouTube video headline."
+                                ),
+                                "reason": "read text",
+                            },
+                        ),
+                    ]),
+                _tool_turn(content="This turn should not run."),
+            ])
+        tts_agent = FakeTTSAgent()
+        strategy = LiveStrategy(
+            transcription_agent=FakeTranscriptionAgent(),
+            llm_agent=llm_agent,
+            tts_agent=tts_agent,
+            screen_capture_agent=screen_capture_agent,
+            ocr_agent=ocr_agent,
+            clipboard_service=clipboard_service,
+            settings=_tool_settings(),
+        )
+
+        interaction = strategy.execute(
+            {
+                "recording_path": "input.wav",
+                "tool_notice_callback": notices.append,
+                "status_callback": lambda state, message: stages.append(
+                    (state, message)
+                ),
+            }
+        )
+
+        self.assertTrue(screen_capture_agent.called)
+        self.assertEqual(clipboard_service.last_copied_text, "Read me")
+        self.assertEqual(
+            ocr_agent.instructions,
+            ["Extract only the YouTube video headline."],
+        )
+        self.assertEqual(len(llm_agent.message_snapshots), 1)
+        self.assertEqual(
+            llm_agent.prepare_inputs,
+            ["Done, I copied it to your clipboard. Anything else?"],
+        )
+        self.assertEqual(
+            tts_agent.calls[0][0],
+            "spoken:Done, I copied it to your clipboard. Anything else?...",
+        )
+        self.assertEqual(notices, [])
+        self.assertIn(("idle", "OCR copied text to clipboard."), stages)
+        self.assertEqual(interaction.tool_calls[0].tool_name, "ocr_screen")
+        self.assertEqual(interaction.tool_calls[0].status, "success")
+        self.assertEqual(
+            interaction.response,
+            "spoken:Done, I copied it to your clipboard. Anything else?",
+        )
+        self.assertTrue(interaction.speech_path.endswith(".wav"))
+
+    def test_end_live_session_tool_returns_terminal_live_turn(self) -> None:
+        llm_agent = FakeToolLLMAgent(
+            [
+                _tool_turn(
+                    tool_calls=[
+                        _tool_call(
+                            "end_live_session",
+                            {"reason": "user said no"},
+                        )
+                    ]
+                )
+            ]
+        )
+        tts_agent = FakeTTSAgent()
+        stages: list[tuple[str, str]] = []
+        strategy = LiveStrategy(
+            transcription_agent=FakeTranscriptionAgent(),
+            llm_agent=llm_agent,
+            tts_agent=tts_agent,
+            settings=_tool_settings(tools_enabled=False),
+        )
+
+        interaction = strategy.execute(
+            {
+                "recording_path": "input.wav",
+                "status_callback": lambda state, message: stages.append(
+                    (state, message)
+                ),
+            }
+        )
+
+        self.assertEqual(tts_agent.calls, [])
+        self.assertEqual(interaction.response, "Live ended.")
+        self.assertEqual(interaction.speech_path, "")
+        self.assertEqual(
+            interaction.tool_calls[0].tool_name,
+            "end_live_session",
+        )
+        self.assertIn(("idle", "Live ended."), stages)
+
+    def test_ocr_tool_notice_is_silent(self) -> None:
+        notice = compose_tool_notice(
+            _notice_call("ocr_screen", {"reason": "read text"}),
+            ToolNoticeContext(user_context="extract the text"),
+        )
+
+        self.assertEqual(notice, "")
 
     def test_tool_mode_invalid_arguments_do_not_execute_tool(self) -> None:
         screen_capture_agent = FakeToolScreenCaptureAgent()
@@ -397,7 +593,9 @@ class LiveStrategyTests(unittest.TestCase):
                         _tool_call("take_screenshot", {"unexpected": "value"})
                     ]
                 ),
-                _tool_turn(content="I cannot inspect the screen from that call."),
+                _tool_turn(
+                    content="I cannot inspect the screen from that call."
+                ),
             ]
         )
         strategy = LiveStrategy(
@@ -418,12 +616,16 @@ class LiveStrategyTests(unittest.TestCase):
             ["I cannot inspect the screen from that call."],
         )
 
-    def test_tool_mode_keeps_parallel_tool_results_before_image_followups(self) -> None:
+    def test_tool_mode_keeps_parallel_tool_results_before_image_followups(
+        self,
+    ) -> None:
         llm_agent = FakeToolLLMAgent(
             [
                 _tool_turn(
                     tool_calls=[
-                        _tool_call("take_screenshot", {"reason": "inspect code"}),
+                        _tool_call(
+                            "take_screenshot", {"reason": "inspect code"}
+                        ),
                         _tool_call("unknown_tool", {}),
                     ]
                 ),
@@ -447,7 +649,9 @@ class LiveStrategyTests(unittest.TestCase):
 
     def test_search_notice_mentions_weather_location(self) -> None:
         notice = compose_tool_notice(
-            _notice_call("web_search", {"query": "current weather in Vilnius"}),
+            _notice_call(
+                "web_search", {"query": "current weather in Vilnius"}
+            ),
             ToolNoticeContext(user_context="what is the weather in Vilnius"),
         )
 
@@ -455,7 +659,9 @@ class LiveStrategyTests(unittest.TestCase):
 
     def test_repeated_generic_search_notice_is_suppressed(self) -> None:
         context = ToolNoticeContext(user_context="look that up")
-        call = _notice_call("web_search", {"query": "what is Gemini 3.1 Flash"})
+        call = _notice_call(
+            "web_search", {"query": "what is Gemini 3.1 Flash"}
+        )
         next_call = _notice_call("web_search", {"query": "what is Flash Lite"})
 
         notice = compose_tool_notice(call, context)
@@ -497,7 +703,12 @@ class LiveStrategyTests(unittest.TestCase):
         notice = compose_tool_notice(
             _notice_call(
                 "web_fetch",
-                {"url": "https://very-long-dashed-source-name.example.com/page"},
+                {
+                    "url": (
+                        "https://very-long-dashed-source-name.example.com/"
+                        "page"
+                    )
+                },
             ),
             context,
         )
@@ -507,8 +718,14 @@ class LiveStrategyTests(unittest.TestCase):
     def test_screenshot_notice_uses_reason(self) -> None:
         cases = [
             ("inspect code", "I'll take a quick screenshot of your code."),
-            ("read the traceback error", "I'll take a quick screenshot of the error."),
-            ("look at the screen", "I'll take a quick screenshot of your screen."),
+            (
+                "read the traceback error",
+                "I'll take a quick screenshot of the error.",
+            ),
+            (
+                "look at the screen",
+                "I'll take a quick screenshot of your screen.",
+            ),
             ("", "I'll take a quick screenshot."),
         ]
 

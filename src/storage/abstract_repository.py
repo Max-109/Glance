@@ -9,20 +9,20 @@ T = TypeVar("T")
 class AbstractRepository(ABC, Generic[T]):
     @abstractmethod
     def load(self) -> list[T]:
-        """Load all entities from persistent storage."""
+        "Load all entities from persistent storage."
 
     @abstractmethod
     def save(self, entities: list[T]) -> None:
-        """Persist all entities to storage."""
+        "Persist all entities to storage."
 
     @abstractmethod
     def add(self, entity: T) -> None:
-        """Add one entity to storage."""
+        "Add one entity to storage."
 
     @abstractmethod
     def remove(self, entity_id: str) -> None:
-        """Remove one entity from storage."""
+        "Remove one entity from storage."
 
     @abstractmethod
     def list_all(self) -> list[T]:
-        """Return all in-memory entities."""
+        "Return all in-memory entities."

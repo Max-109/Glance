@@ -65,7 +65,11 @@ class QtAudioPlaybackService(QObject):
     ) -> None:
         if Signal is None:
             raise ProviderError("Qt multimedia playback is unavailable.")
-        if QMediaPlayer is None and QAudioSink is None and QAudioOutput is None:
+        if (
+            QMediaPlayer is None
+            and QAudioSink is None
+            and QAudioOutput is None
+        ):
             raise ProviderError("Qt multimedia playback is unavailable.")
         super().__init__()
         self._device_service = device_service or AudioDeviceService()
@@ -106,8 +110,12 @@ class QtAudioPlaybackService(QObject):
         self._play_requested.connect(self._play_on_main_thread)
         self._stop_requested.connect(self._stop_on_main_thread)
         if self._player is not None:
-            self._player.mediaStatusChanged.connect(self._on_media_status_changed)
-            playback_state_changed = getattr(self._player, "playbackStateChanged", None)
+            self._player.mediaStatusChanged.connect(
+                self._on_media_status_changed
+            )
+            playback_state_changed = getattr(
+                self._player, "playbackStateChanged", None
+            )
             if playback_state_changed is not None:
                 playback_state_changed.connect(self._on_playback_state_changed)
             position_changed = getattr(self._player, "positionChanged", None)
@@ -123,12 +131,16 @@ class QtAudioPlaybackService(QObject):
         self._output_device_id = output_device_id or "default"
         if self._output is None:
             return
-        device = self._device_service.resolve_output_device(self._output_device_id)
+        device = self._device_service.resolve_output_device(
+            self._output_device_id
+        )
         set_device = getattr(self._output, "setDevice", None)
         if callable(set_device) and device is not None:
             set_device(device)
 
-    def play_blocking(self, audio_path: str, stop_event: Event | None = None) -> str:
+    def play_blocking(
+        self, audio_path: str, stop_event: Event | None = None
+    ) -> str:
         if not Path(audio_path).exists():
             raise ProviderError(f"Speech file does not exist: {audio_path}")
 
@@ -169,7 +181,9 @@ class QtAudioPlaybackService(QObject):
             return
 
         if self._player is None or QUrl is None:
-            self._error_message = "Audio playback is unavailable for this file format."
+            self._error_message = (
+                "Audio playback is unavailable for this file format."
+            )
             self._finish_playback(playback_id)
             return
 
@@ -389,7 +403,9 @@ class QtAudioPlaybackService(QObject):
         self._audio_sink_state_connected = False
 
     def _should_use_audio_sink(self, audio_path: str) -> bool:
-        return self._wav_playback_available() and _is_riff_wave_file(Path(audio_path))
+        return self._wav_playback_available() and _is_riff_wave_file(
+            Path(audio_path)
+        )
 
     def _wav_playback_available(self) -> bool:
         return all(
@@ -413,12 +429,16 @@ class QtAudioPlaybackService(QObject):
                 "WAV audio playback could not open the decoded audio buffer."
             )
 
-        device = self._device_service.resolve_output_device(self._output_device_id)
+        device = self._device_service.resolve_output_device(
+            self._output_device_id
+        )
         if device is None:
             self._audio_sink = QAudioSink(audio_format, self)
         else:
             self._audio_sink = QAudioSink(device, audio_format, self)
-        self._audio_sink.stateChanged.connect(self._on_audio_sink_state_changed)
+        self._audio_sink.stateChanged.connect(
+            self._on_audio_sink_state_changed
+        )
         self._audio_sink_state_connected = True
         self._playback_started = True
         self._audio_sink.start(self._audio_buffer)
@@ -432,7 +452,9 @@ class QtAudioPlaybackService(QObject):
             audio_format = QAudioFormat()
             audio_format.setChannelCount(wav_file.getnchannels())
             audio_format.setSampleRate(wav_file.getframerate())
-            self._configure_wav_sample_format(audio_format, wav_file.getsampwidth())
+            self._configure_wav_sample_format(
+                audio_format, wav_file.getsampwidth()
+            )
             return audio_format, wav_file.readframes(wav_file.getnframes())
 
     def _configure_wav_sample_format(
@@ -442,7 +464,9 @@ class QtAudioPlaybackService(QObject):
             sample_format = _resolve_sample_format(sample_width_bytes)
             if sample_format is None:
                 raise ProviderError(
-                    f"Unsupported WAV sample width: {sample_width_bytes * 8} bits."
+                    f"Unsupported WAV sample width: {
+                        sample_width_bytes * 8
+                    } bits."
                 )
             audio_format.setSampleFormat(sample_format)
             return
@@ -451,7 +475,8 @@ class QtAudioPlaybackService(QObject):
         set_byte_order = getattr(audio_format, "setByteOrder", None)
         set_sample_type = getattr(audio_format, "setSampleType", None)
         if not all(
-            callable(method) for method in (set_sample_size, set_codec, set_sample_type)
+            callable(method)
+            for method in (set_sample_size, set_codec, set_sample_type)
         ):
             raise ProviderError(
                 "WAV audio playback could not configure the output format."
@@ -536,4 +561,6 @@ def _is_riff_wave_file(audio_path: Path) -> bool:
         header = audio_path.read_bytes()[:12]
     except OSError:
         return False
-    return len(header) >= 12 and header[:4] == b"RIFF" and header[8:12] == b"WAVE"
+    return (
+        len(header) >= 12 and header[:4] == b"RIFF" and header[8:12] == b"WAVE"
+    )

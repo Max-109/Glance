@@ -53,7 +53,9 @@ QT_SPECIAL_KEYS = {
 
 
 def normalize_keybind(value: str) -> str:
-    parts = [segment.strip() for segment in str(value).split("+") if segment.strip()]
+    parts = [
+        segment.strip() for segment in str(value).split("+") if segment.strip()
+    ]
     if not parts:
         raise ValidationError("Shortcut cannot be empty.")
 
@@ -67,7 +69,9 @@ def normalize_keybind(value: str) -> str:
                 normalized_modifiers.append(canonical_modifier)
             continue
         if main_key:
-            raise ValidationError("Shortcut must have exactly one non-modifier key.")
+            raise ValidationError(
+                "Shortcut must have exactly one non-modifier key."
+            )
         main_key = _normalize_main_key(upper_part)
 
     if not main_key:
@@ -102,16 +106,7 @@ def to_pynput_hotkey(value: str) -> str:
     if last_part.startswith("F") and last_part[1:].isdigit():
         converted.append(f"<{last_part.lower()}>")
     elif last_part in {
-        "SPACE",
-        "TAB",
-        "ENTER",
-        "ESC",
-        "BACKSPACE",
-        "DELETE",
-        "UP",
-        "DOWN",
-        "LEFT",
-        "RIGHT",
+        "SPACETABENTERESCBACKSPACEDELETEUPDOWNLEFTRIGHT",
     }:
         translated = {
             "SPACE": "space",
@@ -133,7 +128,9 @@ def to_pynput_hotkey(value: str) -> str:
 
 def qt_event_to_keybind(key: int, modifiers: int, text: str) -> str | None:
     if Qt is None:
-        raise RuntimeError("Qt is required to build a shortcut from key events.")
+        raise RuntimeError(
+            "Qt is required to build a shortcut from key events."
+        )
 
     key_value = _enum_value(key)
     modifier_value = _enum_value(modifiers)

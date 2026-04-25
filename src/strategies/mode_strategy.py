@@ -15,4 +15,4 @@ def force_pause_at_end_for_tts(text: str) -> str:
 class ModeStrategy(ABC):
     @abstractmethod
     def execute(self, context: dict) -> BaseInteraction:
-        """Run one mode workflow and return the resulting interaction."""
+        "Run one mode workflow and return the resulting interaction."

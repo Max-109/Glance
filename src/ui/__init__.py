@@ -1,1 +1,1 @@
-"""User interface adapters."""
+"User interface adapters."

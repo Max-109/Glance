@@ -19,7 +19,10 @@ from src.services.providers import (
     OpenAICompatibleProvider,
 )
 from src.services.settings_manager import SettingsManager
-from src.storage.json_storage import JsonSettingsStore, SessionDirectoryRepository
+from src.storage.json_storage import (
+    JsonSettingsStore,
+    SessionDirectoryRepository,
+)
 
 
 class Orchestrator:
@@ -89,7 +92,9 @@ class Orchestrator:
 
 def build_orchestrator() -> Orchestrator:
     paths = build_app_paths()
-    settings_manager = SettingsManager(store=JsonSettingsStore(paths.config_file))
+    settings_manager = SettingsManager(
+        store=JsonSettingsStore(paths.config_file)
+    )
     settings = settings_manager.load()
     history_repository = SessionDirectoryRepository(paths.sessions_dir)
     history_manager = HistoryManager(

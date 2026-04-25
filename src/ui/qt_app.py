@@ -7,14 +7,32 @@ import logging
 from pathlib import Path
 from threading import Thread
 
-from PySide6.QtCore import QByteArray, QCoreApplication, QObject, Qt, QTimer, Signal
-from PySide6.QtGui import QAction, QColor, QCursor, QFont, QIcon, QPainter, QPixmap
+from PySide6.QtCore import (
+    QByteArray,
+    QCoreApplication,
+    QObject,
+    Qt,
+    QTimer,
+    Signal,
+)
+from PySide6.QtGui import (
+    QAction,
+    QColor,
+    QCursor,
+    QFont,
+    QIcon,
+    QPainter,
+    QPixmap,
+)
 from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import QApplication, QMenu, QSystemTrayIcon
 
 from src.core.orchestrator import build_orchestrator_with_dependencies
 from src.services.app_paths import build_app_paths
-from src.services.app_logging import configure_app_logging, update_console_logging_accent
+from src.services.app_logging import (
+    configure_app_logging,
+    update_console_logging_accent,
+)
 from src.services.audio_playback import QtAudioPlaybackService
 from src.services.audio_recording import build_live_audio_recorder
 from src.services.audio_signal import AudioTestSignalService
@@ -27,9 +45,13 @@ from src.services.providers import (
     OpenAICompatibleProvider,
 )
 from src.services.settings_manager import SettingsManager
-from src.storage.json_storage import JsonSettingsStore, SessionDirectoryRepository
+from src.storage.json_storage import (
+    JsonSettingsStore,
+    SessionDirectoryRepository,
+)
 from src.ui.electron_bridge import SettingsBridgeServer
 from src.ui.electron_window import ElectronShellController
+from src.ui.ocr_capture import OCRCaptureController
 from src.ui.runtime_visual import (
     current_epoch_ms,
     effective_visual_state,
@@ -61,7 +83,9 @@ class TrayIconController(QObject):
         self._animation_timer.setSingleShot(True)
         self._animation_timer.timeout.connect(self._handle_visual_tick)
 
-        app.styleHints().colorSchemeChanged.connect(self._handle_color_scheme_changed)
+        app.styleHints().colorSchemeChanged.connect(
+            self._handle_color_scheme_changed
+        )
         self._refresh_animation()
         self._apply_icon()
 
@@ -80,7 +104,9 @@ class TrayIconController(QObject):
         self._refresh_animation()
         self._apply_icon()
 
-    def runtime_status(self, *, message: str, revision: int) -> dict[str, int | str]:
+    def runtime_status(
+        self, *, message: str, revision: int
+    ) -> dict[str, int | str]:
         return {
             "runtimeState": self._base_state,
             "runtimeMessage": str(message).strip() or "Live is idle.",
@@ -142,9 +168,9 @@ class LiveCueController:
         self._playback_service = QtAudioPlaybackService(
             output_device_id=output_device_id,
         )
-        self._cue_paths = (signal_service or AudioTestSignalService()).write_live_mode_cues(
-            audio_feedback_dir
-        )
+        self._cue_paths = (
+            signal_service or AudioTestSignalService()
+        ).write_live_mode_cues(audio_feedback_dir)
         self._previous_state: str | None = None
         self._previous_message = ""
         self._enabled = True
@@ -204,8 +230,16 @@ def _cue_key_for_status_transition(
     if previous_state == "idle" and normalized_state == "listening":
         return "start"
     if normalized_state == "speaking" and normalized_message == "Speaking...":
-        if previous_state != "speaking" or previous_message != normalized_message:
+        if (
+            previous_state != "speaking"
+            or previous_message != normalized_message
+        ):
             return "reply_ready"
+    if normalized_state == "idle" and normalized_message in {
+        "OCR copied text to clipboard.",
+        "OCR found no visible text. Clipboard cleared.",
+    }:
+        return "ocr_complete"
     if normalized_state == "idle" and normalized_message in {
         "Live stopped.",
         "No speech detected. Live is idle.",
@@ -227,9 +261,13 @@ def run_settings_app() -> int:
         app.setWindowIcon(app_icon)
 
     paths = build_app_paths()
-    settings_manager = SettingsManager(store=JsonSettingsStore(paths.config_file))
+    settings_manager = SettingsManager(
+        store=JsonSettingsStore(paths.config_file)
+    )
     settings = settings_manager.load()
-    log_file = configure_app_logging(paths.root_dir, accent_color=settings.accent_color)
+    log_file = configure_app_logging(
+        paths.root_dir, accent_color=settings.accent_color
+    )
     logger = logging.getLogger("glance.ui")
     logger.debug("launch pid=%s", os.getpid())
     logger.debug("log file: %s", log_file)
@@ -249,6 +287,22 @@ def run_settings_app() -> int:
         paths=paths,
         output_device_id=settings.audio_output_device,
         logger=logger,
+    )
+    tray_holder = {}
+
+    def show_ocr_message(message: str, kind: str) -> None:
+        controller._apply_status_update(message, kind)
+        tray = tray_holder.get("tray")
+        if tray is not None and kind in {"success", "error"}:
+            tray.showMessage("Glance", message)
+
+    ocr_controller = OCRCaptureController(
+        orchestrator_factory=lambda: _build_runtime_orchestrator(
+            settings_manager=settings_manager,
+            history_manager=history_manager,
+            paths=paths,
+        ),
+        on_message=show_ocr_message,
     )
 
     def persist_electron_window_size(width: int, height: int) -> None:
@@ -281,9 +335,11 @@ def run_settings_app() -> int:
         controller,
         live_controller,
         live_cue_controller,
+        ocr_controller.start,
         settings_bridge,
         log_file,
     )
+    tray_holder["tray"] = tray
     tray.show()
     if _env_flag_enabled("GLANCE_AUTO_OPEN"):
         QTimer.singleShot(
@@ -293,15 +349,11 @@ def run_settings_app() -> int:
         callbacks={
             "live": live_controller.toggle,
             "quick": lambda: tray.showMessage(
-                "Glance",
-                "Quick Ask keybind is saved, but Quick Ask isn't available yet.",
+                "GlanceQuick Ask keybind is saved, but Quick Ask isn't "
+                "available yet.",
             ),
-            "ocr": lambda: tray.showMessage(
-                "Glance",
-                "Read Screen keybind is saved, but Read Screen isn't available yet.",
-            ),
-        }
-    )
+            "ocr": ocr_controller.start,
+        })
     runtime_refresh_timer = QTimer(app)
     runtime_refresh_timer.setSingleShot(True)
     pending_hotkey_refresh = False
@@ -327,8 +379,12 @@ def run_settings_app() -> int:
             logger.exception("Live orchestrator unavailable during refresh")
             tray.showMessage("Glance", f"Live unavailable: {exc}")
         try:
-            live_controller.set_recorder(_build_live_recorder(persisted_settings))
-            live_controller.set_output_device(persisted_settings.audio_output_device)
+            live_controller.set_recorder(
+                _build_live_recorder(persisted_settings)
+            )
+            live_controller.set_output_device(
+                persisted_settings.audio_output_device
+            )
             if live_cue_controller is not None:
                 live_cue_controller.set_output_device(
                     persisted_settings.audio_output_device
@@ -364,11 +420,16 @@ def run_settings_app() -> int:
 
     def handle_binding_change() -> None:
         if controller.bindingActive:
-            logger.debug("suspending hotkeys for keybind capture: %s", controller.bindingField)
+            logger.debug(
+                "suspending hotkeys for keybind capture: %s",
+                controller.bindingField,
+            )
             hotkey_manager.set_enabled(False)
             runtime_refresh_timer.stop()
             return
-        logger.debug("keybind capture ended; waiting for window hide before refresh")
+        logger.debug(
+            "keybind capture ended; waiting for window hide before refresh"
+        )
         schedule_hotkey_refresh_when_window_hides()
 
     controller.savedSettingsChanged.connect(schedule_runtime_refresh)
@@ -378,6 +439,7 @@ def run_settings_app() -> int:
     if live_cue_controller is not None:
         app.aboutToQuit.connect(live_cue_controller.stop)
     app.aboutToQuit.connect(live_controller.stop)
+    app.aboutToQuit.connect(ocr_controller.stop)
     app.aboutToQuit.connect(controller.stopVoicePreview)
     app.aboutToQuit.connect(controller.stopAudioInputTest)
     app.aboutToQuit.connect(controller.stopSpeakerTest)
@@ -419,6 +481,7 @@ def _build_tray_icon(
     controller: SettingsViewModel,
     live_controller: LiveSessionController,
     live_cue_controller: LiveCueController | None,
+    ocr_callback,
     settings_bridge: SettingsBridgeServer,
     log_file: Path,
 ) -> QSystemTrayIcon:
@@ -455,7 +518,7 @@ def _build_tray_icon(
     menu.addAction(quick_action)
 
     ocr_action = QAction("OCR: --", menu)
-    ocr_action.setEnabled(False)
+    ocr_action.triggered.connect(ocr_callback)
     menu.addAction(ocr_action)
 
     def update_keybind_actions() -> None:
@@ -476,7 +539,8 @@ def _build_tray_icon(
         live_state_action.setText(f"Live status: {state}")
         tray.setToolTip(f"Glance\n{message}")
         if any(
-            token in message.lower() for token in {"failed", "unavailable", "error"}
+            token in message.lower()
+            for token in {"failed", "unavailable", "error"}
         ):
             tray_icon_controller.flash_error()
             tray.showMessage("Glance", f"{message}\nSee log: {log_file}")
@@ -600,7 +664,9 @@ def _tray_icon_color(color_scheme: Qt.ColorScheme | None) -> str:
     return "#FFFFFF"
 
 
-def _tray_segment_opacities(state: str, frame: int) -> tuple[float, float, float, float]:
+def _tray_segment_opacities(
+    state: str, frame: int
+) -> tuple[float, float, float, float]:
     pulse_alpha = 1.0 if frame else 0.38
     completed_alpha = 0.9
     idle_alpha = 0.56

@@ -31,8 +31,12 @@ class AudioDeviceService:
         self._input_devices_provider = (
             input_devices_provider or self._default_input_devices
         )
-        self._host_apis_provider = host_apis_provider or self._default_host_apis
-        self._has_input_backend = input_devices_provider is not None or sd is not None
+        self._host_apis_provider = (
+            host_apis_provider or self._default_host_apis
+        )
+        self._has_input_backend = (
+            input_devices_provider is not None or sd is not None
+        )
         self._output_devices_provider = (
             output_devices_provider or self._default_output_devices
         )
@@ -97,11 +101,17 @@ class AudioDeviceService:
 
     @staticmethod
     def _device_label(device: dict, host_apis: list[dict]) -> str:
-        name = str(device.get("name", "Input Device")).strip() or "Input Device"
+        name = (
+            str(device.get("name", "Input Device")).strip() or "Input Device"
+        )
         host_api_index = device.get("hostapi")
         host_api_name = ""
-        if isinstance(host_api_index, int) and 0 <= host_api_index < len(host_apis):
-            host_api_name = str(host_apis[host_api_index].get("name", "")).strip()
+        if isinstance(host_api_index, int) and 0 <= host_api_index < len(
+            host_apis
+        ):
+            host_api_name = str(
+                host_apis[host_api_index].get("name", "")
+            ).strip()
         if host_api_name:
             return f"{name} ({host_api_name})"
         return name

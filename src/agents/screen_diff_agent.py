@@ -10,7 +10,9 @@ class ScreenDiffAgent(BaseAgent):
     def run(self, *, previous_path: str | None, current_path: str) -> bool:
         if previous_path is None:
             return True
-        return self._digest(Path(previous_path)) != self._digest(Path(current_path))
+        return self._digest(Path(previous_path)) != self._digest(
+            Path(current_path)
+        )
 
     @staticmethod
     def _digest(file_path: Path) -> str:

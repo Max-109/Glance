@@ -40,12 +40,16 @@ class GlobalHotkeyManager:
     def update_bindings(self, settings: AppSettings) -> None:
         if keyboard is None:
             raise PermissionDeniedError(
-                "Global hotkeys require the 'pynput' package and accessibility permission."
+                "Global hotkeys require the 'pynput' package and "
+                "accessibility permission."
             )
         if not _input_monitoring_is_trusted():
-            logger.info("Hotkeys disabled because Accessibility access is not granted")
+            logger.info(
+                "Hotkeys disabled because Accessibility access is not granted"
+            )
             raise PermissionDeniedError(
-                "Global hotkeys require macOS Accessibility access for the app that launches Glance, such as Terminal or iTerm."
+                "Global hotkeys require macOS Accessibility access for the "
+                "app that launches Glance, such as Terminal or iTerm."
             )
 
         with self._lock:
@@ -54,7 +58,9 @@ class GlobalHotkeyManager:
             self._rebuild_hotkeys_locked()
             logger.debug(
                 "Active hotkeys updated in place: %s",
-                ", ".join(description for description, _ in self._hotkey_specs),
+                ", ".join(
+                    description for description, _ in self._hotkey_specs
+                ),
             )
 
     def set_enabled(self, enabled: bool) -> None:
@@ -100,10 +106,12 @@ class GlobalHotkeyManager:
         except Exception as exc:
             if _is_accessibility_permission_error(exc):
                 logger.info(
-                    "Hotkey registration failed because Accessibility access is not granted"
+                    "Hotkey registration failed because Accessibility access "
+                    "is not granted"
                 )
                 raise PermissionDeniedError(
-                    "Global hotkeys require macOS Accessibility access for the app that launches Glance, such as Terminal or iTerm."
+                    "Global hotkeys require macOS Accessibility access for "
+                    "the app that launches Glance, such as Terminal or iTerm."
                 ) from exc
             raise
         self._listener = listener
@@ -174,4 +182,6 @@ def _is_accessibility_permission_error(exc: Exception) -> bool:
     if sys.platform != "darwin":
         return False
     message = str(exc)
-    return "AXIsProcessTrusted" in message or "accessibility" in message.lower()
+    return (
+        "AXIsProcessTrusted" in message or "accessibility" in message.lower()
+    )

@@ -6,7 +6,10 @@ from src.agents.llm_agent import LLMAgent
 from src.agents.screen_capture_agent import ScreenCaptureAgent
 from src.agents.tts_agent import TTSAgent
 from src.models.interactions import QuickInteraction
-from src.strategies.mode_strategy import ModeStrategy, force_pause_at_end_for_tts
+from src.strategies.mode_strategy import (
+    ModeStrategy,
+    force_pause_at_end_for_tts,
+)
 
 
 class QuickStrategy(ModeStrategy):
@@ -21,9 +24,16 @@ class QuickStrategy(ModeStrategy):
         self._tts_agent = tts_agent
 
     def execute(self, context: dict) -> QuickInteraction:
-        image_path = self._screen_capture_agent.run(image_path=context["image_path"])
-        question = context.get("question") or "What should I notice in this selection?"
-        answer = self._llm_agent.run(user_prompt=question, image_paths=[image_path])
+        image_path = self._screen_capture_agent.run(
+            image_path=context["image_path"]
+        )
+        question = (
+            context.get("question")
+            or "What should I notice in this selection?"
+        )
+        answer = self._llm_agent.run(
+            user_prompt=question, image_paths=[image_path]
+        )
         spoken_reply = self._llm_agent.prepare_speech_text(text=answer)
         temp_file = tempfile.NamedTemporaryFile(
             prefix="glance-quick-reply-",

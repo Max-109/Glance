@@ -19,13 +19,17 @@ class _UiThreadExecutor(QObject):
         super().__init__()
         self._executeRequested.connect(self._execute)
 
-    def call(self, callback: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
+    def call(
+        self, callback: Callable[..., Any], *args: Any, **kwargs: Any
+    ) -> Any:
         if QThread.currentThread() is self.thread():
             return callback(*args, **kwargs)
 
         completed = Event()
         result_holder: dict[str, Any] = {}
-        self._executeRequested.emit((callback, args, kwargs, result_holder, completed))
+        self._executeRequested.emit(
+            (callback, args, kwargs, result_holder, completed)
+        )
         completed.wait()
         error = result_holder.get("error")
         if error is not None:
@@ -67,7 +71,9 @@ def _build_state_snapshot(viewmodel: SettingsViewModel) -> dict[str, Any]:
         "previewActive": viewmodel.previewActive,
         "themeOptions": viewmodel.themeOptions,
         "reasoningOptions": viewmodel.reasoningOptions,
-        "transcriptionReasoningOptions": viewmodel.transcriptionReasoningOptions,
+        "transcriptionReasoningOptions": (
+            viewmodel.transcriptionReasoningOptions
+        ),
         "ttsModelOptions": viewmodel.ttsModelOptions,
         "voiceOptions": viewmodel.voiceOptions,
         "voiceOptionLabels": viewmodel.voiceOptionLabels,
@@ -77,7 +83,9 @@ def _build_state_snapshot(viewmodel: SettingsViewModel) -> dict[str, Any]:
     }
 
 
-def _build_audio_state_snapshot(viewmodel: SettingsViewModel) -> dict[str, Any]:
+def _build_audio_state_snapshot(
+    viewmodel: SettingsViewModel,
+) -> dict[str, Any]:
     return {
         "audioInputLevel": viewmodel.audioInputLevel,
         "audioInputTestActive": viewmodel.audioInputTestActive,
@@ -122,7 +130,9 @@ class SettingsBridgeServer:
         return snapshot
 
     def audio_state(self) -> dict[str, Any]:
-        return self._executor.call(_build_audio_state_snapshot, self._viewmodel)
+        return self._executor.call(
+            _build_audio_state_snapshot, self._viewmodel
+        )
 
     def set_runtime_status(self, status: dict[str, Any]) -> None:
         next_status = coerce_runtime_status(status)
@@ -144,7 +154,9 @@ class SettingsBridgeServer:
         self._executor.call(self._viewmodel.assignKeybind, field_name, keybind)
         return self.snapshot()
 
-    def run_action(self, action: str, payload: dict[str, Any]) -> dict[str, Any]:
+    def run_action(
+        self, action: str, payload: dict[str, Any]
+    ) -> dict[str, Any]:
         action_map: dict[str, Callable[[], None]] = {
             "save": self._viewmodel.save,
             "reset": self._viewmodel.reset,
@@ -167,7 +179,9 @@ class SettingsBridgeServer:
 
         if action == "startKeybindCapture":
             field_name = str(payload.get("fieldName", "")).strip()
-            self._executor.call(self._viewmodel.startKeybindCapture, field_name)
+            self._executor.call(
+                self._viewmodel.startKeybindCapture, field_name
+            )
             return self.snapshot()
 
         handler = action_map.get(action)
@@ -213,7 +227,9 @@ class SettingsBridgeServer:
                     self._send_json({"ok": True, "state": bridge.snapshot()})
                     return
                 if self.path == "/api/audio-state":
-                    self._send_json({"ok": True, "state": bridge.audio_state()})
+                    self._send_json(
+                        {"ok": True, "state": bridge.audio_state()}
+                    )
                     return
                 self._send_error(HTTPStatus.NOT_FOUND, "Unknown route.")
 
@@ -226,7 +242,9 @@ class SettingsBridgeServer:
                             payload.get("value"),
                         )
                     elif self.path == "/api/section":
-                        state = bridge.set_section(str(payload.get("section", "")))
+                        state = bridge.set_section(
+                            str(payload.get("section", ""))
+                        )
                     elif self.path == "/api/keybind":
                         state = bridge.assign_keybind(
                             str(payload.get("fieldName", "")),
@@ -238,13 +256,17 @@ class SettingsBridgeServer:
                             payload,
                         )
                     else:
-                        self._send_error(HTTPStatus.NOT_FOUND, "Unknown route.")
+                        self._send_error(
+                            HTTPStatus.NOT_FOUND, "Unknown route."
+                        )
                         return
                 except ValueError as exc:
                     self._send_error(HTTPStatus.BAD_REQUEST, str(exc))
                     return
                 except Exception as exc:  # pragma: no cover - surfaced to UI.
-                    self._send_error(HTTPStatus.INTERNAL_SERVER_ERROR, str(exc))
+                    self._send_error(
+                        HTTPStatus.INTERNAL_SERVER_ERROR, str(exc)
+                    )
                     return
 
                 self._send_json({"ok": True, "state": state})
@@ -261,29 +283,43 @@ class SettingsBridgeServer:
                     return {}
                 try:
                     return json.loads(raw_body.decode("utf-8"))
-                except json.JSONDecodeError as exc:  # pragma: no cover - input guard.
-                    raise ValueError("Could not decode the request body.") from exc
+                except (
+                    json.JSONDecodeError
+                ) as exc:  # pragma: no cover - input guard.
+                    raise ValueError(
+                        "Could not decode the request body."
+                    ) from exc
 
             def _send_common_headers(self) -> None:
                 self.send_header("Access-Control-Allow-Origin", "*")
-                self.send_header("Access-Control-Allow-Headers", "Content-Type")
-                self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+                self.send_header(
+                    "Access-Control-Allow-Headers", "Content-Type"
+                )
+                self.send_header(
+                    "Access-Control-Allow-Methods", "GET, POST, OPTIONS"
+                )
                 self.send_header("Cache-Control", "no-store")
 
             def _send_json(self, payload: dict[str, Any]) -> None:
                 response = json.dumps(payload).encode("utf-8")
                 self.send_response(HTTPStatus.OK)
                 self._send_common_headers()
-                self.send_header("Content-Type", "application/json; charset=utf-8")
+                self.send_header(
+                    "Content-Type", "application/json; charset=utf-8"
+                )
                 self.send_header("Content-Length", str(len(response)))
                 self.end_headers()
                 self.wfile.write(response)
 
             def _send_error(self, status: HTTPStatus, message: str) -> None:
-                response = json.dumps({"ok": False, "error": message}).encode("utf-8")
+                response = json.dumps({"ok": False, "error": message}).encode(
+                    "utf-8"
+                )
                 self.send_response(status)
                 self._send_common_headers()
-                self.send_header("Content-Type", "application/json; charset=utf-8")
+                self.send_header(
+                    "Content-Type", "application/json; charset=utf-8"
+                )
                 self.send_header("Content-Length", str(len(response)))
                 self.end_headers()
                 self.wfile.write(response)

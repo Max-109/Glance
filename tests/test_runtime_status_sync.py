@@ -10,7 +10,9 @@ from src.ui.runtime_visual import (
 
 
 class RuntimeStatusSyncTests(unittest.TestCase):
-    def test_coerce_runtime_status_applies_defaults_and_non_negative_numbers(self) -> None:
+    def test_coerce_runtime_status_applies_defaults_and_non_negative_numbers(
+        self,
+    ) -> None:
         status = coerce_runtime_status(
             {
                 "runtimeState": " speaking ",
@@ -34,7 +36,9 @@ class RuntimeStatusSyncTests(unittest.TestCase):
             },
         )
 
-    def test_normalize_tray_state_maps_processing_to_transcribing(self) -> None:
+    def test_normalize_tray_state_maps_processing_to_transcribing(
+        self,
+    ) -> None:
         self.assertEqual(normalize_runtime_state("processing"), "transcribing")
 
     def test_frame_for_phase_uses_shared_phase_start_timestamp(self) -> None:
@@ -69,7 +73,9 @@ class RuntimeStatusSyncTests(unittest.TestCase):
             1_420,
         )
 
-    def test_effective_visual_state_uses_error_override_until_timeout(self) -> None:
+    def test_effective_visual_state_uses_error_override_until_timeout(
+        self,
+    ) -> None:
         self.assertEqual(
             effective_visual_state(
                 base_state="speaking",

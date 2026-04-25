@@ -44,7 +44,9 @@ class ToolCallRecord:
             result_preview=str(payload.get("result_preview", "")),
             error=str(payload.get("error", "")),
             result_path=str(payload.get("result_path", "")),
-            artifact_paths=[str(path) for path in payload.get("artifact_paths", [])],
+            artifact_paths=[
+                str(path) for path in payload.get("artifact_paths", [])
+            ],
             started_at=str(payload.get("started_at", "")),
             finished_at=str(payload.get("finished_at", "")),
         )
@@ -59,7 +61,7 @@ class BaseInteraction(BaseEntity, ABC):
 
     @abstractmethod
     def summary(self) -> str:
-        """Return a short human-readable summary."""
+        "Return a short human-readable summary."
 
 
 @dataclass
@@ -99,7 +101,7 @@ class OCRInteraction(BaseInteraction):
     def __post_init__(self) -> None:
         super().__post_init__()
         self.image_path = self.require_text(self.image_path, "image_path")
-        self.extracted_text = self.require_text(self.extracted_text, "extracted_text")
+        self.extracted_text = str(self.extracted_text).strip()
 
     def summary(self) -> str:
         return f"OCR: {self.extracted_text[:40]}"
@@ -126,7 +128,9 @@ class LiveInteraction(BaseInteraction):
 
     def __post_init__(self) -> None:
         super().__post_init__()
-        self.recording_path = self.require_text(self.recording_path, "recording_path")
+        self.recording_path = self.require_text(
+            self.recording_path, "recording_path"
+        )
         self.response = self.require_text(self.response, "response")
         self.tool_calls = [
             record
@@ -164,7 +168,9 @@ class SessionRecord(BaseEntity):
     def add_interaction(self, interaction: BaseInteraction) -> None:
         if interaction.mode != self.mode:
             raise ValidationError(
-                f"Interaction mode '{interaction.mode}' does not match session mode '{self.mode}'."
+                f"Interaction mode '{
+                    interaction.mode
+                }' does not match session mode '{self.mode}'."
             )
         self.interactions.append(interaction)
 
@@ -213,7 +219,9 @@ def interaction_from_dict(payload: dict) -> BaseInteraction:
         )
     if interaction_type == "live":
         return LiveInteraction(
-            recording_path=payload.get("recording_path", payload.get("audio_path", "")),
+            recording_path=payload.get(
+                "recording_path", payload.get("audio_path", "")
+            ),
             transcript=payload["transcript"],
             response=payload["response"],
             frame_paths=list(payload.get("frame_paths", [])),
@@ -224,4 +232,6 @@ def interaction_from_dict(payload: dict) -> BaseInteraction:
             ],
             **common,
         )
-    raise ValidationError(f"Unsupported interaction type: {interaction_type!r}")
+    raise ValidationError(
+        f"Unsupported interaction type: {interaction_type!r}"
+    )

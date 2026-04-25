@@ -82,7 +82,9 @@ class AudioPlaybackServiceStateMachineTests(unittest.TestCase):
         audio_playback.QAudio = self._original_qaudio
         audio_playback.QTimer = self._original_qtimer
 
-    def test_end_of_media_schedules_finish_using_remaining_duration(self) -> None:
+    def test_end_of_media_schedules_finish_using_remaining_duration(
+        self,
+    ) -> None:
         service = self._make_service()
         service._active_playback_id = 7
         service._playback_started = True
@@ -144,7 +146,9 @@ class AudioPlaybackServiceStateMachineTests(unittest.TestCase):
             "Audio playback failed because the media file was invalid.",
         )
 
-    def test_audio_sink_idle_state_drains_then_finishes_wav_playback(self) -> None:
+    def test_audio_sink_idle_state_drains_then_finishes_wav_playback(
+        self,
+    ) -> None:
         service = self._make_service()
         completion_event = Event()
         audio_sink = FakeAudioSink(error=FakeQAudio.NoError)
@@ -187,7 +191,9 @@ class AudioPlaybackServiceStateMachineTests(unittest.TestCase):
             fake_wav_path.write_bytes(b"ID3\x04\x00\x00\x00\x00\x00\x00")
 
             self.assertTrue(service._should_use_audio_sink(str(wav_path)))
-            self.assertFalse(service._should_use_audio_sink(str(fake_wav_path)))
+            self.assertFalse(
+                service._should_use_audio_sink(str(fake_wav_path))
+            )
 
     @staticmethod
     def _make_service() -> audio_playback.QtAudioPlaybackService:

@@ -3,7 +3,10 @@ from __future__ import annotations
 from pathlib import Path
 
 from src.agents.base_agent import BaseAgent
-from src.exceptions.app_exceptions import PermissionDeniedError, ValidationError
+from src.exceptions.app_exceptions import (
+    PermissionDeniedError,
+    ValidationError,
+)
 
 try:
     from PIL import ImageGrab
@@ -18,12 +21,15 @@ class ScreenCaptureAgent(BaseAgent):
         if image_path:
             source = Path(image_path)
             if not source.exists():
-                raise ValidationError(f"Image path does not exist: {image_path}")
+                raise ValidationError(
+                    f"Image path does not exist: {image_path}"
+                )
             return str(source)
 
         if ImageGrab is None:
             raise PermissionDeniedError(
-                "Pillow ImageGrab is unavailable, so direct screen capture cannot run."
+                "Pillow ImageGrab is unavailable, so direct screen capture "
+                "cannot run."
             )
         destination = Path(output_path or "screen_capture.png")
         try:
@@ -31,6 +37,7 @@ class ScreenCaptureAgent(BaseAgent):
             grab.save(destination)
         except OSError as exc:
             raise PermissionDeniedError(
-                "Screen capture failed. Check macOS screen recording permission."
+                "Screen capture failed. Check macOS screen recording "
+                "permission."
             ) from exc
         return str(destination)

@@ -17,10 +17,12 @@ class ConsoleLoggingTests(unittest.TestCase):
                 "name": "glance.live",
                 "levelno": logging.INFO,
                 "levelname": "INFO",
-                "msg": "live turn completed\ncapture    7012.3 ms\ntotal      18260.4 ms",
+                "msg": (
+                    "live turn completed\ncapture    7012.3 ms\n"
+                    "total      18260.4 ms"
+                ),
                 "args": (),
-            }
-        )
+            })
 
         formatted = formatter.format(record)
 

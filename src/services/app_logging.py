@@ -48,24 +48,35 @@ class _ConsoleLogFormatter(logging.Formatter):
         header = " ".join(
             [
                 self._colorize(timestamp, self._palette.timestamp),
-                self._colorize(level, _level_color(record.levelno, self._palette)),
+                self._colorize(
+                    level, _level_color(record.levelno, self._palette)
+                ),
                 self._colorize(logger_name, self._palette.logger_name),
             ]
         )
 
         message = record.getMessage().rstrip()
         if record.exc_info:
-            message = f"{message}\n{self.formatException(record.exc_info)}".strip()
+            message = f"{message}\n{
+                self.formatException(record.exc_info)
+            }".strip()
         if record.stack_info:
-            message = f"{message}\n{self.formatStack(record.stack_info)}".strip()
+            message = f"{message}\n{
+                self.formatStack(record.stack_info)
+            }".strip()
 
         if not message:
             return header
 
-        body_lines = [_style_console_line(line, self._palette, self._use_color) for line in message.splitlines()]
+        body_lines = [
+            _style_console_line(line, self._palette, self._use_color)
+            for line in message.splitlines()
+        ]
         if len(body_lines) == 1:
             return f"{header}  {body_lines[0]}"
-        indented_body = "\n".join(f"  {line}" if line else "" for line in body_lines)
+        indented_body = "\n".join(
+            f"  {line}" if line else "" for line in body_lines
+        )
         return f"{header}\n{indented_body}"
 
     def _colorize(self, value: str, color: str) -> str:
@@ -88,9 +99,10 @@ def configure_app_logging(
         file_handler = logging.FileHandler(log_file, encoding="utf-8")
         file_handler.set_name(_FILE_HANDLER_NAME)
         logger.addHandler(file_handler)
-    elif not isinstance(file_handler, logging.FileHandler) or Path(
-        file_handler.baseFilename
-    ) != log_file:
+    elif (
+        not isinstance(file_handler, logging.FileHandler)
+        or Path(file_handler.baseFilename) != log_file
+    ):
         logger.removeHandler(file_handler)
         file_handler.close()
         file_handler = logging.FileHandler(log_file, encoding="utf-8")
@@ -113,7 +125,9 @@ def configure_app_logging(
     console_handler.setFormatter(
         _ConsoleLogFormatter(
             accent_color=accent_color,
-            use_color=_stream_supports_color(getattr(console_handler, "stream", None)),
+            use_color=_stream_supports_color(
+                getattr(console_handler, "stream", None)
+            ),
         )
     )
 
@@ -160,16 +174,24 @@ def _level_color(levelno: int, palette: _ConsolePalette) -> str:
     return palette.info
 
 
-def _style_console_line(line: str, palette: _ConsolePalette, use_color: bool) -> str:
+def _style_console_line(
+    line: str, palette: _ConsolePalette, use_color: bool
+) -> str:
     if not use_color or not line:
         return line
 
-    detail_match = re.match(r"^(?P<label>[a-z][a-z _-]{1,20})(?P<gap>\s{2,})(?P<value>.+)$", line)
+    detail_match = re.match(
+        r"^(?P<label>[a-z][a-z _-]{1,20})(?P<gap>\s{2,})(?P<value>.+)$", line
+    )
     if detail_match is not None:
         label = detail_match.group("label")
         gap = detail_match.group("gap")
         value = _TIMING_PATTERN.sub(
-            lambda match: f"{palette.info}{match.group(0)}{_ANSI_RESET}{palette.detail_value}",
+            lambda match: (
+                f"{palette.info}{match.group(0)}{_ANSI_RESET}{
+                    palette.detail_value
+                }"
+            ),
             detail_match.group("value"),
         )
         return (
@@ -179,7 +201,9 @@ def _style_console_line(line: str, palette: _ConsolePalette, use_color: bool) ->
         )
 
     styled_line = _TIMING_PATTERN.sub(
-        lambda match: f"{palette.info}{match.group(0)}{_ANSI_RESET}{palette.body}",
+        lambda match: (
+            f"{palette.info}{match.group(0)}{_ANSI_RESET}{palette.body}"
+        ),
         line,
     )
     return f"{palette.body}{styled_line}{_ANSI_RESET}"
@@ -214,7 +238,9 @@ def _build_console_palette(accent_color: str) -> _ConsolePalette:
 
 def _hex_to_rgb(value: str) -> tuple[int, int, int]:
     stripped_value = value.lstrip("#")
-    return tuple(int(stripped_value[index : index + 2], 16) for index in (0, 2, 4))
+    return tuple(
+        int(stripped_value[index: index + 2], 16) for index in (0, 2, 4)
+    )
 
 
 def _mix_rgb(

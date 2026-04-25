@@ -4,6 +4,7 @@ from src.agents.ocr_agent import OCRAgent
 from src.agents.screen_capture_agent import ScreenCaptureAgent
 from src.models.interactions import OCRInteraction
 from src.services.clipboard import ClipboardService
+from src.services.ocr import OCRService
 from src.strategies.mode_strategy import ModeStrategy
 
 
@@ -15,15 +16,18 @@ class OCRStrategy(ModeStrategy):
         clipboard_service: ClipboardService,
     ) -> None:
         self._screen_capture_agent = screen_capture_agent
-        self._ocr_agent = ocr_agent
-        self._clipboard_service = clipboard_service
+        self._ocr_service = OCRService(ocr_agent, clipboard_service)
 
     def execute(self, context: dict) -> OCRInteraction:
-        image_path = self._screen_capture_agent.run(image_path=context["image_path"])
-        extracted_text = self._ocr_agent.run(image_path=image_path)
-        self._clipboard_service.copy_text(extracted_text)
+        image_path = self._screen_capture_agent.run(
+            image_path=context["image_path"]
+        )
+        result = self._ocr_service.extract_to_clipboard(
+            image_path=image_path,
+            instruction=str(context.get("instruction", "")).strip(),
+        )
         return OCRInteraction(
             mode="ocr",
             image_path=image_path,
-            extracted_text=extracted_text,
+            extracted_text=result.text,
         )

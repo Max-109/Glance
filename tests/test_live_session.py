@@ -36,6 +36,19 @@ class FakeOrchestrator:
         return SimpleNamespace(speech_path="reply.wav")
 
 
+class FakeTerminalOrchestrator(FakeOrchestrator):
+    def run_mode(self, mode: str, **context):
+        self.run_calls.append({"mode": mode, **context})
+        status_callback = context["status_callback"]
+        status_callback("transcribing", "Transcribing...")
+        status_callback("generating", "Checking...")
+        status_callback("idle", "Live ended.")
+        return SimpleNamespace(
+            speech_path="",
+            response="Live ended.",
+        )
+
+
 class FakePlaybackService:
     def __init__(self) -> None:
         self.calls: list[str] = []
@@ -52,7 +65,9 @@ class FakePlaybackService:
 
 
 class LiveSessionControllerTests(unittest.TestCase):
-    def test_live_turn_emits_split_runtime_states_before_playback(self) -> None:
+    def test_live_turn_emits_split_runtime_states_before_playback(
+        self,
+    ) -> None:
         statuses: list[tuple[str, str]] = []
         orchestrator = FakeOrchestrator()
         playback_service = FakePlaybackService()
@@ -62,7 +77,9 @@ class LiveSessionControllerTests(unittest.TestCase):
                 orchestrator=orchestrator,
                 recorder=FakeRecorder(),
                 playback_service=playback_service,
-                on_status=lambda state, message: statuses.append((state, message)),
+                on_status=lambda state, message: statuses.append(
+                    (state, message)
+                ),
             )
 
             controller.start()
@@ -97,7 +114,9 @@ class LiveSessionControllerTests(unittest.TestCase):
                 orchestrator=orchestrator,
                 recorder=SilentRecorder(),
                 playback_service=playback_service,
-                on_status=lambda state, message: statuses.append((state, message)),
+                on_status=lambda state, message: statuses.append(
+                    (state, message)
+                ),
             )
 
             controller.start()
@@ -115,6 +134,36 @@ class LiveSessionControllerTests(unittest.TestCase):
             [
                 ("listening", "Listening..."),
                 ("idle", "No speech detected. Live is idle."),
+            ],
+        )
+
+    def test_terminal_live_turn_skips_playback_and_stops(self) -> None:
+        statuses: list[tuple[str, str]] = []
+        orchestrator = FakeTerminalOrchestrator()
+        playback_service = FakePlaybackService()
+
+        controller = LiveSessionController(
+            orchestrator=orchestrator,
+            recorder=FakeRecorder(),
+            playback_service=playback_service,
+            on_status=lambda state, message: statuses.append((state, message)),
+        )
+
+        controller.start()
+
+        thread = controller._thread
+        if thread is not None:
+            thread.join(timeout=2)
+            self.assertFalse(thread.is_alive())
+
+        self.assertEqual(playback_service.calls, [])
+        self.assertEqual(
+            statuses,
+            [
+                ("listening", "Listening..."),
+                ("transcribing", "Transcribing..."),
+                ("generating", "Checking..."),
+                ("idle", "Live ended."),
             ],
         )
 

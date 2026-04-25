@@ -19,6 +19,7 @@ from src.agents.screen_capture_agent import ScreenCaptureAgent
 from src.exceptions.app_exceptions import GlanceError, ValidationError
 from src.models.interactions import ToolCallRecord
 from src.models.settings import AppSettings
+from src.services.ocr import OCRService
 
 
 @dataclass(frozen=True)
@@ -63,7 +64,7 @@ class ToolCallRequest:
 
 
 class ToolExecutionError(GlanceError):
-    """Raised when a runtime tool cannot complete safely."""
+    "Raised when a runtime tool cannot complete safely."
 
 
 class RuntimeToolRegistry:
@@ -72,32 +73,50 @@ class RuntimeToolRegistry:
         settings: AppSettings,
         *,
         screen_capture_agent: ScreenCaptureAgent | None = None,
+        ocr_service: OCRService | None = None,
+        include_live_control_tools: bool = False,
     ) -> None:
         self._settings = settings
         self._screen_capture_agent = screen_capture_agent
+        self._ocr_service = ocr_service
+        self._include_live_control_tools = include_live_control_tools
         self._definitions = self._build_definitions()
 
     @property
     def enabled_definitions(self) -> list[ToolDefinition]:
         if not self._settings.tools_enabled:
-            return []
+            return [
+                definition
+                for name, definition in self._definitions.items()
+                if self._is_live_control_tool(name)
+            ]
         return [
             definition
             for name, definition in self._definitions.items()
-            if self._policy_for_tool(name) == "allow"
+            if self._is_live_control_tool(name)
+            or self._policy_for_tool(name) == "allow"
         ]
 
     def get(self, name: str) -> ToolDefinition | None:
+        definition = self._definitions.get(name)
+        if definition is None:
+            return None
+        if self._is_live_control_tool(name):
+            return definition
         if not self._settings.tools_enabled:
             return None
-        definition = self._definitions.get(name)
-        if definition is None or self._policy_for_tool(name) != "allow":
-            return None
-        return definition
+        if self._policy_for_tool(name) == "allow":
+            return definition
+        return None
+
+    def _is_live_control_tool(self, name: str) -> bool:
+        return self._include_live_control_tools and name == "end_live_session"
 
     def _policy_for_tool(self, name: str) -> str:
         if name == "take_screenshot":
             return self._settings.tool_take_screenshot_policy
+        if name == "ocr_screen":
+            return self._settings.tool_ocr_policy
         if name == "web_search":
             return self._settings.tool_web_search_policy
         if name == "web_fetch":
@@ -109,15 +128,17 @@ class RuntimeToolRegistry:
             "take_screenshot": ToolDefinition(
                 name="take_screenshot",
                 description=(
-                    "Capture the user's current screen when visual context is needed "
-                    "to answer the live request."
+                    "Capture the user's current screen when visual context is "
+                    "needed to answer the live request."
                 ),
                 parameters_schema={
                     "type": "object",
                     "properties": {
                         "reason": {
                             "type": "string",
-                            "description": "Brief reason the screenshot is needed.",
+                            "description": (
+                                "Brief reason the screenshot is needed."
+                            ),
                         }
                     },
                     "additionalProperties": False,
@@ -125,12 +146,46 @@ class RuntimeToolRegistry:
                 timeout_seconds=6,
                 executor=self._take_screenshot,
             ),
+            "ocr_screen": ToolDefinition(
+                name="ocr_screen",
+                description=(
+                    "Capture the user's current primary screen, extract the "
+                    "exact text requested by the user, and copy that OCR "
+                    "result to the clipboard. Always pass the user's specific "
+                    "extraction goal in instruction, for example: 'Extract "
+                    "only the YouTube video headline.'"
+                ),
+                parameters_schema={
+                    "type": "object",
+                    "properties": {
+                        "instruction": {
+                            "type": "string",
+                            "description": (
+                                "The user's exact OCR extraction goal. Use "
+                                "this to target a specific item, or ask for "
+                                "all visible text only when the user asked "
+                                "for all text."
+                            ),
+                        },
+                        "reason": {
+                            "type": "string",
+                            "description": (
+                                "Brief reason the screen text is needed."
+                            ),
+                        },
+                    },
+                    "required": ["instruction"],
+                    "additionalProperties": False,
+                },
+                timeout_seconds=30,
+                executor=self._ocr_screen,
+            ),
             "web_search": ToolDefinition(
                 name="web_search",
                 description=(
-                    "Search the web for current public information. Use this when "
-                    "the answer depends on recent facts, pricing, schedules, or other "
-                    "details likely to change."
+                    "Search the web for current public information. Use this "
+                    "when the answer depends on recent facts, pricing, "
+                    "schedules, or other details likely to change."
                 ),
                 parameters_schema={
                     "type": "object",
@@ -143,7 +198,9 @@ class RuntimeToolRegistry:
                             "type": "integer",
                             "minimum": 1,
                             "maximum": 8,
-                            "description": "Maximum number of results to return.",
+                            "description": (
+                                "Maximum number of results to return."
+                            ),
                         },
                     },
                     "required": ["query"],
@@ -155,8 +212,8 @@ class RuntimeToolRegistry:
             "web_fetch": ToolDefinition(
                 name="web_fetch",
                 description=(
-                    "Read a specific public http or https page and return concise "
-                    "page text for reasoning."
+                    "Read a specific public http or https page and return "
+                    "concise page text for reasoning."
                 ),
                 parameters_schema={
                     "type": "object",
@@ -172,11 +229,34 @@ class RuntimeToolRegistry:
                 timeout_seconds=12,
                 executor=_web_fetch,
             ),
+            "end_live_session": ToolDefinition(
+                name="end_live_session",
+                description=(
+                    "End the current Glance Live session when the user "
+                    "clearly "
+                    "says they are done, says no to more help, says goodbye, "
+                    "or asks Glance to stop listening."
+                ),
+                parameters_schema={
+                    "type": "object",
+                    "properties": {
+                        "reason": {
+                            "type": "string",
+                            "description": "Brief reason Live should end.",
+                        }
+                    },
+                    "additionalProperties": False,
+                },
+                timeout_seconds=1,
+                executor=self._end_live_session,
+            ),
         }
 
     def _take_screenshot(self, arguments: dict[str, Any]) -> ToolResult:
         if self._screen_capture_agent is None:
-            raise ToolExecutionError("Screen capture is not available in this runtime.")
+            raise ToolExecutionError(
+                "Screen capture is not available in this runtime."
+            )
         reason = str(arguments.get("reason", "")).strip()
         temp_file = tempfile.NamedTemporaryFile(
             prefix="glance-tool-screenshot-",
@@ -184,15 +264,63 @@ class RuntimeToolRegistry:
             delete=False,
         )
         temp_file.close()
-        screenshot_path = self._screen_capture_agent.run(output_path=temp_file.name)
+        screenshot_path = self._screen_capture_agent.run(
+            output_path=temp_file.name
+        )
         return ToolResult(
             content=(
-                "Screenshot captured. Use the attached image as visual context for "
-                "the user's request."
-            ),
+                "Screenshot captured. Use the attached image as visual "
+                "context for "
+                "the user's request."),
+            artifact_paths=[screenshot_path],
+            images=[
+                ToolImage(
+                    path=screenshot_path,
+                    mime_type="image/png")],
+            metadata={
+                "reason": reason},
+        )
+
+    def _ocr_screen(self, arguments: dict[str, Any]) -> ToolResult:
+        if self._screen_capture_agent is None:
+            raise ToolExecutionError(
+                "Screen capture is not available in this runtime."
+            )
+        if self._ocr_service is None:
+            raise ToolExecutionError("OCR is not available in this runtime.")
+        instruction = str(arguments.get("instruction", "")).strip()
+        if not instruction:
+            raise ToolExecutionError("OCR instruction is required.")
+        reason = str(arguments.get("reason", "")).strip()
+        temp_file = tempfile.NamedTemporaryFile(
+            prefix="glance-ocr-screen-",
+            suffix=".png",
+            delete=False,
+        )
+        temp_file.close()
+        screenshot_path = self._screen_capture_agent.run(
+            output_path=temp_file.name
+        )
+        result = self._ocr_service.extract_to_clipboard(
+            image_path=screenshot_path,
+            instruction=instruction,
+        )
+        return ToolResult(
+            content=result.text,
             artifact_paths=[screenshot_path],
             images=[ToolImage(path=screenshot_path, mime_type="image/png")],
-            metadata={"reason": reason},
+            metadata={
+                "instruction": instruction,
+                "reason": reason,
+                "copied_to_clipboard": True,
+            },
+        )
+
+    def _end_live_session(self, arguments: dict[str, Any]) -> ToolResult:
+        reason = str(arguments.get("reason", "")).strip()
+        return ToolResult(
+            content="Live ended.",
+            metadata={"reason": reason, "end_live_session": True},
         )
 
 
@@ -200,7 +328,9 @@ class ToolExecutor:
     def __init__(self, registry: RuntimeToolRegistry) -> None:
         self._registry = registry
 
-    def execute(self, call: ToolCallRequest) -> tuple[ToolCallRecord, ToolResult]:
+    def execute(
+        self, call: ToolCallRequest
+    ) -> tuple[ToolCallRecord, ToolResult]:
         started_at = _utc_now()
         definition = self._registry.get(call.name)
         if definition is None:
@@ -250,7 +380,9 @@ def _run_with_timeout(
     timeout_seconds: float,
     tool_name: str,
 ) -> ToolResult:
-    pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix=f"glance-{tool_name}")
+    pool = ThreadPoolExecutor(
+        max_workers=1, thread_name_prefix=f"glance-{tool_name}"
+    )
     future = pool.submit(executor, arguments)
     try:
         return future.result(timeout=timeout_seconds)
@@ -280,7 +412,9 @@ def _error_execution(
     return record, result
 
 
-def _validate_arguments(schema: dict[str, Any], arguments: dict[str, Any]) -> None:
+def _validate_arguments(
+    schema: dict[str, Any], arguments: dict[str, Any]
+) -> None:
     if not isinstance(arguments, dict):
         raise ValidationError("Tool arguments must be an object.")
     required = schema.get("required", [])
@@ -332,8 +466,7 @@ def _web_search(arguments: dict[str, Any]) -> ToolResult:
     return ToolResult(
         content=content,
         result_path=_write_temp_result(
-            "glance-web-search-",
-            ".json",
+            "glance-web-search-.json",
             json.dumps({"query": query, "results": results}, indent=2),
         ),
         metadata={
@@ -398,7 +531,9 @@ class _SearchResultParser(HTMLParser):
         self._current_text: list[str] = []
         self._capture_link = False
 
-    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+    def handle_starttag(
+        self, tag: str, attrs: list[tuple[str, str | None]]
+    ) -> None:
         if tag != "a":
             return
         attr_map = {name: value or "" for name, value in attrs}
@@ -450,11 +585,15 @@ class _TextExtractor(HTMLParser):
         self.parts: list[str] = []
         self._skip_depth = 0
 
-    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+    def handle_starttag(
+        self, tag: str, attrs: list[tuple[str, str | None]]
+    ) -> None:
         del attrs
         if tag in {"script", "style", "noscript", "svg"}:
             self._skip_depth += 1
-        if tag in {"p", "br", "li", "h1", "h2", "h3", "h4", "article", "section"}:
+        if tag in {
+            "pbrlih1h2h3h4articlesection",
+        }:
             self.parts.append("\n")
 
     def handle_endtag(self, tag: str) -> None:
@@ -475,7 +614,9 @@ def _html_to_text(body: str) -> str:
 
 
 def _extract_title(body: str) -> str:
-    match = re.search(r"<title[^>]*>(.*?)</title>", body, flags=re.IGNORECASE | re.S)
+    match = re.search(
+        r"<title[^>]*>(.*?)</title>", body, flags=re.IGNORECASE | re.S
+    )
     if match is None:
         return ""
     return _squash_whitespace(html.unescape(match.group(1)))
@@ -486,7 +627,9 @@ def _normalize_duckduckgo_url(url: str) -> str:
         url = f"https:{url}"
     normalized_url = html.unescape(url)
     parsed = urlparse(normalized_url)
-    if parsed.netloc.endswith("duckduckgo.com") and parsed.path.startswith("/l/"):
+    if parsed.netloc.endswith("duckduckgo.com") and parsed.path.startswith(
+        "/l/"
+    ):
         destination = parse_qs(parsed.query).get("uddg", [""])[0]
         if destination:
             return unquote(destination)
@@ -512,7 +655,11 @@ def short_site_name(url: str) -> str:
     for domain, label in known_names.items():
         if host == domain or host.endswith(f".{domain}"):
             return label
-    parts = [part for part in host.split(".") if part not in {"co", "com", "net", "org"}]
+    parts = [
+        part
+        for part in host.split(".")
+        if part not in {"co", "com", "net", "org"}
+    ]
     if not parts:
         return ""
     base = parts[-2] if len(parts) > 1 and len(parts[-1]) <= 3 else parts[0]
@@ -542,12 +689,28 @@ def _write_temp_result(prefix: str, suffix: str, content: str) -> str:
 def _arguments_summary(tool_name: str, arguments: dict[str, Any]) -> str:
     if tool_name == "take_screenshot":
         reason = str(arguments.get("reason", "")).strip()
-        return f"reason: {_preview(reason, limit=80)}" if reason else "screen context"
+        return (
+            f"reason: {_preview(reason, limit=80)}"
+            if reason
+            else "screen context"
+        )
+    if tool_name == "ocr_screen":
+        instruction = str(arguments.get("instruction", "")).strip()
+        if instruction:
+            return f"instruction: {_preview(instruction, limit=80)}"
+        reason = str(arguments.get("reason", "")).strip()
+        return (
+            f"reason: {_preview(reason, limit=80)}"
+            if reason
+            else "read screen text"
+        )
     if tool_name == "web_search":
         return f"query: {_preview(str(arguments.get('query', '')), limit=80)}"
     if tool_name == "web_fetch":
         parsed = urlparse(str(arguments.get("url", "")))
-        return parsed.netloc or _preview(str(arguments.get("url", "")), limit=80)
+        return parsed.netloc or _preview(
+            str(arguments.get("url", "")), limit=80
+        )
     return _preview(json.dumps(arguments, ensure_ascii=False), limit=120)
 
 

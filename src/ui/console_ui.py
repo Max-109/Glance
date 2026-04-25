@@ -48,7 +48,9 @@ class ConsoleUI:
     def _run_ocr_mode(self) -> None:
         image_path = input("Image path: ").strip()
         try:
-            interaction = self._orchestrator.run_mode("ocr", image_path=image_path)
+            interaction = self._orchestrator.run_mode(
+                "ocr", image_path=image_path
+            )
         except GlanceError as exc:
             print(f"Read Screen failed: {exc}")
             return
@@ -73,7 +75,8 @@ class ConsoleUI:
             return
         for session in sessions:
             print(
-                f"[{session.mode}] {session.created_at} ({len(session.interactions)} interactions)"
+                f"[{session.mode}] {session.created_at} "
+                f"({len(session.interactions)} interactions)"
             )
             for interaction in session.interactions:
                 print(f"  - {interaction.summary()}")

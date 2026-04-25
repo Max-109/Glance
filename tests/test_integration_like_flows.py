@@ -1,6 +1,7 @@
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 
 from src.core.orchestrator import Orchestrator
 from src.factories.strategy_factory import ModeStrategyFactory
@@ -59,12 +60,47 @@ class FakeLLMAgent:
     ):
         return LiveSpeechReply(
             voice_id="UgBBYS2sOqTuMpoF3BR0",
-            text=f"live:{transcript}:history={len(conversation_history or [])}",
+            text=(
+                f"live:{transcript}:history="
+                f"{len(conversation_history or [])}"
+            ),
+        )
+
+    def build_live_tool_messages(
+        self, *, transcript, conversation_history=None
+    ):
+        return [
+            {"role": "system", "content": "tool system"},
+            *list(conversation_history or []),
+            {"role": "user", "content": transcript},
+        ]
+
+    def run_tool_turn(self, *, messages, tools, session_id=None):
+        del tools, session_id
+        user_messages = [
+            message
+            for message in messages
+            if message.get("role") == "user"
+            and isinstance(message.get("content"), str)
+        ]
+        transcript = user_messages[-1]["content"]
+        history_count = max(0, len(user_messages) - 1) + len(
+            [
+                message
+                for message in messages
+                if message.get("role") == "assistant"
+            ]
+        )
+        content = f"live:{transcript}:history={history_count}"
+        return SimpleNamespace(
+            content=content,
+            tool_calls=[],
+            assistant_message={"role": "assistant", "content": content},
         )
 
 
 class FakeOCRAgent:
-    def run(self, *, image_path):
+    def run(self, *, image_path, instruction=""):
         return f"ocr:{image_path}"
 
 
@@ -130,7 +166,9 @@ class OrchestratorFlowTests(unittest.TestCase):
         self.assertEqual(len(self.orchestrator.list_history()), 1)
 
     def test_ocr_mode_copies_text(self) -> None:
-        interaction = self.orchestrator.run_mode("ocr", image_path="sample.png")
+        interaction = self.orchestrator.run_mode(
+            "ocr", image_path="sample.png"
+        )
 
         self.assertEqual(interaction.extracted_text, "ocr:sample.png")
         self.assertEqual(self.clipboard.last_copied_text, "ocr:sample.png")
@@ -142,9 +180,13 @@ class OrchestratorFlowTests(unittest.TestCase):
             "live", recording_path=str(recording_path)
         )
 
-        self.assertTrue(interaction.recording_path.endswith("turn-001-user.wav"))
+        self.assertTrue(
+            interaction.recording_path.endswith("turn-001-user.wav")
+        )
         self.assertEqual(interaction.transcript, "transcribed:turn.wav")
-        self.assertEqual(interaction.response, "live:transcribed:turn.wav:history=0")
+        self.assertEqual(
+            interaction.response, "live:transcribed:turn.wav:history=0"
+        )
         self.assertTrue(interaction.speech_path.endswith(".wav"))
         self.assertEqual(
             self.tts_agent.calls[0][0],
@@ -185,7 +227,9 @@ class OrchestratorFlowTests(unittest.TestCase):
             "live", session=second_session, recording_path=str(recording_path)
         )
 
-        self.assertEqual(interaction.response, "live:transcribed:turn.wav:history=0")
+        self.assertEqual(
+            interaction.response, "live:transcribed:turn.wav:history=0"
+        )
 
 
 if __name__ == "__main__":

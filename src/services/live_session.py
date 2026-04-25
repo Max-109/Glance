@@ -58,7 +58,9 @@ class LiveSessionController:
             if callable(set_output_device):
                 set_output_device(output_device_id)
 
-    def set_status_callback(self, callback: Callable[[str, str], None] | None) -> None:
+    def set_status_callback(
+        self, callback: Callable[[str, str], None] | None
+    ) -> None:
         self._on_status = callback
 
     def toggle(self) -> None:
@@ -72,8 +74,7 @@ class LiveSessionController:
             return
         if self._orchestrator is None:
             self._set_status(
-                "idle",
-                "Finish setting up your providers to use Live.",
+                "idleFinish setting up your providers to use Live.",
             )
             return
         if self._recorder is None:
@@ -127,8 +128,13 @@ class LiveSessionController:
                     if self._stop_event.is_set():
                         break
                     if str(exc) == "No speech was detected.":
-                        logger.info("No speech detected before wait timeout; going idle")
-                        self._set_status("idle", "No speech detected. Live is idle.")
+                        logger.info(
+                            "No speech detected before wait timeout; going "
+                            "idle"
+                        )
+                        self._set_status(
+                            "idle", "No speech detected. Live is idle."
+                        )
                         break
                     self._set_status("idle", str(exc))
                     break
@@ -159,6 +165,23 @@ class LiveSessionController:
                 if self._stop_event.is_set():
                     break
 
+                if not str(interaction.speech_path).strip():
+                    if self._state != "idle":
+                        self._set_status(
+                            "idle",
+                            str(interaction.response).strip()
+                            or "Live is idle.",
+                        )
+                    logger.info(
+                        "live turn completed\ncapture    %.1f ms\npipeline   "
+                        "%.1f ms\nplayback   %.1f ms\ntotal      %.1f ms",
+                        capture_elapsed_ms,
+                        pipeline_elapsed_ms,
+                        playback_elapsed_ms,
+                        _elapsed_ms(turn_started_at),
+                    )
+                    break
+
                 self._set_status("speaking", "Speaking...")
                 playback_started_at = perf_counter()
                 try:
@@ -179,13 +202,16 @@ class LiveSessionController:
 
                 playback_elapsed_ms = _elapsed_ms(playback_started_at)
                 logger.info(
-                    "live turn completed\ncapture    %.1f ms\npipeline   %.1f ms\nplayback   %.1f ms\ntotal      %.1f ms",
+                    "live turn completed\ncapture    %.1f ms\npipeline   %.1f "
+                    "ms\nplayback   %.1f ms\ntotal      %.1f ms",
                     capture_elapsed_ms,
                     pipeline_elapsed_ms,
                     playback_elapsed_ms,
                     _elapsed_ms(turn_started_at),
                 )
-        except Exception as exc:  # pragma: no cover - defensive runtime logging.
+        except (
+            Exception
+        ) as exc:  # pragma: no cover - defensive runtime logging.
             logger.exception("Unexpected live session failure")
             self._set_status("idle", f"Live failed: {exc}")
         finally:

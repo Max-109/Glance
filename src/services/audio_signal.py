@@ -27,9 +27,13 @@ class AudioTestSignalService:
             envelope *= min(tail_index / (sample_rate * 0.05), 1.0)
             sample = math.sin(2 * math.pi * frequency_hz * index / sample_rate)
             amplitude = int(sample * volume * envelope * 32767)
-            samples.extend(amplitude.to_bytes(2, byteorder="little", signed=True))
+            samples.extend(
+                amplitude.to_bytes(2, byteorder="little", signed=True)
+            )
 
-        return self._write_wav(output_path, sample_rate=sample_rate, samples=bytes(samples))
+        return self._write_wav(
+            output_path, sample_rate=sample_rate, samples=bytes(samples)
+        )
 
     def write_live_mode_cues(self, output_dir: Path) -> dict[str, Path]:
         return {
@@ -54,6 +58,14 @@ class AudioTestSignalService:
                     (698.46, 0.034, 0.13),
                     (None, 0.014, 0.0),
                     (523.25, 0.082, 0.18),
+                ],
+            ),
+            "ocr_complete": self._write_tone_sequence(
+                output_dir / "live-ocr-complete.wav",
+                [
+                    (1760.0, 0.018, 0.11),
+                    (None, 0.012, 0.0),
+                    (2349.32, 0.032, 0.17),
                 ],
             ),
         }
@@ -83,11 +95,17 @@ class AudioTestSignalService:
                     )
                     sample = (fundamental + harmonic) / 1.22
                     amplitude = int(sample * volume * envelope * 32767)
-                samples.extend(amplitude.to_bytes(2, byteorder="little", signed=True))
+                samples.extend(
+                    amplitude.to_bytes(2, byteorder="little", signed=True)
+                )
 
-        return self._write_wav(output_path, sample_rate=sample_rate, samples=bytes(samples))
+        return self._write_wav(
+            output_path, sample_rate=sample_rate, samples=bytes(samples)
+        )
 
-    def _write_wav(self, output_path: Path, *, sample_rate: int, samples: bytes) -> Path:
+    def _write_wav(
+        self, output_path: Path, *, sample_rate: int, samples: bytes
+    ) -> Path:
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
         with wave.open(str(output_path), "wb") as wav_file:

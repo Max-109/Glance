@@ -50,6 +50,8 @@ class ModeStrategyFactory:
                 llm_agent=llm_agent,
                 tts_agent=tts_agent,
                 screen_capture_agent=screen_capture_agent,
+                ocr_agent=ocr_agent,
+                clipboard_service=clipboard_service,
                 settings=settings,
             )
         raise ValidationError(f"Unsupported mode: {mode!r}")

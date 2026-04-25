@@ -84,7 +84,9 @@ class GlobalHotkeyManagerTests(unittest.TestCase):
         with (
             patch.object(global_hotkeys, "keyboard", keyboard_module),
             patch.object(
-                global_hotkeys, "_input_monitoring_is_trusted", return_value=True
+                global_hotkeys,
+                "_input_monitoring_is_trusted",
+                return_value=True,
             ),
         ):
             manager.update_bindings(AppSettings())
@@ -101,7 +103,9 @@ class GlobalHotkeyManagerTests(unittest.TestCase):
         with (
             patch.object(global_hotkeys, "keyboard", keyboard_module),
             patch.object(
-                global_hotkeys, "_input_monitoring_is_trusted", return_value=True
+                global_hotkeys,
+                "_input_monitoring_is_trusted",
+                return_value=True,
             ),
         ):
             manager.update_bindings(AppSettings())
@@ -110,7 +114,9 @@ class GlobalHotkeyManagerTests(unittest.TestCase):
         self.assertTrue(keyboard_module.listener.stopped)
         self.assertEqual(keyboard_module.listener.joined_with, 1.0)
 
-    def test_update_bindings_reuses_listener_and_rebuilds_hotkeys(self) -> None:
+    def test_update_bindings_reuses_listener_and_rebuilds_hotkeys(
+        self,
+    ) -> None:
         keyboard_module = FakeKeyboardModule()
         manager = global_hotkeys.GlobalHotkeyManager({"live": lambda: None})
         first_settings = AppSettings()
@@ -127,7 +133,9 @@ class GlobalHotkeyManagerTests(unittest.TestCase):
         with (
             patch.object(global_hotkeys, "keyboard", keyboard_module),
             patch.object(
-                global_hotkeys, "_input_monitoring_is_trusted", return_value=True
+                global_hotkeys,
+                "_input_monitoring_is_trusted",
+                return_value=True,
             ),
         ):
             manager.update_bindings(first_settings)
@@ -136,24 +144,32 @@ class GlobalHotkeyManagerTests(unittest.TestCase):
         self.assertEqual(len(keyboard_module.listeners), 1)
         self.assertEqual(keyboard_module.hotkeys[-1].keys, "<cmd>+k")
 
-    def test_update_bindings_raises_permission_error_when_untrusted(self) -> None:
+    def test_update_bindings_raises_permission_error_when_untrusted(
+        self,
+    ) -> None:
         manager = global_hotkeys.GlobalHotkeyManager({"live": lambda: None})
 
         with (
             patch.object(global_hotkeys, "keyboard", FakeKeyboardModule()),
             patch.object(
-                global_hotkeys, "_input_monitoring_is_trusted", return_value=False
+                global_hotkeys,
+                "_input_monitoring_is_trusted",
+                return_value=False,
             ),
         ):
             with self.assertRaises(PermissionDeniedError):
                 manager.update_bindings(AppSettings())
 
     def test_input_monitoring_uses_application_services_symbol(self) -> None:
-        fake_framework = type("FakeFramework", (), {"AXIsProcessTrusted": lambda: True})
+        fake_framework = type(
+            "FakeFramework", (), {"AXIsProcessTrusted": lambda: True}
+        )
 
         with (
             patch.object(global_hotkeys.sys, "platform", "darwin"),
-            patch.object(global_hotkeys, "ApplicationServices", fake_framework),
+            patch.object(
+                global_hotkeys, "ApplicationServices", fake_framework
+            ),
             patch.object(global_hotkeys, "HIServices", None),
         ):
             self.assertTrue(global_hotkeys._input_monitoring_is_trusted())

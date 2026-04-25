@@ -1,1 +1,1 @@
-"""Mode strategy implementations."""
+"Mode strategy implementations."

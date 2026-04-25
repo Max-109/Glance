@@ -20,6 +20,11 @@ from src.services.providers import (
     _speech_response_format,
     _wrap_pcm_file_as_wav,
 )
+from src.services.ocr import (
+    NO_VISIBLE_TEXT_SENTINEL,
+    OCRService,
+    sanitize_ocr_output,
+)
 from src.strategies.live_strategy import LiveStrategy
 from src.strategies.ocr_strategy import OCRStrategy
 from src.strategies.quick_strategy import QuickStrategy
@@ -52,8 +57,8 @@ class DummyProvider:
             text=transcript,
         )
 
-    def extract_text(self, image_path: str) -> str:
-        return image_path
+    def extract_text(self, image_path: str, *, instruction: str = "") -> str:
+        return f"{instruction}:{image_path}" if instruction else image_path
 
     def transcribe(self, audio_path: str) -> str:
         return audio_path
@@ -62,6 +67,51 @@ class DummyProvider:
         self, text: str, output_path: Path, *, voice_id: str | None = None
     ) -> str:
         return str(output_path)
+
+
+class DummyClipboard:
+    def __init__(self) -> None:
+        self.last_copied_text = ""
+
+    def copy_text(self, text: str) -> None:
+        self.last_copied_text = text
+
+
+class OCRServiceTests(unittest.TestCase):
+    def test_sanitize_ocr_output_removes_code_fence_and_intro(self) -> None:
+        self.assertEqual(
+            sanitize_ocr_output(
+                "Here is the extracted text:\n```text\nA\nB\n```"
+            ),
+            "A\nB",
+        )
+        self.assertEqual(
+            sanitize_ocr_output("```text\nA\nB\n```"),
+            "A\nB",
+        )
+
+    def test_sanitize_no_visible_text_sentinel_into_empty_text(
+        self,
+    ) -> None:
+        self.assertEqual(sanitize_ocr_output(NO_VISIBLE_TEXT_SENTINEL), "")
+
+    def test_extract_to_clipboard_copies_sanitized_text(self) -> None:
+        provider = DummyProvider()
+        clipboard = DummyClipboard()
+        service = OCRService(OCRAgent(provider), clipboard)
+
+        result = service.extract_to_clipboard(
+            image_path="Receipt.png",
+            instruction="Extract only the receipt total.",
+        )
+
+        self.assertEqual(
+            result.text, "Extract only the receipt total.:Receipt.png"
+        )
+        self.assertEqual(
+            clipboard.last_copied_text,
+            "Extract only the receipt total.:Receipt.png",
+        )
 
 
 class ModeStrategyFactoryTests(unittest.TestCase):
@@ -116,12 +166,13 @@ class SpeechProviderFormatTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             pcm_path = Path(temp_dir) / "reply.wav"
             pcm_path.write_bytes(
-                b"\xff\xff\xf1\xff\xed\xff\xee\xff" + ((b"\x00\x00\x01\x00") * 64)
+                b"\xff\xff\xf1\xff\xed\xff\xee\xff"
+                + ((b"\x00\x00\x01\x00") * 64)
             )
 
             self.assertIsNone(_detect_audio_format(pcm_path))
 
-    def test_normalize_synthesized_audio_renames_mismatched_mp3_when_wav_conversion_unavailable(
+    def test_normalize_audio_renames_mp3_when_wav_convert_unavailable(
         self,
     ) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -129,15 +180,18 @@ class SpeechProviderFormatTests(unittest.TestCase):
             output_path.write_bytes(b"ID3\x04\x00\x00\x00\x00\x00\x00")
 
             with patch(
-                "src.services.providers._convert_audio_to_wav", return_value=None
+                "src.services.providers._convert_audio_to_wav",
+                return_value=None,
             ):
-                normalized_path = _normalize_synthesized_audio(output_path, "wav")
+                normalized_path = _normalize_synthesized_audio(
+                    output_path, "wav"
+                )
 
             self.assertEqual(normalized_path.suffix, ".mp3")
             self.assertTrue(normalized_path.exists())
             self.assertFalse(output_path.exists())
 
-    def test_normalize_synthesized_audio_wraps_headerless_pcm_when_wav_requested(
+    def test_normalize_audio_wraps_headerless_pcm_for_wav(
         self,
     ) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -159,7 +213,8 @@ class SpeechProviderFormatTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             output_path = Path(temp_dir) / "reply.wav"
             output_path.write_bytes(
-                b"\xff\xff\xf1\xff\xed\xff\xee\xff" + ((b"\x00\x00\x01\x00") * 64)
+                b"\xff\xff\xf1\xff\xed\xff\xee\xff"
+                + ((b"\x00\x00\x01\x00") * 64)
             )
 
             normalized_path = _normalize_synthesized_audio(output_path, "wav")

@@ -34,23 +34,31 @@ class SessionDirectoryRepositoryTests(unittest.TestCase):
             session_dirs = list((temp_path / "sessions").iterdir())
 
             self.assertEqual(len(loaded), 1)
-            self.assertEqual(loaded[0].interactions[0].summary(), "Quick: Question")
+            self.assertEqual(
+                loaded[0].interactions[0].summary(), "Quick: Question"
+            )
             self.assertEqual(len(session_dirs), 1)
             self.assertTrue((session_dirs[0] / "session.json").exists())
             self.assertTrue((session_dirs[0] / "conversation.md").exists())
-            self.assertTrue(Path(loaded[0].interactions[0].image_path).exists())
+            self.assertTrue(
+                Path(loaded[0].interactions[0].image_path).exists()
+            )
 
     def test_load_rejects_invalid_json(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             session_dir = Path(temp_dir) / "sessions" / "bad-session"
             session_dir.mkdir(parents=True)
-            (session_dir / "session.json").write_text("not-json", encoding="utf-8")
+            (session_dir / "session.json").write_text(
+                "not-json", encoding="utf-8"
+            )
             repo = SessionDirectoryRepository(Path(temp_dir) / "sessions")
 
             with self.assertRaises(StorageError):
                 repo.load()
 
-    def test_live_interaction_round_trip_preserves_recording_path(self) -> None:
+    def test_live_interaction_round_trip_preserves_recording_path(
+        self,
+    ) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
             repo = SessionDirectoryRepository(temp_path / "sessions")
@@ -72,8 +80,12 @@ class SessionDirectoryRepositoryTests(unittest.TestCase):
             repo.save([session])
             loaded = repo.load()
             interaction = loaded[0].interactions[0]
-            self.assertTrue(interaction.recording_path.endswith("turn-001-user.wav"))
-            self.assertTrue(interaction.speech_path.endswith("turn-001-assistant.mp3"))
+            self.assertTrue(
+                interaction.recording_path.endswith("turn-001-user.wav")
+            )
+            self.assertTrue(
+                interaction.speech_path.endswith("turn-001-assistant.mp3")
+            )
             self.assertTrue(Path(interaction.recording_path).exists())
             self.assertTrue(Path(interaction.speech_path).exists())
 
@@ -117,7 +129,9 @@ class SessionDirectoryRepositoryTests(unittest.TestCase):
             saved_payload = (session_dir / "session.json").read_text(
                 encoding="utf-8"
             )
-            markdown = (session_dir / "conversation.md").read_text(encoding="utf-8")
+            markdown = (session_dir / "conversation.md").read_text(
+                encoding="utf-8"
+            )
             loaded_tool_call = loaded[0].interactions[0].tool_calls[0]
 
             self.assertIn('"tool_calls"', saved_payload)

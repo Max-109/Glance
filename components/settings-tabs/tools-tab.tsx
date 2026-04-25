@@ -16,6 +16,14 @@ const TOOL_CARDS = [
     description: "Use the current screen when the question needs visual context.",
   },
   {
+    id: "ocr",
+    title: "OCR",
+    icon: "capture",
+    policyField: "tool_ocr_policy",
+    notice: "Example: I'll read the text on your screen.",
+    description: "Extract exact visible text and tables, then copy them to clipboard.",
+  },
+  {
     id: "search",
     title: "Web Search",
     icon: "world-search",
@@ -82,7 +90,7 @@ export function ToolsTab({
           </div>
         </div>
 
-        <div className="grid gap-4 px-5 py-5 lg:grid-cols-3">
+        <div className="grid gap-4 px-5 py-5 lg:grid-cols-4">
           {TOOL_CARDS.map((tool) => {
             const enabled = policyEnabled(settingValue(state, tool.policyField));
             return (
