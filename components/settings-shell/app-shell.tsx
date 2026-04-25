@@ -54,7 +54,7 @@ export function GlanceAppShell({
 }) {
   const runtimeLabel = RUNTIME_LABELS[state.runtimeState] || RUNTIME_LABELS.idle;
   const hasValidationErrors = Object.keys(state.errors).length > 0;
-  const saveLabel = state.manualSaveDirty ? "Save Provider Changes" : "Save Changes";
+  const saveLabel = "Save Changes";
 
   return (
     <main
