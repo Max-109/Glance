@@ -64,7 +64,6 @@ export interface BridgeState {
   ttsModelOptions: string[];
   voiceOptions: string[];
   voiceOptionLabels: Record<string, string>;
-  languageOptions: string[];
   promptDefaults: Record<string, string>;
   historyPreview: HistoryPreviewItem[];
   historyStats: HistoryStats;
@@ -137,7 +136,7 @@ export function sectionMeta(section: SectionId): {
   if (section === "voice") {
     return {
       title: "Voice",
-      description: "Choose a voice, preview it, and set a default language.",
+      description: "Choose a voice and preview recorded samples.",
     };
   }
   if (section === "tools") {

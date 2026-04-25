@@ -11,7 +11,6 @@ import { Icon } from "@/components/icons";
 import { cn } from "@/lib/utils";
 
 import {
-  LANGUAGE_LABELS,
   type SettingsTabProps,
   settingValue,
 } from "./shared";
@@ -102,25 +101,12 @@ const VOICE_PERSONALITIES: Record<string, VoicePersonality> = {
   },
 };
 
-const LANGUAGE_FLAGS: Record<string, string> = {
-  en: "🇺🇸",
-  lt: "🇱🇹",
-  fr: "🇫🇷",
-  de: "🇩🇪",
-  es: "🇪🇸",
-};
-
 function splitVoiceLabel(label: string): { name: string; detail: string } {
   const [name, detail] = label.split(" - ");
   return {
     name: name || label,
     detail: detail || "Glance chooses a voice for each reply based on emotions.",
   };
-}
-
-function splitLanguageLabel(label: string): { name: string; code: string } {
-  const [name, code] = label.split(" · ");
-  return { name: name || label, code: code || label.slice(0, 2).toUpperCase() };
 }
 
 function getVoicePersonality(name: string): VoicePersonality {
@@ -216,7 +202,6 @@ export function VoiceTab({
   onRunAction,
 }: Pick<SettingsTabProps, "state" | "onSetField" | "onRunAction">) {
   const selectedVoice = settingValue(state, "tts_voice_id") || state.voiceOptions[0] || "auto";
-  const selectedLanguage = settingValue(state, "fallback_language") || "en";
   const selectedLabel = state.voiceOptionLabels[selectedVoice] || selectedVoice;
   const selectedVoiceMeta = splitVoiceLabel(selectedLabel);
   const selectedPersonality = getVoicePersonality(
@@ -333,55 +318,6 @@ export function VoiceTab({
               )}
             </div>
           </article>
-
-          <section className="grid gap-3" aria-labelledby="language-picker-title">
-            <div>
-              <h2 id="language-picker-title" className="text-sm font-semibold text-[var(--text-strong)]">
-                Default language
-              </h2>
-              <p className="mt-1 text-xs text-[var(--text-muted)]">
-                Used when Glance cannot infer a language from the conversation.
-              </p>
-            </div>
-
-            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
-              {state.languageOptions.map((language) => {
-                const { name, code } = splitLanguageLabel(LANGUAGE_LABELS[language] || language);
-                const selected = language === selectedLanguage;
-                return (
-                  <button
-                    key={language}
-                    type="button"
-                    className={cn(
-                      "flex min-h-20 items-center gap-3 rounded-2xl border bg-card px-3 text-left transition-[background-color,border-color,box-shadow,transform] active:scale-[0.99] focus-visible:ring-4 focus-visible:ring-[color-mix(in_srgb,var(--accent)_12%,transparent)]",
-                      selected
-                        ? "border-[color-mix(in_srgb,var(--accent)_46%,transparent)] bg-[color-mix(in_srgb,var(--accent)_9%,var(--card))] text-[var(--text-strong)]"
-                        : "border-white/10 text-[var(--text-muted)] hover:bg-white/[0.03]",
-                    )}
-                    aria-pressed={selected}
-                    onClick={() => onSetField("fallback_language", language)}
-                  >
-                    <span
-                      className={cn(
-                        "grid size-12 shrink-0 place-items-center rounded-2xl border text-xl",
-                        selected
-                          ? "border-[color-mix(in_srgb,var(--accent)_44%,transparent)] bg-[color-mix(in_srgb,var(--accent)_16%,transparent)]"
-                          : "border-white/10 bg-white/[0.035]",
-                      )}
-                    >
-                      {LANGUAGE_FLAGS[language] || "🏳️"}
-                    </span>
-                    <span className="min-w-0">
-                      <span className="block truncate text-sm font-semibold">{name}</span>
-                      <span className="mt-0.5 block font-mono text-[0.68rem] uppercase tracking-[0.16em] text-[var(--text-muted)]">
-                        {code}
-                      </span>
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </section>
 
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
             {otherVoices.map((voiceId) => {

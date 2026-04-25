@@ -544,18 +544,7 @@ class OpenAICompatibleProvider:
         override = self._shared_prompt_override()
         if override:
             prompt += f" Additional instructions: {override}"
-        if match_user_language:
-            prompt += (
-                " Reply in the same language as the user's spoken request, unless the user "
-                "explicitly asks you to use another language. If they ask for another language, "
-                "answer in that language immediately in the same reply."
-            )
-        else:
-            prompt += (
-                f" Reply in {self._settings.fallback_language} unless the user explicitly asks "
-                "for another language. If they ask for another language, answer in that language "
-                "immediately in the same reply."
-            )
+        prompt += _language_reply_instruction()
         prompt += (
             " Keep the delivery conversational and pleasant, without sounding forced, overly "
             "cheerful, or theatrical."
@@ -584,11 +573,7 @@ class OpenAICompatibleProvider:
         override = self._shared_prompt_override()
         if override:
             prompt += f" Additional instructions: {override}"
-        prompt += (
-            " Reply in the same language as the user's spoken request, unless the user explicitly "
-            "asks you to use another language. If they ask for another language, answer in that "
-            "language immediately in the same reply."
-        )
+        prompt += _language_reply_instruction()
         if self._settings.tts_voice_id == AUTO_TTS_VOICE_ID:
             prompt += (
                 " Auto voice selection is active. First choose the single best voice ID from the "
@@ -1251,6 +1236,15 @@ def _input_audio_payload_from_path(audio_path: Path) -> dict[str, str]:
         "data": base64.b64encode(audio_bytes).decode("ascii"),
         "format": audio_format,
     }
+
+
+def _language_reply_instruction() -> str:
+    return (
+        " Reply in the same language as the user's request, unless the user explicitly asks "
+        "you to use another language. If they ask for another language, answer in that "
+        "language immediately in the same reply. Do not claim you are limited to English "
+        "or cannot speak a requested language; attempt the requested language directly."
+    )
 
 
 def _file_to_data_url(file_path: Path) -> str:

@@ -45,10 +45,16 @@ class SettingsViewModel(QObject):
         {
             "llm_base_url",
             "llm_api_key",
+            "llm_model_name",
+            "live_keybind",
+            "quick_keybind",
+            "ocr_keybind",
             "tts_base_url",
             "tts_api_key",
+            "tts_model",
             "transcription_base_url",
             "transcription_api_key",
+            "transcription_model_name",
         }
     )
 
@@ -261,10 +267,6 @@ class SettingsViewModel(QObject):
             voice_id: get_tts_voice_label(voice_id) for voice_id in TTS_VOICE_OPTIONS
         }
 
-    @Property("QStringList", constant=True)
-    def languageOptions(self) -> list[str]:
-        return ["en", "lt", "fr", "de", "es"]
-
     @Property("QVariantMap", constant=True)
     def promptDefaults(self) -> dict[str, str]:
         return dict(PROMPT_DEFAULTS)
@@ -300,6 +302,8 @@ class SettingsViewModel(QObject):
             self.errorsChanged.emit()
         self._recompute_dirty()
         self.settingsChanged.emit()
+        if field_name not in self._MANUAL_SAVE_FIELDS:
+            self._apply_autosave()
 
     @Slot()
     def save(self) -> None:
@@ -610,7 +614,6 @@ class SettingsViewModel(QObject):
         self._validate_optional_url(payload, "tts_base_url", errors)
         self._require_text(payload, "tts_model", errors)
         self._require_text(payload, "tts_voice_id", errors)
-        self._require_text(payload, "fallback_language", errors)
         self._require_text(payload, "live_keybind", errors)
         self._require_text(payload, "quick_keybind", errors)
         self._require_text(payload, "ocr_keybind", errors)

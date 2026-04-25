@@ -197,13 +197,22 @@ class SettingsViewModelKeybindTests(unittest.TestCase):
         )
         self.assertTrue(self.viewmodel.dirty)
 
-    def test_audio_fields_stay_dirty_until_manual_save(self) -> None:
+    def test_audio_fields_autosave(self) -> None:
         self.viewmodel.setField("audio_vad_threshold", "0.6")
 
         self.assertEqual(
-            self.settings_manager.reload().audio_vad_threshold, 0.5
+            self.settings_manager.reload().audio_vad_threshold, 0.6
         )
-        self.assertTrue(self.viewmodel.dirty)
+        self.assertFalse(self.viewmodel.dirty)
+
+    def test_voice_selection_autosaves(self) -> None:
+        self.viewmodel.setField("tts_voice_id", "UgBBYS2sOqTuMpoF3BR0")
+
+        self.assertEqual(
+            self.settings_manager.reload().tts_voice_id,
+            "UgBBYS2sOqTuMpoF3BR0",
+        )
+        self.assertFalse(self.viewmodel.dirty)
 
     def test_build_history_preview_uses_latest_interaction_summary_and_answer(self) -> None:
         session = self.viewmodel._history_manager.start_session("quick")

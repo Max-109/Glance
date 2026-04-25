@@ -117,7 +117,6 @@ class AppSettings:
     tts_api_key: str = ""
     tts_model: str = "eleven-v3"
     tts_voice_id: str = DEFAULT_TTS_VOICE
-    fallback_language: str = "en"
     history_retention_enabled: bool = True
     history_length: int = 50
     tools_enabled: bool = False
@@ -176,8 +175,6 @@ class AppSettings:
             raise ValidationError(
                 "transcription_reasoning must be minimal, low, medium, or high."
             )
-        if not self.fallback_language.strip():
-            raise ValidationError("fallback_language cannot be empty.")
         if self.history_length <= 0:
             raise ValidationError("history_length must be positive.")
         for field_name in (
@@ -265,7 +262,6 @@ class AppSettings:
             tts_voice_id=normalize_tts_voice_id(
                 data.get("tts_voice_id", cls.tts_voice_id)
             ),
-            fallback_language=data.get("fallback_language", cls.fallback_language),
             history_retention_enabled=coerce_bool(
                 data.get("history_retention_enabled", cls.history_retention_enabled)
             ),

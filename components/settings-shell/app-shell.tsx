@@ -53,6 +53,8 @@ export function GlanceAppShell({
   onDiscard: () => void;
 }) {
   const runtimeLabel = RUNTIME_LABELS[state.runtimeState] || RUNTIME_LABELS.idle;
+  const hasValidationErrors = Object.keys(state.errors).length > 0;
+  const saveLabel = state.manualSaveDirty ? "Save Provider Changes" : "Save Changes";
 
   return (
     <main
@@ -172,9 +174,14 @@ export function GlanceAppShell({
               {footerStatus}
             </span>
             <div className="flex items-center gap-2">
-              {state.manualSaveDirty ? (
-                <GlanceButton icon="check" variant="primary" onClick={onSave}>
-                  Save Provider Changes
+              {state.dirty ? (
+                <GlanceButton
+                  icon="check"
+                  variant="primary"
+                  disabled={hasValidationErrors || state.saving}
+                  onClick={onSave}
+                >
+                  {saveLabel}
                 </GlanceButton>
               ) : null}
               <GlanceButton

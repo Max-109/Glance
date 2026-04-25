@@ -68,14 +68,6 @@ export const REASONING_ICONS: Record<string, string> = {
   high: "level-4",
 };
 
-export const LANGUAGE_LABELS: Record<string, string> = {
-  en: "English · EN",
-  lt: "Lietuvių · LT",
-  fr: "Français · FR",
-  de: "Deutsch · DE",
-  es: "Español · ES",
-};
-
 export const THEME_LABELS: Record<string, string> = {
   dark: "Dark",
   light: "Light",

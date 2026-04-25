@@ -71,7 +71,6 @@ def _build_state_snapshot(viewmodel: SettingsViewModel) -> dict[str, Any]:
         "ttsModelOptions": viewmodel.ttsModelOptions,
         "voiceOptions": viewmodel.voiceOptions,
         "voiceOptionLabels": viewmodel.voiceOptionLabels,
-        "languageOptions": viewmodel.languageOptions,
         "promptDefaults": viewmodel.promptDefaults,
         "historyPreview": viewmodel.buildHistoryPreview(),
         "historyStats": viewmodel.buildHistoryStats(),

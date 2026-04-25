@@ -63,7 +63,6 @@ const EMPTY_STATE: BridgeState = {
     tts_api_key: "",
     tts_model: "eleven-v3",
     tts_voice_id: "auto",
-    fallback_language: "en",
     history_retention_enabled: true,
     history_length: 50,
     tools_enabled: false,
@@ -138,7 +137,6 @@ const EMPTY_STATE: BridgeState = {
     tnSpp4vdxKPjI9w0GnoV: "Hope - Upbeat and Clear",
     NNl6r8mD7vthiJatiJt1: "Bradford - Expressive and Articulate",
   },
-  languageOptions: ["en", "lt", "fr", "de", "es"],
   promptDefaults: {},
   historyPreview: [],
   historyStats: {
@@ -202,6 +200,29 @@ function isMacDesktopPlatform() {
   }
 
   return /mac/i.test(`${navigator.platform} ${navigator.userAgent}`);
+}
+
+function hasValidationErrors(state: BridgeState): boolean {
+  return Object.keys(state.errors).length > 0;
+}
+
+function footerStatusForState(state: BridgeState, bridgeError: string): string {
+  if (bridgeError) {
+    return "Not connected";
+  }
+  if (state.saving) {
+    return "Saving provider changes";
+  }
+  if (state.manualSaveDirty) {
+    return "Provider changes not saved";
+  }
+  if (hasValidationErrors(state)) {
+    return "Fix highlighted fields";
+  }
+  if (state.dirty) {
+    return "Changes not saved";
+  }
+  return "All changes saved";
 }
 
 function buildThemeStyle(
@@ -809,15 +830,7 @@ export function SettingsPage() {
     );
   }
 
-  const footerStatus = bridgeError
-    ? "Not connected"
-    : liveState.saving
-      ? "Saving provider changes"
-      : liveState.manualSaveDirty
-        ? "Provider changes not saved"
-        : liveState.dirty
-          ? "Fix highlighted fields"
-          : "All changes saved";
+  const footerStatus = footerStatusForState(liveState, bridgeError);
 
   const discardLabel = liveState.manualSaveDirty
     ? "Discard provider changes"

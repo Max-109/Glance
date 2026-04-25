@@ -25,7 +25,6 @@ class ProviderPromptTests(unittest.TestCase):
                 "llm_base_url": "https://api.example.com/v1",
                 "llm_model_name": "model-a",
                 "tts_base_url": "https://tts.example.com/v1",
-                "fallback_language": "en",
                 "system_prompt_override": "Be extra attentive to follow-up questions.",
             },
             validate=False,
@@ -77,11 +76,17 @@ class ProviderPromptTests(unittest.TestCase):
         self.assertIn("You are a terse text assistant.", prompt)
         self.assertNotIn(DEFAULT_TEXT_REPLY_PROMPT, prompt)
 
-    def test_system_prompt_supports_immediate_language_switch(self) -> None:
-        prompt = self.provider._build_system_prompt(match_user_language=True)
+    def test_system_prompt_matches_user_language_and_supports_immediate_switch(self) -> None:
+        prompt = self.provider._build_system_prompt(match_user_language=False)
 
+        self.assertIn("Reply in the same language as the user's request", prompt)
+        self.assertNotIn("Reply in en", prompt)
         self.assertIn(
             "If they ask for another language, answer in that language immediately in the same reply.",
+            prompt,
+        )
+        self.assertIn(
+            "Do not claim you are limited to English or cannot speak a requested language",
             prompt,
         )
 
