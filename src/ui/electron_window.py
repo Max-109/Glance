@@ -60,12 +60,14 @@ class ElectronShellController(QObject):
         initial_width: int = DEFAULT_ELECTRON_WINDOW_WIDTH,
         initial_height: int = DEFAULT_ELECTRON_WINDOW_HEIGHT,
         on_bounds_changed: Callable[[int, int], None] | None = None,
+        on_quit_requested: Callable[[], None] | None = None,
     ) -> None:
         super().__init__()
         self._project_root = project_root
         self._bridge_url = bridge_url
         self._logger = logger
         self._on_bounds_changed = on_bounds_changed
+        self._on_quit_requested = on_quit_requested
         self._entrypoint = project_root / "electron" / "main.js"
         self._electron_binary = find_electron_binary(project_root)
         if not self._entrypoint.exists():
@@ -281,6 +283,10 @@ class ElectronShellController(QObject):
         if event_type == "closed":
             self._process = None
             self._set_visible(False)
+            return
+        if event_type == "quit-requested":
+            if self._on_quit_requested is not None:
+                self._on_quit_requested()
             return
         if event_type == "error":
             self._logger.error(

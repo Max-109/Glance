@@ -20,9 +20,11 @@ let isQuitting = false;
 let stdinBuffer = "";
 let staticServer = null;
 let staticServerUrl = "";
+const staticServerSockets = new Set();
 let appReady = false;
 let stdoutClosed = false;
 let latestRuntimeStatus = null;
+let quitRequestedByHost = false;
 const pendingCommands = [];
 
 const CONTENT_TYPES = {
@@ -183,6 +185,10 @@ function ensureStaticServer(rootDir) {
       }
     });
 
+    server.on("connection", (socket) => {
+      staticServerSockets.add(socket);
+      socket.once("close", () => staticServerSockets.delete(socket));
+    });
     server.once("error", reject);
     server.listen(0, "127.0.0.1", () => {
       const address = server.address();
@@ -195,6 +201,27 @@ function ensureStaticServer(rootDir) {
       resolve(staticServerUrl);
     });
   });
+}
+
+function closeStaticServer() {
+  const server = staticServer;
+  if (!server) {
+    return;
+  }
+
+  staticServer = null;
+  staticServerUrl = "";
+  try {
+    server.close();
+    if (typeof server.closeAllConnections === "function") {
+      server.closeAllConnections();
+    }
+  } finally {
+    for (const socket of staticServerSockets) {
+      socket.destroy();
+    }
+    staticServerSockets.clear();
+  }
 }
 
 function emitBounds(window) {
@@ -291,6 +318,7 @@ function handleCommand(payload) {
   }
 
   if (command === "terminate") {
+    quitRequestedByHost = true;
     isQuitting = true;
     app.quit();
     return;
@@ -350,12 +378,11 @@ app.on("window-all-closed", (event) => {
 });
 
 app.on("before-quit", () => {
-  isQuitting = true;
-  if (staticServer) {
-    staticServer.close();
-    staticServer = null;
-    staticServerUrl = "";
+  if (!quitRequestedByHost) {
+    emit({ type: "quit-requested" });
   }
+  isQuitting = true;
+  closeStaticServer();
 });
 
 app.whenReady().then(() => {
@@ -369,6 +396,7 @@ app.whenReady().then(() => {
 process.stdin.setEncoding("utf8");
 process.stdin.on("data", handleStdinChunk);
 process.stdin.on("end", () => {
+  quitRequestedByHost = true;
   isQuitting = true;
   app.quit();
 });

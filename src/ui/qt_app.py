@@ -339,6 +339,7 @@ def run_settings_app() -> int:
         initial_width=settings.electron_window_width,
         initial_height=settings.electron_window_height,
         on_bounds_changed=persist_electron_window_size,
+        on_quit_requested=app.quit,
     )
     tray = _build_tray_icon(
         app,
@@ -469,6 +470,7 @@ def _build_settings_window(
     initial_width: int,
     initial_height: int,
     on_bounds_changed,
+    on_quit_requested,
 ):
     window = ElectronShellController(
         project_root=Path(__file__).resolve().parents[2],
@@ -477,6 +479,7 @@ def _build_settings_window(
         initial_width=initial_width,
         initial_height=initial_height,
         on_bounds_changed=on_bounds_changed,
+        on_quit_requested=on_quit_requested,
     )
     logger.debug("using Electron settings shell")
     return window
