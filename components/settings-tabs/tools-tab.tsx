@@ -12,7 +12,6 @@ const TOOL_CARDS = [
     title: "Screenshot",
     icon: "photo-search",
     policyField: "tool_take_screenshot_policy",
-    notice: "Example: I'll take a quick screenshot of your code.",
     description: "Use the current screen when the question needs visual context.",
   },
   {
@@ -20,7 +19,6 @@ const TOOL_CARDS = [
     title: "OCR",
     icon: "capture",
     policyField: "tool_ocr_policy",
-    notice: "Example: I'll read the text on your screen.",
     description: "Extract exact visible text and tables, then copy them to clipboard.",
   },
   {
@@ -28,7 +26,6 @@ const TOOL_CARDS = [
     title: "Web Search",
     icon: "world-search",
     policyField: "tool_web_search_policy",
-    notice: "Example: I'm checking the weather in Vilnius.",
     description: "Look up recent or changing information from public results.",
   },
   {
@@ -36,7 +33,6 @@ const TOOL_CARDS = [
     title: "Open Page",
     icon: "fetch",
     policyField: "tool_web_fetch_policy",
-    notice: "Example: I found OpenAI. I'm opening it.",
     description: "Read a specific page when a link matters to the answer.",
   },
 ] as const;
@@ -99,7 +95,6 @@ export function ToolsTab({
                 title={tool.title}
                 description={tool.description}
                 icon={tool.icon}
-                notice={tool.notice}
                 enabled={enabled}
                 masterEnabled={masterEnabled}
                 onChange={(value) =>
@@ -118,7 +113,6 @@ function ToolCard({
   title,
   description,
   icon,
-  notice,
   enabled,
   masterEnabled,
   onChange,
@@ -126,7 +120,6 @@ function ToolCard({
   title: string;
   description: string;
   icon: string;
-  notice: string;
   enabled: boolean;
   masterEnabled: boolean;
   onChange: (value: boolean) => void;
@@ -135,7 +128,7 @@ function ToolCard({
   return (
     <article
       className={cn(
-        "flex min-h-[18rem] flex-col rounded-2xl border bg-black/10 p-5 transition-[border-color,background-color,box-shadow]",
+        "flex min-h-[14rem] flex-col rounded-2xl border bg-black/10 p-5 transition-[border-color,background-color,box-shadow]",
         active
           ? "border-[color-mix(in_srgb,var(--accent)_42%,rgba(255,255,255,0.1))] bg-[color-mix(in_srgb,var(--accent)_8%,transparent)] shadow-[0_0_0_1px_color-mix(in_srgb,var(--accent)_8%,transparent)]"
           : "border-white/10",
@@ -165,14 +158,6 @@ function ToolCard({
           {description}
         </p>
       </div>
-
-      <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.035] px-3 py-3">
-        <p className="font-mono text-[0.68rem] font-bold uppercase tracking-[0.16em] text-[var(--text-muted)]">
-          adaptive speech
-        </p>
-        <p className="mt-1 text-sm text-[var(--text-strong)]">{notice}</p>
-      </div>
-
     </article>
   );
 }
