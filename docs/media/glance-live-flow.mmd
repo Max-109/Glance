@@ -1,0 +1,8 @@
+flowchart LR
+    Speech[Speech] --> VAD[TEN VAD]
+    VAD --> Input[Transcription or multimodal]
+    Input --> Reply[AI reply]
+    Reply <--> Tools[Tools]
+    Reply --> Eleven[Eleven v3]
+    Eleven --> Spoken[Spoken reply]
+    Spoken --> History[History]

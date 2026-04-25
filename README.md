@@ -1,67 +1,61 @@
 <div align="center">
-  <img src="./src/ui/glance_app_icon.svg" width="96" alt="Glance app icon" />
+  <img src="./docs/media/glance-mark.svg" width="92" alt="Glance activity mark" />
   <h1>Glance</h1>
-  <p><strong>A tray-first desktop assistant for live voice help, screen-aware tools, OCR, and spoken replies.</strong></p>
+  <p><strong>A live desktop voice agent with screen-aware tools, natural speech, and a focused Electron settings UI.</strong></p>
   <p>
-    <img alt="macOS focused" src="https://img.shields.io/badge/macOS-focused-18181b?style=flat-square&labelColor=18181b&color=f0b100" />
-    <img alt="Python runtime" src="https://img.shields.io/badge/runtime-Python%20%2B%20PySide6-18181b?style=flat-square&labelColor=18181b&color=3f3f46" />
-    <img alt="Electron shell" src="https://img.shields.io/badge/shell-Electron%20%2B%20Next.js-18181b?style=flat-square&labelColor=18181b&color=3f3f46" />
-    <img alt="Accent token" src="https://img.shields.io/badge/accent-%23F0B100-f0b100?style=flat-square&labelColor=18181b&color=f0b100" />
+    <img alt="Python runtime" src="https://img.shields.io/badge/runtime-Python%20%2B%20PySide6-18181b?style=flat-square&labelColor=18181b&color=f0b100" />
+    <img alt="Electron settings" src="https://img.shields.io/badge/settings-Electron%20%2B%20Next.js-18181b?style=flat-square&labelColor=18181b&color=3f3f46" />
+    <img alt="Speech detection" src="https://img.shields.io/badge/speech-TEN%20VAD-18181b?style=flat-square&labelColor=18181b&color=3f3f46" />
+    <img alt="Voice model" src="https://img.shields.io/badge/voice-Eleven%20v3-18181b?style=flat-square&labelColor=18181b&color=f0b100" />
   </p>
 </div>
 
-Glance lives in the menu bar, listens on your hotkey, and gives you short spoken help without making you leave the app you are using. The Python runtime owns capture, providers, sessions, audio, and hotkeys; the Electron + Next.js shell owns the settings experience.
+Glance is built for the moments when typing would break your flow. Press the Live hotkey, speak naturally, and Glance listens, reasons over the request, optionally uses the tools you allowed, and answers out loud.
 
-The UI follows the app's own accent logic: dark charcoal surfaces, restrained borders, compact controls, and one configurable accent color used for active states, ranges, status, focus, and console logging.
+The app is split into two parts. Python runs the real desktop agent: audio capture, TEN VAD speech detection, providers, tools, history, hotkeys, and the macOS tray/menu bar behavior. Electron and Next.js render the settings UI: Tools, Audio, Providers, Voice, Preferences, and History.
 
 <!--
-When the UI walkthrough GIF is ready, place it at docs/media/glance-ui.gif and uncomment this block.
-
-<p align="center">
-  <img src="./docs/media/glance-ui.gif" alt="Glance UI walkthrough" width="860" />
-</p>
+Future README GIF slot:
+docs/media/glance-ui.gif
 -->
 
-## What Glance Does
+## What It Does
 
-| Area | In the app | What it controls |
-| --- | --- | --- |
-| Tools | `Tools` | Lets Live use screen and web context when it helps: screenshots, OCR, web search, and web fetch. |
-| Audio | `Audio` | Mic, speaker, speech strictness, endpoint patience, wait time, max turn length, and preroll. |
-| Providers | `Providers` | OpenAI-compatible reply provider, transcription provider, TTS provider, models, reasoning, and API keys. |
-| Voice | `Voice` | Auto voice selection, fixed Eleven v3 voices, and recorded voice previews. |
-| Preferences | `Preferences` | Theme, accent color, prompts, Live hotkey, and OCR hotkey. |
-| History | `History` | Session retention and recent Live/OCR interaction previews. |
+| Feature | What happens |
+| --- | --- |
+| Live voice turns | Glance records speech, sends it to the configured model path, then speaks back. |
+| TEN VAD | Local voice activity detection decides when speech starts and when the turn is finished. |
+| Tools | If enabled, the model can use screenshot capture, OCR, web search, and web page fetching. |
+| Eleven v3 | The default TTS model is Eleven v3, chosen for natural delivery, voice variety, and emotion tags. |
+| Provider setup | Reply, transcription, and voice providers are configurable from the app. |
+| History | Sessions are saved with transcripts, replies, audio files, screenshots, tool records, and readable Markdown. |
 
-## Architecture
+The visual mark has four active phases: Listening, Transcribing, Generating, and Speaking. Idle is the resting state. Error briefly flashes the full mark.
+
+## Live Flow
 
 <p align="center">
-  <img src="./docs/glance-architecture.svg" alt="Glance architecture graph" width="900" />
+  <img src="./docs/media/glance-live-flow.svg" alt="Glance live turn flow" width="900" />
 </p>
-
-<details>
-<summary>Mermaid source</summary>
 
 ```mermaid
 flowchart LR
-    Hotkeys["Global hotkeys<br/>Live / OCR"] --> Tray["PySide6 tray runtime<br/>status, cues, window control"]
-    Tray --> Bridge["SettingsBridgeServer<br/>local bridge API"]
-    Bridge --> Shell["Electron + Next.js settings shell<br/>Tools, Audio, Providers, Voice, Preferences, History"]
-    Tray --> Orchestrator["Orchestrator<br/>sessions, settings, history"]
-    Orchestrator --> Live["Live strategy<br/>mic, transcript, reply, speech"]
-    Orchestrator --> OCR["OCR strategy<br/>screen capture to clipboard"]
-    Live --> Providers["OpenAI-compatible providers<br/>LLM, transcription, TTS"]
-    Live --> Tools["Runtime tools<br/>screenshot, OCR, web search, web fetch"]
-    OCR --> Providers
-    Orchestrator --> Store["~/.glance<br/>config.json, sessions, audio feedback"]
-    Shell --> Store
+    Speech[Speech] --> VAD[TEN VAD]
+    VAD --> Input[Transcription or multimodal]
+    Input --> Reply[AI reply]
+    Reply <--> Tools[Tools]
+    Reply --> Eleven[Eleven v3]
+    Eleven --> Spoken[Spoken reply]
+    Spoken --> History[History]
 ```
 
-</details>
+In normal Live mode, Glance records the turn and transcribes it before asking the reply model for an answer. In multimodal mode, the configured model can receive the audio directly and write the reply without a separate transcription step.
 
-## Quick Start
+When tools are enabled, the model only sees the tools the user allowed. The current tool set is screenshot capture, OCR, web search, and web page fetching. OCR copies extracted text to the clipboard and saves the tool record with the session.
 
-Glance is currently easiest to run on macOS, because it uses a PySide6 tray app, global hotkeys, audio devices, screen capture, and an Electron settings window.
+## Run It
+
+Glance is currently built around macOS desktop APIs: menu bar status, microphone access, screen capture, global hotkeys, and Electron for the settings window.
 
 ```bash
 python3 -m venv .venv
@@ -72,7 +66,7 @@ bun install
 GLANCE_PYTHON=.venv/bin/python bun run dev:desktop
 ```
 
-If Bun is installed through Homebrew but not on your shell `PATH`, run the launcher with the explicit binary:
+If Bun is installed through Homebrew but is not on your shell `PATH`, use the full binary path:
 
 ```bash
 BUN_BIN=/opt/homebrew/bin/bun \
@@ -80,80 +74,120 @@ GLANCE_PYTHON=.venv/bin/python \
 /opt/homebrew/bin/bun run dev:desktop
 ```
 
-The dev launcher starts the Next.js settings shell, waits for it to become available, then opens the Python desktop app with `GLANCE_NEXT_DEV_URL` and `GLANCE_AUTO_OPEN` set for you.
-
-> [!TIP]
-> macOS may ask for Microphone, Screen Recording, and Accessibility permissions. Glance needs those permissions for Live audio, OCR/screen context, and global hotkeys.
-
-## Run Modes
-
-### Desktop Dev
-
-```bash
-GLANCE_PYTHON=.venv/bin/python bun run dev:desktop
-```
-
-Use this while working on the settings shell. It runs Next.js in dev mode and points Electron at the dev server.
-
-### Built Desktop Shell
+For a built settings shell:
 
 ```bash
 bun run build
 .venv/bin/python main.py
 ```
 
-`next.config.ts` exports the settings shell into `out/`. When `GLANCE_NEXT_DEV_URL` is not set, Electron serves that static `out/index.html` through a local static server.
-
-### CLI Fallback
+For the CLI fallback:
 
 ```bash
 .venv/bin/python main.py --cli
 ```
 
-The CLI path builds the same orchestrator without opening the tray/settings shell.
+> [!TIP]
+> macOS may ask for Microphone, Screen Recording, and Accessibility permissions. Glance needs those for Live audio, screen tools/OCR, and global hotkeys.
 
-## Provider Setup
+## Use It
 
-Open `Providers` in the settings shell and configure:
+1. Open Glance.
+2. Configure Providers. Reply, Transcription, and Voice each have their own base URL, API key, and model fields.
+3. Choose audio devices and tune speech strictness in Audio.
+4. Enable only the tools you want Glance to use.
+5. Press the Live hotkey and speak.
+6. Use the OCR hotkey when you want visible text copied from the screen.
 
-| Field group | Used for |
+Settings are saved to `~/.glance/config.json`. Session data lives under `~/.glance/sessions`. Audio cues are generated under `~/.glance/audio-feedback`.
+
+## Providers
+
+Glance is not tied to one AI vendor. It expects OpenAI-compatible API shapes, so it can work with providers and gateways that expose OpenAI-style chat, audio, and speech endpoints. OpenRouter, Naga, local gateways, and many hosted model APIs fit this pattern once the base URL, key, and model are set.
+
+Anthropic-native APIs are the common exception because their request and response format is different. If you want Anthropic models, use an OpenAI-compatible gateway for them.
+
+The default voice path uses `eleven-v3`, shown in prose as Eleven v3. The prompt layer prepares speech for that model by using natural wording and small square-bracket delivery tags such as `[warmly]`, `[thoughtful]`, or `[amused]`. Fixed voices are available, and Auto can choose a voice per reply from the allowed Eleven v3 voice list.
+
+## Implementation Notes
+
+The core runtime is Python. The settings UI is React/Next.js running inside Electron.
+
+| Area | Main role |
 | --- | --- |
-| Reply provider | The Live answer model and tool-capable turns. |
-| Transcription provider | Speech-to-text for Live when multimodal audio is not enabled. |
-| Voice provider | Eleven v3 speech output and voice previews. |
-
-Settings are saved to `~/.glance/config.json`. Session history, audio feedback cues, transcripts, recordings, generated speech, and tool records live under `~/.glance/sessions` and `~/.glance/audio-feedback`.
-
-## Project Map
-
-| Path | Purpose |
-| --- | --- |
-| `main.py` | Entry point for tray mode and `--cli`. |
-| `src/ui/qt_app.py` | PySide6 tray runtime, global status, live cues, bridge server, and Electron shell controller. |
+| `main.py` | Starts desktop mode or the CLI fallback. |
+| `src/ui/qt_app.py` | PySide6 application, tray/menu bar behavior, live status, hotkeys, OCR, and Electron startup. |
 | `src/ui/electron_window.py` | Launches and controls the Electron settings window. |
-| `app/`, `components/`, `lib/` | Next.js settings shell, Glance tabs, UI primitives, bridge types, and accent styling. |
-| `src/core/orchestrator.py` | Wires settings, history, providers, agents, strategies, and clipboard services. |
-| `src/strategies/live_strategy.py` | Live voice pipeline, runtime tools, OCR handoff, and speech generation. |
-| `src/strategies/ocr_strategy.py` | Screen capture to OCR to clipboard flow. |
-| `src/services/providers.py` | OpenAI-compatible LLM, transcription, and TTS provider calls. |
-| `src/models/settings.py` | Defaults, validation, keybinds, provider fields, voice list, and `accent_color`. |
-| `tests/` | Python unit coverage and focused Electron shell tests. |
+| `src/core/orchestrator.py` | Wires settings, providers, agents, strategies, history, and clipboard behavior. |
+| `src/strategies/live_strategy.py` | Live turn pipeline, tool loop, Eleven v3 speech output, and tool records. |
+| `src/services/audio_recording.py` | TEN VAD capture, endpoint timing, preroll, wait timeout, and WAV writing. |
+| `src/tools/runtime.py` | Runtime tool registry and execution for screenshot, OCR, search, page fetch, and ending Live. |
+| `src/storage/json_storage.py` | Config/session persistence and Markdown conversation export. |
+| `components/` | Electron settings UI, tabs, controls, icons, and activity mark. |
 
-## Accent System
+The mode system uses a small Strategy + Factory Method shape:
 
-The default accent is `#f0b100`, but Glance treats it as a setting rather than a hardcoded brand color. The same value flows through:
+```python
+if normalized_mode == "ocr":
+    return OCRStrategy(...)
+if normalized_mode == "live":
+    return LiveStrategy(...)
+```
 
-- `accent_color` in `AppSettings`
-- CSS variables such as `--accent`, `--accent-strong`, `--accent-soft`, `--accent-border`, and `--accent-glow`
-- selected navigation, sliders, switches, badges, rings, and status dots
-- console log color mixing in `src/services/app_logging.py`
+That keeps `Orchestrator.run_mode(...)` clean. The orchestrator asks the factory for the right strategy, then saves the resulting interaction into the active session.
 
-That is why the README uses the same yellow-on-charcoal visual language without pretending the accent can never change.
+Factory Method fits here because Glance chooses the mode at runtime, while each strategy needs different dependencies. The orchestrator should not know how to build every mode. A Singleton would be a poor fit because tests and runtime wiring both need replaceable services.
+
+## Coursework Notes
+
+This project was built for OOP coursework, so the README also documents the implementation choices.
+
+| Requirement | How Glance covers it |
+| --- | --- |
+| Abstraction | Shared contracts such as `BaseAgent`, `ModeStrategy`, and `AbstractRepository` describe what an object can do without exposing the concrete implementation. |
+| Encapsulation | Settings validation, provider calls, recorder internals, tool execution, and storage logic hide their state behind focused class methods. |
+| Inheritance | Agents, strategies, interactions, repositories, and app exceptions extend shared base types so common behavior stays in one place. |
+| Polymorphism | The orchestrator can run different modes and agents through common methods such as `execute(...)` and `run(...)`. |
+| Composition / aggregation | The orchestrator is assembled from providers, agents, strategies, history, settings, screen capture, OCR, TTS, and clipboard services. |
+| Design pattern | Strategy is used for Live vs OCR workflows; Factory Method is used by `ModeStrategyFactory`. |
+| File read/write | Glance reads and writes `config.json`, `session.json`, `conversation.md`, audio files, screenshots, and tool result files. |
+| Testing | Python uses `unittest`; Electron window behavior is covered with Node tests. |
+| Code style | The Python code is split into clear modules and follows PEP8-style class, function, import, and naming conventions. |
+
+Short example of composition in the runtime:
+
+```python
+return Orchestrator(
+    settings=settings,
+    history_manager=history_manager,
+    strategy_factory=ModeStrategyFactory(...),
+    screen_capture_agent=ScreenCaptureAgent(),
+    transcription_agent=TranscriptionAgent(...),
+    llm_agent=LLMAgent(...),
+    ocr_agent=OCRAgent(...),
+    tts_agent=TTSAgent(...),
+    clipboard_service=ClipboardService(),
+)
+```
+
+## Results
+
+- Glance can run a complete spoken turn: detect speech, capture audio, ask a model, generate speech with Eleven v3, and save the session.
+- The tools are permission-based. If a tool is disabled, the model does not get that tool definition.
+- TEN VAD made Live feel closer to a real conversation because the app can stop recording after a natural pause instead of relying only on manual stopping.
+- The main implementation challenge was keeping the Python runtime and Electron settings UI in sync without turning the UI into the source of truth.
+- The result is a working desktop agent with a real settings shell, persistent history, tests, and a clear path for adding more tools later.
+
+## Conclusions
+
+Glance ended up as more than a wrapper around a model. It has a local desktop runtime, configurable providers, voice output, screen-aware tools, and persistent sessions. The most useful parts are the Live flow and the tool system, because they let the assistant react to what the user is doing instead of only answering isolated text prompts.
+
+Future work would be packaging, cleaner onboarding for provider setup, more tool permissions, and a polished README GIF that shows the real UI flow.
 
 ## Useful Commands
 
 ```bash
-# type-check the settings shell
+# type-check the settings UI
 bun run typecheck
 
 # build the exported Electron shell
@@ -162,15 +196,6 @@ bun run build
 # run Python tests
 .venv/bin/python -m unittest discover -s tests
 
-# run focused Electron control tests
+# run focused Electron tests
 node --test tests/electron_window_control.test.js tests/electron_window_chrome.test.js
 ```
-
-## Notes For UI Captures
-
-The best README GIF should show the real first-level app names: `Tools`, `Audio`, `Providers`, `Voice`, `Preferences`, and `History`. A good capture sequence is:
-
-1. Start on `Audio` to show the dark shell, live mic controls, and accent slider state.
-2. Switch to `Tools` and toggle tool availability.
-3. Open `Providers` and `Voice` briefly to show model/voice setup.
-4. End on the tray status changing from `Idle` into a Live interaction.

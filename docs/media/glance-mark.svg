@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-labelledby="title desc">
+  <title id="title">Glance activity mark</title>
+  <desc id="desc">Four segmented bars matching the Glance live activity indicator.</desc>
+  <defs>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  <g fill="#f0b100" filter="url(#glow)">
+    <rect x="20" y="35" width="10" height="26" rx="1.5" opacity="0.9"/>
+    <rect x="35" y="20" width="26" height="10" rx="1.5" opacity="0.72"/>
+    <rect x="66" y="35" width="10" height="26" rx="1.5" opacity="0.48"/>
+    <rect x="35" y="66" width="26" height="10" rx="1.5" opacity="0.32"/>
+  </g>
+  <g fill="#f4f4f5">
+    <rect x="20" y="35" width="10" height="26" rx="1.5" opacity="0.16"/>
+    <rect x="35" y="20" width="26" height="10" rx="1.5" opacity="0.12"/>
+    <rect x="66" y="35" width="10" height="26" rx="1.5" opacity="0.1"/>
+    <rect x="35" y="66" width="26" height="10" rx="1.5" opacity="0.08"/>
+  </g>
+</svg>
+
