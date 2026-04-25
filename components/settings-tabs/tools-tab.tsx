@@ -1,3 +1,4 @@
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Icon } from "@/components/icons";
 import { StatusBadge } from "@/components/settings-shell/status-badge";
 import { Switch } from "@/components/ui/switch";
@@ -12,7 +13,7 @@ const TOOL_CARDS = [
     title: "Screenshot",
     icon: "photo-search",
     policyField: "tool_take_screenshot_policy",
-    description: "Use the current screen when the question needs visual context.",
+    description: "Use the current screen when visual context would help.",
   },
   {
     id: "ocr",
@@ -26,14 +27,14 @@ const TOOL_CARDS = [
     title: "Web Search",
     icon: "world-search",
     policyField: "tool_web_search_policy",
-    description: "Look up recent or changing information from public results.",
+    description: "Look up recent or changing information from the web.",
   },
   {
     id: "fetch",
     title: "Open Page",
     icon: "fetch",
     policyField: "tool_web_fetch_policy",
-    description: "Read a specific page when a link matters to the answer.",
+    description: "Open a specific page when the link matters.",
   },
 ] as const;
 
@@ -52,64 +53,137 @@ export function ToolsTab({
   const enabledCount = TOOL_CARDS.filter((tool) =>
     policyEnabled(settingValue(state, tool.policyField)),
   ).length;
+  const disabledCount = TOOL_CARDS.length - enabledCount;
 
   return (
-    <div className="grid gap-5">
-      <section className="overflow-hidden rounded-2xl border border-white/10 bg-card shadow-none">
-        <div className="border-b border-white/10 px-5 py-4">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div className="min-w-0">
-              <div className="flex items-center gap-3">
-                <span className="grid size-11 place-items-center rounded-2xl border border-[color-mix(in_srgb,var(--accent)_36%,transparent)] bg-[color-mix(in_srgb,var(--accent)_14%,transparent)] text-[var(--accent-strong)]">
-                  <Icon name="tools" className="size-5" />
-                </span>
-                <div>
-                  <h2 className="text-base font-semibold text-[var(--text-strong)]">
-                    Live tools
-                  </h2>
-                  <p className="mt-1 text-sm text-[var(--text-muted)]">
-                    Let Glance decide when a screenshot or web lookup would help.
-                  </p>
+    <div className="grid gap-4">
+      <Card className="shell-surface gap-0 overflow-hidden rounded-2xl py-0 shadow-none">
+        <CardHeader className="border-b border-border px-5 py-4">
+          <div className="flex min-w-0 items-center justify-between gap-4">
+            <div className="flex min-w-0 items-center gap-4">
+              <span
+                className={cn(
+                  "grid size-12 shrink-0 place-items-center rounded-2xl border border-[var(--panel-border)] bg-[var(--chip-bg-soft)] text-[var(--text-muted)]",
+                  masterEnabled && "text-[var(--accent-strong)]",
+                )}
+              >
+                <Icon name="tools" className="size-5" />
+              </span>
+              <div className="min-w-0">
+                <div className="flex min-w-0 flex-wrap items-center gap-3">
+                  <CardTitle className="text-base font-semibold">Live tools</CardTitle>
+                  <StatusBadge tone={masterEnabled ? "accent" : "disabled"}>
+                    {masterEnabled ? `${enabledCount} enabled` : "off"}
+                  </StatusBadge>
                 </div>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Let Glance decide when screen or web context helps.
+                </p>
               </div>
             </div>
-            <div className="flex shrink-0 items-center gap-2">
-              <StatusBadge tone={masterEnabled ? "accent" : "disabled"}>
-                {masterEnabled ? `${enabledCount} enabled` : "off"}
-              </StatusBadge>
-              <Switch
-                checked={masterEnabled}
-                onCheckedChange={(value) => onSetField("tools_enabled", value)}
-                aria-label="Enable Live tools"
-              />
-            </div>
+            <Switch
+              checked={masterEnabled}
+              onCheckedChange={(value) => onSetField("tools_enabled", value)}
+              aria-label="Enable Live tools"
+            />
           </div>
-        </div>
+        </CardHeader>
 
-        <div className="grid gap-4 px-5 py-5 lg:grid-cols-4">
-          {TOOL_CARDS.map((tool) => {
-            const enabled = policyEnabled(settingValue(state, tool.policyField));
-            return (
-              <ToolCard
-                key={tool.id}
-                title={tool.title}
-                description={tool.description}
-                icon={tool.icon}
-                enabled={enabled}
-                masterEnabled={masterEnabled}
-                onChange={(value) =>
-                  onSetField(tool.policyField, value ? "allow" : "deny")
-                }
-              />
-            );
-          })}
-        </div>
-      </section>
+        <CardContent className="grid gap-5 px-5 py-5">
+          <div className="grid gap-4 xl:grid-cols-[minmax(17rem,0.48fr)_minmax(0,1fr)]">
+            <section
+              className={cn(
+                "flex min-h-[24rem] flex-col rounded-2xl border border-[var(--panel-border)] bg-[var(--panel-bg-deep)] p-5 transition-[background-color,opacity]",
+              )}
+              aria-label="Live tools access"
+            >
+              <div className="flex min-w-0 items-start justify-between gap-4">
+                <span
+                  className={cn(
+                    "grid size-14 shrink-0 place-items-center rounded-2xl border border-[var(--panel-border)] bg-[var(--chip-bg-soft)] text-[var(--text-muted)]",
+                    masterEnabled && "text-[var(--accent-strong)]",
+                  )}
+                >
+                  <Icon name="tools" className="size-6" />
+                </span>
+                <Switch
+                  checked={masterEnabled}
+                  onCheckedChange={(value) => onSetField("tools_enabled", value)}
+                  aria-label="Enable Live tools"
+                />
+              </div>
+
+              <div className="mt-6">
+                <div className="text-lg font-semibold text-[var(--text-strong)]">
+                  Tool access
+                </div>
+                <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">
+                  {masterEnabled
+                    ? "Allow or block tools for Live."
+                    : "Tool use is paused. Your choices stay saved."}
+                </p>
+              </div>
+
+              <div className="mt-6 border-t border-[var(--panel-divider)] pt-5">
+                <div className="grid grid-cols-2 gap-3">
+                  <ToolMetric label="Allowed" value={enabledCount} active={masterEnabled} />
+                  <ToolMetric label="Blocked" value={disabledCount} active={false} />
+                </div>
+              </div>
+            </section>
+
+            <section className="grid gap-3" aria-label="Tool permissions">
+              {TOOL_CARDS.map((tool) => {
+                const enabled = policyEnabled(settingValue(state, tool.policyField));
+                return (
+                  <ToolPermissionRow
+                    key={tool.id}
+                    title={tool.title}
+                    description={tool.description}
+                    icon={tool.icon}
+                    enabled={enabled}
+                    masterEnabled={masterEnabled}
+                    onChange={(value) =>
+                      onSetField(tool.policyField, value ? "allow" : "deny")
+                    }
+                  />
+                );
+              })}
+            </section>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
 
-function ToolCard({
+function ToolMetric({
+  label,
+  value,
+  active,
+}: {
+  label: string;
+  value: number;
+  active: boolean;
+}) {
+  return (
+    <div className="rounded-2xl border border-[var(--panel-border)] bg-[var(--chip-bg-soft)] px-4 py-3">
+      <div
+        className={cn(
+          "font-mono text-2xl font-semibold",
+          active ? "text-[var(--accent-strong)]" : "text-[var(--text-strong)]",
+        )}
+      >
+        {value}
+      </div>
+      <div className="mt-1 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+        {label}
+      </div>
+    </div>
+  );
+}
+
+function ToolPermissionRow({
   title,
   description,
   icon,
@@ -126,38 +200,35 @@ function ToolCard({
 }) {
   const active = masterEnabled && enabled;
   return (
-    <article
+    <div
       className={cn(
-        "flex min-h-[14rem] flex-col rounded-2xl border bg-black/10 p-5 transition-[border-color,background-color,box-shadow]",
-        active
-          ? "border-[color-mix(in_srgb,var(--accent)_42%,rgba(255,255,255,0.1))] bg-[color-mix(in_srgb,var(--accent)_8%,transparent)] shadow-[0_0_0_1px_color-mix(in_srgb,var(--accent)_8%,transparent)]"
-          : "border-white/10",
+        "grid min-h-[7.25rem] grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-5 rounded-2xl border border-[var(--panel-border)] bg-[var(--panel-bg-deep)] p-5 transition-[background-color,opacity]",
+        !masterEnabled && "opacity-70",
+        !active && "hover:bg-[var(--item-hover)]",
       )}
     >
-      <div className="flex items-start justify-between gap-3">
-        <span
-          className={cn(
-            "grid size-12 shrink-0 place-items-center rounded-2xl border border-white/10 bg-white/[0.045] text-[var(--text-muted)]",
-            active &&
-              "border-[color-mix(in_srgb,var(--accent)_42%,transparent)] bg-[color-mix(in_srgb,var(--accent)_16%,transparent)] text-[var(--accent-strong)]",
-          )}
-        >
-          <Icon name={icon} className="size-5" />
-        </span>
-        <Switch checked={enabled} onCheckedChange={onChange} aria-label={title} />
-      </div>
+      <span
+        className={cn(
+          "grid size-12 shrink-0 place-items-center rounded-2xl border border-[var(--panel-border)] bg-[var(--chip-bg-soft)] text-[var(--text-muted)]",
+          active && "text-[var(--accent-strong)]",
+        )}
+      >
+        <Icon name={icon} className="size-5" />
+      </span>
 
-      <div className="mt-5 min-w-0">
-        <div className="flex flex-wrap items-center gap-2">
-          <h3 className="text-lg font-semibold text-[var(--text-strong)]">{title}</h3>
+      <div className="min-w-0">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <h3 className="truncate text-base font-semibold text-[var(--text-strong)]">
+            {title}
+          </h3>
           <StatusBadge tone={enabled ? "accent" : "disabled"}>
-            {enabled ? "allowed" : "denied"}
+            {enabled ? "allowed" : "blocked"}
           </StatusBadge>
         </div>
-        <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">
-          {description}
-        </p>
+        <p className="mt-1 text-sm leading-6 text-[var(--text-muted)]">{description}</p>
       </div>
-    </article>
+
+      <Switch checked={enabled} onCheckedChange={onChange} aria-label={title} />
+    </div>
   );
 }

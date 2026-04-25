@@ -142,7 +142,7 @@ export function sectionMeta(section: SectionId): {
   if (section === "tools") {
     return {
       title: "Tools",
-      description: "Choose what Glance can use during Live replies.",
+      description: "Let Live use screen and web context when it helps.",
     };
   }
   if (section === "audio") {
