@@ -241,6 +241,7 @@ def _cue_key_for_status_transition(
     }:
         return "ocr_complete"
     if normalized_state == "idle" and normalized_message in {
+        "Live ended.",
         "Live stopped.",
         "No speech detected. Live is idle.",
     }:

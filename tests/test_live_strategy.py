@@ -23,6 +23,16 @@ class FakeTranscriptionAgent:
         return f"transcript for {audio_path}"
 
 
+class FakePhraseTranscriptionAgent(FakeTranscriptionAgent):
+    def __init__(self, transcript: str) -> None:
+        super().__init__()
+        self.transcript = transcript
+
+    def run(self, *, audio_path: str) -> str:
+        self.calls.append(audio_path)
+        return self.transcript
+
+
 class FakeLLMAgent:
     def __init__(self) -> None:
         self.calls: list[dict[str, object]] = []
@@ -574,6 +584,95 @@ class LiveStrategyTests(unittest.TestCase):
             interaction.tool_calls[0].tool_name,
             "end_live_session",
         )
+        self.assertIn(("idle", "Live ended."), stages)
+
+    def test_thanks_after_ocr_confirmation_ends_without_model_turn(
+        self,
+    ) -> None:
+        llm_agent = FakeToolLLMAgent([])
+        tts_agent = FakeTTSAgent()
+        session = SessionRecord(mode="live")
+        session.add_interaction(
+            LiveInteraction(
+                mode="live",
+                recording_path="ocr.wav",
+                transcript="copy the headline",
+                response="Done, I copied it to your clipboard. Anything else?",
+                speech_path="reply.wav",
+            )
+        )
+        stages: list[tuple[str, str]] = []
+        strategy = LiveStrategy(
+            transcription_agent=FakePhraseTranscriptionAgent("thank you"),
+            llm_agent=llm_agent,
+            tts_agent=tts_agent,
+            settings=_tool_settings(),
+        )
+
+        interaction = strategy.execute(
+            {
+                "recording_path": "thank-you.wav",
+                "session": session,
+                "status_callback": lambda state, message: stages.append(
+                    (state, message)
+                ),
+            }
+        )
+
+        self.assertEqual(llm_agent.message_snapshots, [])
+        self.assertEqual(tts_agent.calls, [])
+        self.assertEqual(interaction.response, "Live ended.")
+        self.assertEqual(interaction.speech_path, "")
+        self.assertEqual(interaction.tool_calls[0].tool_name, "end_live_session")
+        self.assertIn(("idle", "Live ended."), stages)
+
+    def test_model_closing_reply_after_ocr_confirmation_ends_session(
+        self,
+    ) -> None:
+        llm_agent = FakeToolLLMAgent(
+            [
+                _tool_turn(
+                    content=(
+                        "VOICE_ID: Mark\n\n[smile] No problem at all! Let me "
+                        "know if you need anything else, otherwise have a "
+                        "great day!"
+                    )
+                )
+            ]
+        )
+        tts_agent = FakeTTSAgent()
+        stages: list[tuple[str, str]] = []
+        session = SessionRecord(mode="live")
+        session.add_interaction(
+            LiveInteraction(
+                mode="live",
+                recording_path="ocr.wav",
+                transcript="copy the headline",
+                response="Done, I copied it to your clipboard. Anything else?",
+                speech_path="reply.wav",
+            )
+        )
+        strategy = LiveStrategy(
+            transcription_agent=FakeTranscriptionAgent(),
+            llm_agent=llm_agent,
+            tts_agent=tts_agent,
+            settings=_tool_settings(multimodal_live_enabled=True),
+        )
+
+        interaction = strategy.execute(
+            {
+                "recording_path": "input.wav",
+                "session": session,
+                "status_callback": lambda state, message: stages.append(
+                    (state, message)
+                ),
+            }
+        )
+
+        self.assertEqual(tts_agent.calls, [])
+        self.assertEqual(interaction.response, "Live ended.")
+        self.assertEqual(interaction.speech_path, "")
+        self.assertEqual(interaction.tool_calls[0].tool_name, "end_live_session")
         self.assertIn(("idle", "Live ended."), stages)
 
     def test_ocr_tool_notice_is_silent(self) -> None:

@@ -403,8 +403,9 @@ class OpenAICompatibleProvider:
                         "spoken answer. If no tool is needed, answer directly "
                         "with the final speech text. Call end_live_session "
                         "when the user clearly says they are done, says no to "
-                        "more help, says goodbye, or asks Glance to stop "
-                        "listening."
+                        "more help, says everything is fine, says thanks after "
+                        "a completed task, says goodbye or bye, or asks "
+                        "Glance to stop listening."
                     ),
                 },
                 audio_part,
@@ -445,7 +446,8 @@ class OpenAICompatibleProvider:
             "extraction instruction, then let Glance confirm that the result "
             "was copied. Never turn OCR output into the spoken final answer. "
             "Call end_live_session when the user clearly says they are done, "
-            "says no to more help, says goodbye, or asks Glance to stop "
+            "says no to more help, says everything is fine, says thanks after "
+            "a completed task, says goodbye or bye, or asks Glance to stop "
             "listening. When you have enough information, give only the final "
             "natural answer text. Do not narrate the tool work in the final "
             "answer; answer with the result directly."
@@ -657,9 +659,9 @@ class OpenAICompatibleProvider:
             "user's exact extraction instruction, then let Glance confirm "
             "that the result was copied. Never turn OCR output into the "
             "spoken final answer. Call end_live_session when the user "
-            "clearly says they are done, says no to more help, says goodbye, "
-            "or asks Glance to stop listening. When you have enough "
-            "information, "
+            "clearly says they are done, says no to more help, says everything "
+            "is fine, says thanks after a completed task, says goodbye or bye, "
+            "or asks Glance to stop listening. When you have enough information, "
             "give only the final spoken answer and follow all voice, "
             "emotion, and VOICE_ID rules above. Do not narrate the tool work "
             "in the final answer; answer with the result directly."
@@ -1228,9 +1230,21 @@ def _convert_audio_to_mp3(source_path: Path) -> Path | None:
         subprocess.run(
             [
                 ffmpeg_path,
-                "-y-hide_banner-loglevelerror-i",
+                "-y",
+                "-hide_banner",
+                "-loglevel",
+                "error",
+                "-i",
                 str(source_path),
-                "-vn-acodeclibmp3lame-b:a32k-ac1-ar16000",
+                "-vn",
+                "-acodec",
+                "libmp3lame",
+                "-b:a",
+                "32k",
+                "-ac",
+                "1",
+                "-ar",
+                "16000",
                 str(converted_path),
             ],
             check=True,

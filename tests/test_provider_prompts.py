@@ -234,6 +234,9 @@ class ProviderPromptTests(unittest.TestCase):
                     prompt,
                 )
                 self.assertIn("Call end_live_session", prompt)
+                self.assertIn("says everything is fine", prompt)
+                self.assertIn("says thanks after a completed task", prompt)
+                self.assertIn("goodbye or bye", prompt)
                 self.assertIn("tool", prompt)
 
     def test_ocr_prompt_is_strict_extraction_only(self) -> None:

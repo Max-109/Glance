@@ -45,6 +45,17 @@ class LiveCueTransitionTests(unittest.TestCase):
             "cancel",
         )
 
+    def test_end_live_session_reuses_cancel_cue(self) -> None:
+        self.assertEqual(
+            _cue_key_for_status_transition(
+                "generating",
+                "Checking...",
+                "idle",
+                "Live ended.",
+            ),
+            "cancel",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

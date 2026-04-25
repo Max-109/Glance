@@ -193,6 +193,12 @@ class LiveStrategy(ModeStrategy):
             include_live_control_tools=True,
         )
         executor = ToolExecutor(registry)
+        if _should_end_live_from_transcript(transcript, conversation_history):
+            return _local_end_live_session(
+                executor,
+                context.get("status_callback"),
+                reason="user declined more help",
+            )
         enabled_tools = registry.enabled_definitions
         messages = self._llm_agent.build_live_tool_messages(
             transcript=transcript,
@@ -266,6 +272,7 @@ class LiveStrategy(ModeStrategy):
         notice_context = ToolNoticeContext(user_context=user_context)
 
         for _step in range(_MAX_TOOL_STEPS_PER_LIVE_TURN):
+            previous_messages = list(messages)
             turn = turn_runner(
                 messages=messages,
                 tools=tool_payloads,
@@ -273,6 +280,15 @@ class LiveStrategy(ModeStrategy):
             )
             messages.append(turn.assistant_message)
             if not turn.tool_calls:
+                if _should_end_live_from_final_reply(
+                    turn.content,
+                    previous_messages,
+                ):
+                    return _local_end_live_session(
+                        executor,
+                        status_callback,
+                        reason="assistant recognized user is done",
+                    )
                 if turn.content:
                     return turn.content, tool_records, False
                 break
@@ -609,6 +625,107 @@ def _is_terminal_tool(tool_name: str) -> bool:
     return tool_name in _TERMINAL_TOOL_NAMES
 
 
+def _local_end_live_session(
+    executor: ToolExecutor,
+    status_callback: object,
+    *,
+    reason: str,
+) -> tuple[str, list[ToolCallRecord], bool]:
+    record, result = executor.execute(
+        ToolCallRequest(
+            call_id="local-end-live-session",
+            name="end_live_session",
+            arguments={"reason": reason},
+        )
+    )
+    status = _terminal_tool_status(
+        ToolCallRequest(
+            call_id=record.call_id,
+            name=record.tool_name,
+            arguments={"reason": reason},
+        ),
+        record,
+        result,
+    )
+    _emit_stage_status(status_callback, "idle", status)
+    return status, [record], True
+
+
+def _should_end_live_from_transcript(
+    transcript: str,
+    conversation_history: list[dict[str, str]],
+) -> bool:
+    text = _normalize_stop_text(transcript)
+    if not text:
+        return False
+    if text in _ALWAYS_STOP_REQUESTS:
+        return True
+    if not _last_assistant_invited_more(conversation_history):
+        return False
+    if text in _DECLINE_MORE_HELP_REQUESTS:
+        return True
+    return text.startswith("no ") and len(text.split()) <= 5
+
+
+def _should_end_live_from_final_reply(
+    content: str,
+    previous_messages: list[dict],
+) -> bool:
+    if not _last_assistant_invited_more(previous_messages):
+        return False
+    text = _strip_voice_reply_markup(content)
+    lowered = text.lower()
+    if _normalize_stop_text(text) in _DECLINE_MORE_HELP_REPLIES:
+        return True
+    has_closing_ack = any(
+        phrase in lowered
+        for phrase in (
+            "no problem",
+            "no worries",
+            "you're welcome",
+            "you are welcome",
+            "glad to help",
+        )
+    )
+    has_goodbye = any(
+        phrase in lowered
+        for phrase in (
+            "have a great",
+            "let me know if you need",
+            "anything else",
+            "if you need anything else",
+        )
+    )
+    return has_closing_ack and has_goodbye
+
+
+def _last_assistant_invited_more(messages: list[dict[str, str]] | list[dict]) -> bool:
+    for message in reversed(messages):
+        if message.get("role") != "assistant":
+            continue
+        content = message.get("content", "")
+        if not isinstance(content, str):
+            continue
+        lowered = content.lower()
+        return "anything else" in lowered or "need anything else" in lowered
+    return False
+
+
+def _strip_voice_reply_markup(text: str) -> str:
+    stripped = str(text).strip()
+    stripped = re.sub(r"^VOICE_ID:\s*\S+\s*", "", stripped, flags=re.IGNORECASE)
+    stripped = re.sub(r"\[[^\]]+\]", " ", stripped)
+    return _squash_notice_text(stripped)
+
+
+def _normalize_stop_text(text: str) -> str:
+    normalized = str(text).lower()
+    normalized = re.sub(r"\[[^\]]+\]", " ", normalized)
+    normalized = re.sub(r"[^a-z0-9\s']+", " ", normalized)
+    normalized = re.sub(r"\s+", " ", normalized).strip()
+    return normalized
+
+
 def _ocr_tool_status(record: ToolCallRecord, result: ToolResult) -> str:
     if record.status == "success":
         if result.content.strip():
@@ -764,4 +881,51 @@ def _meaning_words(text: str) -> list[str]:
 _DRIFT_STOPWORDS = {
     "theandforthatthisyouyourarewaswerewithfrombutnotcanjustitsit'si'mimemywe"
     "ourtheythemthereherelookslike",
+}
+
+_ALWAYS_STOP_REQUESTS = {
+    "stop",
+    "stop listening",
+    "end live",
+    "end the live session",
+    "end session",
+    "quit",
+    "exit",
+    "bye",
+    "goodbye",
+}
+
+_DECLINE_MORE_HELP_REQUESTS = {
+    "no",
+    "nope",
+    "nah",
+    "no thanks",
+    "no thank you",
+    "thanks",
+    "thank you",
+    "thanks you",
+    "nothing",
+    "nothing else",
+    "everything is fine",
+    "everything's fine",
+    "everything fine",
+    "all fine",
+    "that's all",
+    "that is all",
+    "that's it",
+    "that is it",
+    "all good",
+    "im good",
+    "i'm good",
+    "done",
+    "we're done",
+    "were done",
+}
+
+_DECLINE_MORE_HELP_REPLIES = {
+    "ok",
+    "okay",
+    "alright",
+    "sure",
+    "sure thing",
 }
