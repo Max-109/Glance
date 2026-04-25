@@ -1,9 +1,9 @@
 import { AudioTab } from "./settings-tabs/audio-tab";
-import { CaptureTab } from "./settings-tabs/capture-tab";
 import { HistoryTab } from "./settings-tabs/history-tab";
 import { PreferencesTab } from "./settings-tabs/preferences-tab";
 import { ProvidersTab } from "./settings-tabs/providers-tab";
 import type { SettingsTabProps } from "./settings-tabs/shared";
+import { ToolsTab } from "./settings-tabs/tools-tab";
 import { VoiceTab } from "./settings-tabs/voice-tab";
 
 export function SettingsTab(props: SettingsTabProps) {
@@ -15,8 +15,8 @@ export function SettingsTab(props: SettingsTabProps) {
     return <VoiceTab {...props} />;
   }
 
-  if (props.state.currentSection === "capture") {
-    return <CaptureTab {...props} />;
+  if (props.state.currentSection === "tools") {
+    return <ToolsTab {...props} />;
   }
 
   if (props.state.currentSection === "audio") {

@@ -8,6 +8,49 @@ from src.models.base_entity import BaseEntity
 
 
 @dataclass
+class ToolCallRecord:
+    call_id: str
+    tool_name: str
+    status: str
+    arguments_summary: str = ""
+    result_preview: str = ""
+    error: str = ""
+    result_path: str = ""
+    artifact_paths: list[str] = field(default_factory=list)
+    started_at: str = ""
+    finished_at: str = ""
+
+    def to_dict(self) -> dict:
+        return {
+            "call_id": self.call_id,
+            "tool_name": self.tool_name,
+            "status": self.status,
+            "arguments_summary": self.arguments_summary,
+            "result_preview": self.result_preview,
+            "error": self.error,
+            "result_path": self.result_path,
+            "artifact_paths": list(self.artifact_paths),
+            "started_at": self.started_at,
+            "finished_at": self.finished_at,
+        }
+
+    @classmethod
+    def from_dict(cls, payload: dict) -> "ToolCallRecord":
+        return cls(
+            call_id=str(payload.get("call_id", "")),
+            tool_name=str(payload.get("tool_name", "")),
+            status=str(payload.get("status", "")),
+            arguments_summary=str(payload.get("arguments_summary", "")),
+            result_preview=str(payload.get("result_preview", "")),
+            error=str(payload.get("error", "")),
+            result_path=str(payload.get("result_path", "")),
+            artifact_paths=[str(path) for path in payload.get("artifact_paths", [])],
+            started_at=str(payload.get("started_at", "")),
+            finished_at=str(payload.get("finished_at", "")),
+        )
+
+
+@dataclass
 class BaseInteraction(BaseEntity, ABC):
     mode: str = ""
 
@@ -79,11 +122,18 @@ class LiveInteraction(BaseInteraction):
     response: str = ""
     frame_paths: list[str] = field(default_factory=list)
     speech_path: str = ""
+    tool_calls: list[ToolCallRecord] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         super().__post_init__()
         self.recording_path = self.require_text(self.recording_path, "recording_path")
         self.response = self.require_text(self.response, "response")
+        self.tool_calls = [
+            record
+            if isinstance(record, ToolCallRecord)
+            else ToolCallRecord.from_dict(record)
+            for record in self.tool_calls
+        ]
 
     def summary(self) -> str:
         return f"Live: {self.transcript[:40]}"
@@ -99,6 +149,7 @@ class LiveInteraction(BaseInteraction):
             "response": self.response,
             "frame_paths": list(self.frame_paths),
             "speech_path": self.speech_path,
+            "tool_calls": [record.to_dict() for record in self.tool_calls],
         }
 
 
@@ -167,6 +218,10 @@ def interaction_from_dict(payload: dict) -> BaseInteraction:
             response=payload["response"],
             frame_paths=list(payload.get("frame_paths", [])),
             speech_path=payload.get("speech_path", ""),
+            tool_calls=[
+                ToolCallRecord.from_dict(record)
+                for record in payload.get("tool_calls", [])
+            ],
             **common,
         )
     raise ValidationError(f"Unsupported interaction type: {interaction_type!r}")

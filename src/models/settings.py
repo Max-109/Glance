@@ -91,6 +91,8 @@ DEFAULT_ELECTRON_WINDOW_WIDTH = 924
 DEFAULT_ELECTRON_WINDOW_HEIGHT = 741
 MIN_ELECTRON_WINDOW_WIDTH = 640
 MIN_ELECTRON_WINDOW_HEIGHT = 500
+DEFAULT_TOOL_POLICY = "allow"
+TOOL_POLICY_OPTIONS = {"allow", "deny"}
 _HEX_COLOR_PATTERN = re.compile(r"^#[0-9a-f]{6}$")
 
 
@@ -117,6 +119,10 @@ class AppSettings:
     fallback_language: str = "en"
     history_retention_enabled: bool = True
     history_length: int = 50
+    tools_enabled: bool = False
+    tool_take_screenshot_policy: str = DEFAULT_TOOL_POLICY
+    tool_web_search_policy: str = DEFAULT_TOOL_POLICY
+    tool_web_fetch_policy: str = DEFAULT_TOOL_POLICY
     screenshot_interval: float = 1.5
     screen_change_threshold: float = 0.08
     batch_window_duration: float = 4.0
@@ -175,6 +181,14 @@ class AppSettings:
             raise ValidationError("fallback_language cannot be empty.")
         if self.history_length <= 0:
             raise ValidationError("history_length must be positive.")
+        for field_name in (
+            "tool_take_screenshot_policy",
+            "tool_web_search_policy",
+            "tool_web_fetch_policy",
+        ):
+            policy = getattr(self, field_name)
+            if policy not in TOOL_POLICY_OPTIONS:
+                raise ValidationError(f"{field_name} must be allow or deny.")
         if self.screenshot_interval <= 0:
             raise ValidationError("screenshot_interval must be positive.")
         if not 0 < self.screen_change_threshold <= 1:
@@ -255,6 +269,21 @@ class AppSettings:
                 data.get("history_retention_enabled", cls.history_retention_enabled)
             ),
             history_length=int(data.get("history_length", cls.history_length)),
+            tools_enabled=coerce_bool(
+                data.get("tools_enabled", cls.tools_enabled)
+            ),
+            tool_take_screenshot_policy=normalize_tool_policy(
+                data.get(
+                    "tool_take_screenshot_policy",
+                    cls.tool_take_screenshot_policy,
+                )
+            ),
+            tool_web_search_policy=normalize_tool_policy(
+                data.get("tool_web_search_policy", cls.tool_web_search_policy)
+            ),
+            tool_web_fetch_policy=normalize_tool_policy(
+                data.get("tool_web_fetch_policy", cls.tool_web_fetch_policy)
+            ),
             screenshot_interval=float(
                 data.get("screenshot_interval", cls.screenshot_interval)
             ),
@@ -373,6 +402,13 @@ def normalize_llm_reasoning(value: str) -> str:
     if lowered_value in {"minimal", "low", "medium", "high"}:
         return lowered_value
     return lowered_value
+
+
+def normalize_tool_policy(value: object) -> str:
+    normalized_value = str(value).strip().lower()
+    if normalized_value in TOOL_POLICY_OPTIONS:
+        return normalized_value
+    return DEFAULT_TOOL_POLICY
 
 
 def coerce_bool(value: object) -> bool:

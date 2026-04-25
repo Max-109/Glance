@@ -16,6 +16,7 @@ from src.models.settings import (
     AUTO_TTS_VOICE_ID,
     AppSettings,
     ELEVEN_V3_VOICES,
+    TOOL_POLICY_OPTIONS,
     TTS_VOICE_OPTIONS,
     coerce_bool,
     get_tts_voice,
@@ -622,6 +623,10 @@ class SettingsViewModel(QObject):
         self._coerce_bool(payload, "multimodal_live_enabled")
         self._coerce_bool(payload, "history_retention_enabled")
         self._coerce_positive_int(payload, "history_length", errors)
+        self._coerce_bool(payload, "tools_enabled")
+        self._coerce_tool_policy(payload, "tool_take_screenshot_policy", errors)
+        self._coerce_tool_policy(payload, "tool_web_search_policy", errors)
+        self._coerce_tool_policy(payload, "tool_web_fetch_policy", errors)
         self._coerce_positive_float(payload, "screenshot_interval", errors)
         self._coerce_positive_float(payload, "batch_window_duration", errors)
         self._coerce_ratio(payload, "screen_change_threshold", errors)
@@ -1147,6 +1152,17 @@ class SettingsViewModel(QObject):
     @staticmethod
     def _coerce_bool(payload: dict[str, Any], field_name: str) -> None:
         payload[field_name] = coerce_bool(payload.get(field_name, False))
+
+    @staticmethod
+    def _coerce_tool_policy(
+        payload: dict[str, Any],
+        field_name: str,
+        errors: dict[str, str],
+    ) -> None:
+        value = str(payload.get(field_name, "allow")).strip().lower()
+        payload[field_name] = value
+        if value not in TOOL_POLICY_OPTIONS:
+            errors[field_name] = "Choose allow or deny."
 
     @staticmethod
     def _coerce_hex_color(

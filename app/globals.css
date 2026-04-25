@@ -259,6 +259,20 @@ textarea:focus-visible {
   border: 0;
 }
 
+.electron-drag-region {
+  -webkit-app-region: drag;
+  user-select: none;
+}
+
+.electron-no-drag-region,
+.electron-drag-region button,
+.electron-drag-region input,
+.electron-drag-region textarea,
+.electron-drag-region select,
+.electron-drag-region a {
+  -webkit-app-region: no-drag;
+}
+
 .desktop-shell {
   --shell-bg: #050506;
   --shell-side: rgba(18, 19, 24, 0.54);

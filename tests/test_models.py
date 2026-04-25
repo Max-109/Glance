@@ -37,6 +37,42 @@ class AppSettingsTests(unittest.TestCase):
         )
         self.assertEqual(settings.history_length, 50)
         self.assertTrue(settings.history_retention_enabled)
+        self.assertFalse(settings.tools_enabled)
+        self.assertEqual(settings.tool_take_screenshot_policy, "allow")
+        self.assertEqual(settings.tool_web_search_policy, "allow")
+        self.assertEqual(settings.tool_web_fetch_policy, "allow")
+
+    def test_from_mapping_loads_tool_settings(self) -> None:
+        settings = AppSettings.from_mapping(
+            {
+                "llm_base_url": "https://api.example.com/v1",
+                "llm_model_name": "model-a",
+                "tts_base_url": "https://tts.example.com/v1",
+                "tools_enabled": "true",
+                "tool_take_screenshot_policy": "deny",
+                "tool_web_search_policy": "allow",
+                "tool_web_fetch_policy": "deny",
+            }
+        )
+
+        self.assertTrue(settings.tools_enabled)
+        self.assertEqual(settings.tool_take_screenshot_policy, "deny")
+        self.assertEqual(settings.tool_web_search_policy, "allow")
+        self.assertEqual(settings.tool_web_fetch_policy, "deny")
+
+    def test_from_mapping_ignores_removed_tool_limit_settings(self) -> None:
+        settings = AppSettings.from_mapping(
+            {
+                "llm_base_url": "https://api.example.com/v1",
+                "llm_model_name": "model-a",
+                "tts_base_url": "https://tts.example.com/v1",
+                "max_tool_steps_per_turn": 99,
+                "max_tool_calls_per_turn": 0,
+            }
+        )
+
+        self.assertFalse(hasattr(settings, "max_tool_steps_per_turn"))
+        self.assertFalse(hasattr(settings, "max_tool_calls_per_turn"))
 
     def test_from_mapping_uses_transcription_defaults_when_values_missing(self) -> None:
         settings = AppSettings.from_mapping(

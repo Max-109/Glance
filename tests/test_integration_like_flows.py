@@ -44,13 +44,19 @@ class FakeLLMAgent:
             return f"live:{transcript}:{len(image_paths or [])}"
         return f"quick:{user_prompt}:{len(image_paths or [])}"
 
-    def prepare_speech_text(self, *, text):
+    def prepare_speech_text(self, *, text, session_id=None):
         return LiveSpeechReply(
             voice_id="UgBBYS2sOqTuMpoF3BR0",
             text=text,
         )
 
-    def generate_live_speech_reply(self, *, transcript, conversation_history=None):
+    def generate_live_speech_reply(
+        self,
+        *,
+        transcript,
+        conversation_history=None,
+        session_id=None,
+    ):
         return LiveSpeechReply(
             voice_id="UgBBYS2sOqTuMpoF3BR0",
             text=f"live:{transcript}:history={len(conversation_history or [])}",

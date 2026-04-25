@@ -1,8 +1,12 @@
 from __future__ import annotations
 
 import base64
+from datetime import datetime
+import json
+import locale
 import logging
 import mimetypes
+import os
 import re
 import shutil
 import subprocess
@@ -11,6 +15,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from time import perf_counter
+from urllib.parse import urlparse
 import wave
 
 from src.exceptions.app_exceptions import ProviderError
@@ -40,12 +45,49 @@ logger = logging.getLogger("glance.providers")
 _PCM_SAMPLE_RATE = 24000
 _PCM_CHANNELS = 1
 _PCM_SAMPLE_WIDTH_BYTES = 2
+_TIMEZONE_COUNTRY_OVERRIDES = {
+    "Europe/Vilnius": "Lithuania",
+}
+_COUNTRY_BY_REGION_CODE = {
+    "AU": "Australia",
+    "BR": "Brazil",
+    "CA": "Canada",
+    "DE": "Germany",
+    "ES": "Spain",
+    "FR": "France",
+    "GB": "United Kingdom",
+    "IE": "Ireland",
+    "IN": "India",
+    "IT": "Italy",
+    "JP": "Japan",
+    "LT": "Lithuania",
+    "NL": "Netherlands",
+    "PL": "Poland",
+    "PT": "Portugal",
+    "SE": "Sweden",
+    "UA": "Ukraine",
+    "US": "United States",
+}
 
 
 @dataclass(frozen=True)
 class LiveSpeechReply:
     voice_id: str
     text: str
+
+
+@dataclass(frozen=True)
+class ProviderToolCall:
+    call_id: str
+    name: str
+    arguments: dict
+
+
+@dataclass(frozen=True)
+class ProviderToolTurn:
+    content: str
+    tool_calls: list[ProviderToolCall]
+    assistant_message: dict
 
 
 class OpenAICompatibleProvider:
@@ -100,10 +142,13 @@ class OpenAICompatibleProvider:
             response = self._client.chat.completions.create(
                 model=self._settings.llm_model_name,
                 **self._llm_reasoning_kwargs(),
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": content},
-                ],
+                **self._openrouter_request_options(),
+                messages=self._cacheable_messages(
+                    [
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": content},
+                    ]
+                ),
             )
         except Exception as exc:  # pragma: no cover - depends on external service.
             logger.exception(
@@ -139,15 +184,19 @@ class OpenAICompatibleProvider:
         *,
         transcript: str,
         conversation_history: list[dict[str, str]] | None = None,
+        session_id: str | None = None,
     ) -> LiveSpeechReply:
         started_at = perf_counter()
         try:
             response = self._client.chat.completions.create(
                 model=self._settings.llm_model_name,
                 **self._llm_reasoning_kwargs(),
-                messages=self._build_live_speech_messages(
-                    transcript=transcript,
-                    conversation_history=conversation_history,
+                **self._openrouter_request_options(session_id=session_id),
+                messages=self._cacheable_messages(
+                    self._build_live_speech_messages(
+                        transcript=transcript,
+                        conversation_history=conversation_history,
+                    )
                 ),
             )
         except Exception as exc:  # pragma: no cover - depends on external service.
@@ -187,6 +236,7 @@ class OpenAICompatibleProvider:
         *,
         audio_path: str,
         conversation_history: list[dict[str, str]] | None = None,
+        session_id: str | None = None,
         client=None,
         model_name: str | None = None,
         reasoning_kwargs: dict[str, str] | None = None,
@@ -215,12 +265,6 @@ class OpenAICompatibleProvider:
 
         started_at = perf_counter()
         try:
-            if upload_path != path:
-                audio_bytes = upload_path.read_bytes()
-                if not audio_bytes:
-                    raise ProviderError("Audio file was empty.")
-            audio_format = upload_path.suffix.lower().lstrip(".") or "wav"
-
             messages: list[dict] = [
                 {
                     "role": "system",
@@ -241,10 +285,7 @@ class OpenAICompatibleProvider:
                         },
                         {
                             "type": "input_audio",
-                            "input_audio": {
-                                "data": base64.b64encode(audio_bytes).decode("ascii"),
-                                "format": audio_format,
-                            },
+                            "input_audio": _input_audio_payload_from_path(upload_path),
                         },
                     ],
                 }
@@ -253,7 +294,8 @@ class OpenAICompatibleProvider:
             response = active_client.chat.completions.create(
                 model=active_model,
                 **active_reasoning_kwargs,
-                messages=messages,
+                **self._openrouter_request_options(session_id=session_id),
+                messages=self._cacheable_messages(messages),
             )
         except Exception as exc:  # pragma: no cover - depends on external service.
             logger.exception(
@@ -283,6 +325,38 @@ class OpenAICompatibleProvider:
         )
         return live_reply
 
+    def build_live_tool_messages_from_audio(
+        self,
+        *,
+        audio_path: str,
+        conversation_history: list[dict[str, str]] | None = None,
+    ) -> list[dict]:
+        audio_part = _audio_message_part_from_path(audio_path)
+        messages: list[dict] = [
+            {
+                "role": "system",
+                "content": self._build_live_tool_speech_system_prompt(),
+            }
+        ]
+        messages.extend(_normalize_chat_messages(conversation_history))
+        messages.append(
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": (
+                            "Listen to the user's spoken audio below. Decide whether to call "
+                            "an enabled tool or give the final spoken answer. If no tool is "
+                            "needed, answer directly with the final speech text."
+                        ),
+                    },
+                    audio_part,
+                ],
+            }
+        )
+        return messages
+
     def _build_live_speech_messages(
         self,
         *,
@@ -299,23 +373,124 @@ class OpenAICompatibleProvider:
         messages.append({"role": "user", "content": transcript.strip()})
         return messages
 
+    def build_live_tool_messages(
+        self,
+        *,
+        transcript: str,
+        conversation_history: list[dict[str, str]] | None = None,
+    ) -> list[dict]:
+        system_prompt = self._build_system_prompt(match_user_language=True)
+        system_prompt += (
+            " You are running inside Glance Live mode with runtime tools available. "
+            "Use a tool only when it materially helps answer the user's spoken request. "
+            "Do not expose tool call names, JSON, arguments, raw fetched text, or screenshot "
+            "metadata to the user. When you have enough information, give only the final "
+            "natural answer text."
+        )
+        messages: list[dict] = [{"role": "system", "content": system_prompt}]
+        messages.extend(_normalize_chat_messages(conversation_history))
+        messages.append({"role": "user", "content": transcript.strip()})
+        return messages
+
+    def parse_live_speech_reply(self, text: str) -> LiveSpeechReply:
+        return self._parse_live_speech_reply(text)
+
+    def run_tool_turn(
+        self,
+        *,
+        messages: list[dict],
+        tools: list[dict],
+        session_id: str | None = None,
+        client=None,
+        model_name: str | None = None,
+        reasoning_kwargs: dict[str, str] | None = None,
+        reasoning_label: str | None = None,
+    ) -> ProviderToolTurn:
+        active_client = client if client is not None else self._client
+        active_model = model_name or self._settings.llm_model_name
+        active_reasoning_kwargs = (
+            reasoning_kwargs
+            if reasoning_kwargs is not None
+            else self._llm_reasoning_kwargs()
+        )
+        active_reasoning_label = (
+            reasoning_label
+            if reasoning_label is not None
+            else self._llm_reasoning_label()
+        )
+        started_at = perf_counter()
+        kwargs: dict = {
+            "model": active_model,
+            **active_reasoning_kwargs,
+            **self._openrouter_request_options(session_id=session_id),
+            "messages": self._cacheable_messages(messages),
+        }
+        if tools:
+            kwargs["tools"] = tools
+            kwargs["tool_choice"] = "auto"
+        try:
+            response = active_client.chat.completions.create(**kwargs)
+        except Exception as exc:  # pragma: no cover - depends on external service.
+            logger.exception(
+                "Tool-capable live request failed after %.1f ms [model=%s reasoning=%s]",
+                _elapsed_ms(started_at),
+                active_model,
+                active_reasoning_label,
+            )
+            raise ProviderError(f"Tool-capable live request failed: {exc}") from exc
+
+        message = response.choices[0].message
+        content = _extract_text_content(getattr(message, "content", ""))
+        tool_calls = _extract_provider_tool_calls(message)
+        assistant_message: dict = {
+            "role": "assistant",
+            "content": content or None,
+        }
+        if tool_calls:
+            assistant_message["tool_calls"] = [
+                _provider_tool_call_to_message_payload(tool_call)
+                for tool_call in getattr(message, "tool_calls", []) or []
+            ]
+        logger.info(
+            "llm tool turn completed\nmodel      %s\nreasoning  %s\ntime       %.1f ms\nusage      %s\ntools      %s\nreply      %s",
+            active_model,
+            active_reasoning_label,
+            _elapsed_ms(started_at),
+            _format_usage_summary(response),
+            ", ".join(call.name for call in tool_calls) or "none",
+            _preview_text(content, limit=140),
+        )
+        return ProviderToolTurn(
+            content=content.strip(),
+            tool_calls=tool_calls,
+            assistant_message=assistant_message,
+        )
+
     def extract_text(self, image_path: str) -> str:
         prompt = "Extract all visible text exactly as written. Preserve line breaks where useful."
         return self.generate_reply(user_prompt=prompt, image_paths=[image_path])
 
-    def prepare_speech_text(self, text: str) -> LiveSpeechReply:
+    def prepare_speech_text(
+        self,
+        text: str,
+        *,
+        session_id: str | None = None,
+    ) -> LiveSpeechReply:
         started_at = perf_counter()
         try:
             response = self._client.chat.completions.create(
                 model=self._settings.llm_model_name,
                 **self._llm_reasoning_kwargs(),
-                messages=[
-                    {
-                        "role": "system",
-                        "content": self._build_tts_preparation_prompt(),
-                    },
-                    {"role": "user", "content": text},
-                ],
+                **self._openrouter_request_options(session_id=session_id),
+                messages=self._cacheable_messages(
+                    [
+                        {
+                            "role": "system",
+                            "content": self._build_tts_preparation_prompt(),
+                        },
+                        {"role": "user", "content": text},
+                    ]
+                ),
             )
         except Exception as exc:  # pragma: no cover - depends on external service.
             logger.exception(
@@ -360,8 +535,10 @@ class OpenAICompatibleProvider:
         return self._settings.llm_reasoning
 
     def _build_system_prompt(self, match_user_language: bool) -> str:
-        prompt = self._resolve_prompt_override(
-            "text_prompt_override", DEFAULT_TEXT_REPLY_PROMPT
+        prompt = _with_runtime_context(
+            self._resolve_prompt_override(
+                "text_prompt_override", DEFAULT_TEXT_REPLY_PROMPT
+            )
         )
         override = self._shared_prompt_override()
         if override:
@@ -384,9 +561,23 @@ class OpenAICompatibleProvider:
         )
         return prompt
 
+    def _build_live_tool_speech_system_prompt(self) -> str:
+        prompt = self._build_live_speech_system_prompt()
+        prompt += (
+            " Runtime tools are available in this live turn. Use a tool only when it materially "
+            "helps answer the user's spoken request. If you need a tool, call the tool instead "
+            "of giving a final answer. Tool calls, tool names, JSON, arguments, raw fetched text, "
+            "and screenshot metadata are private runtime details; never say them to the user. "
+            "When you have enough information, give only the final spoken answer and follow all "
+            "voice, emotion, and VOICE_ID rules above."
+        )
+        return prompt
+
     def _build_live_speech_system_prompt(self) -> str:
-        prompt = self._resolve_prompt_override(
-            "voice_prompt_override", DEFAULT_VOICE_REPLY_PROMPT
+        prompt = _with_runtime_context(
+            self._resolve_prompt_override(
+                "voice_prompt_override", DEFAULT_VOICE_REPLY_PROMPT
+            )
         )
         override = self._shared_prompt_override()
         if override:
@@ -480,6 +671,31 @@ class OpenAICompatibleProvider:
                     "not output a VOICE_ID header when a fixed voice is already selected."
                 )
         return prompt
+
+    def _is_openrouter(self) -> bool:
+        parsed = urlparse(self._settings.llm_base_url)
+        host = parsed.netloc.lower()
+        return host == "openrouter.ai" or host.endswith(".openrouter.ai")
+
+    def _openrouter_request_options(self, *, session_id: str | None = None) -> dict:
+        if not self._is_openrouter():
+            return {}
+        options: dict = {"extra_body": {"usage": {"include": True}}}
+        normalized_session_id = (session_id or "").strip()
+        if normalized_session_id:
+            options["extra_headers"] = {"x-session-affinity": normalized_session_id}
+            options["extra_body"].update(
+                {
+                    "session_id": normalized_session_id,
+                    "prompt_cache_key": normalized_session_id,
+                }
+            )
+        return options
+
+    def _cacheable_messages(self, messages: list[dict]) -> list[dict]:
+        if not self._is_openrouter():
+            return messages
+        return [_mark_cacheable_system_message(message) for message in messages]
 
 
 class NagaTranscriptionProvider:
@@ -922,6 +1138,119 @@ def _noop_cleanup() -> None:
     return None
 
 
+def _with_runtime_context(prompt: str) -> str:
+    return f"{_runtime_context_prompt()}\n\n{prompt}"
+
+
+def _runtime_context_prompt() -> str:
+    return (
+        f"Current day and time: {_format_runtime_datetime(_current_local_datetime())}.\n"
+        f"User country: {_detect_user_country()}.\n"
+        "Use the current day, date, time, year, timezone, and user country above as the source of truth."
+    )
+
+
+def _current_local_datetime() -> datetime:
+    return datetime.now().astimezone()
+
+
+def _format_runtime_datetime(moment: datetime) -> str:
+    timezone_name = moment.tzname() or _format_utc_offset(moment)
+    return (
+        f"{moment.strftime('%A')}, {moment.strftime('%B')} {moment.day}, "
+        f"{moment.year}, {moment.strftime('%H:%M')} {timezone_name} "
+        f"({_format_utc_offset(moment)})"
+    )
+
+
+def _format_utc_offset(moment: datetime) -> str:
+    offset = moment.utcoffset()
+    if offset is None:
+        return "UTC"
+    total_seconds = int(offset.total_seconds())
+    sign = "+" if total_seconds >= 0 else "-"
+    total_seconds = abs(total_seconds)
+    hours, remainder = divmod(total_seconds, 3600)
+    minutes = remainder // 60
+    return f"UTC{sign}{hours:02d}:{minutes:02d}"
+
+
+def _detect_user_country() -> str:
+    explicit_country = os.environ.get("GLANCE_USER_COUNTRY", "").strip()
+    if explicit_country:
+        return explicit_country
+
+    timezone_name = _local_timezone_name()
+    if timezone_name in _TIMEZONE_COUNTRY_OVERRIDES:
+        return _TIMEZONE_COUNTRY_OVERRIDES[timezone_name]
+
+    region_code = _locale_region_code()
+    if region_code in _COUNTRY_BY_REGION_CODE:
+        return _COUNTRY_BY_REGION_CODE[region_code]
+    return "Unknown"
+
+
+def _local_timezone_name() -> str:
+    env_timezone = os.environ.get("TZ", "").strip()
+    if "/" in env_timezone:
+        return env_timezone.lstrip(":")
+
+    try:
+        localtime_path = os.path.realpath("/etc/localtime")
+    except OSError:
+        return ""
+    marker = "/zoneinfo/"
+    if marker not in localtime_path:
+        return ""
+    return localtime_path.split(marker, 1)[1]
+
+
+def _locale_region_code() -> str:
+    locale_names: list[str | None] = [locale.getlocale()[0]]
+    locale_names.extend(
+        os.environ.get(name)
+        for name in ("LC_ALL", "LC_MESSAGES", "LANG")
+    )
+    for locale_name in locale_names:
+        if not locale_name:
+            continue
+        normalized = locale_name.split(".", 1)[0].split("@", 1)[0]
+        if "_" not in normalized:
+            continue
+        region_code = normalized.rsplit("_", 1)[1].upper()
+        if region_code:
+            return region_code
+    return ""
+
+
+def _audio_message_part_from_path(audio_path: str) -> dict:
+    path = Path(audio_path)
+    if not path.exists():
+        raise ProviderError(f"Audio file does not exist: {audio_path}")
+    if not path.read_bytes():
+        raise ProviderError("Audio file was empty.")
+
+    upload_path, cleanup_upload = _prepare_audio_upload_path(path)
+    try:
+        return {
+            "type": "input_audio",
+            "input_audio": _input_audio_payload_from_path(upload_path),
+        }
+    finally:
+        cleanup_upload()
+
+
+def _input_audio_payload_from_path(audio_path: Path) -> dict[str, str]:
+    audio_bytes = audio_path.read_bytes()
+    if not audio_bytes:
+        raise ProviderError("Audio file was empty.")
+    audio_format = audio_path.suffix.lower().lstrip(".") or "wav"
+    return {
+        "data": base64.b64encode(audio_bytes).decode("ascii"),
+        "format": audio_format,
+    }
+
+
 def _file_to_data_url(file_path: Path) -> str:
     if not file_path.exists():
         raise ProviderError(f"Image file does not exist: {file_path}")
@@ -929,6 +1258,46 @@ def _file_to_data_url(file_path: Path) -> str:
     mime_type = mime_type or "application/octet-stream"
     payload = base64.b64encode(file_path.read_bytes()).decode("ascii")
     return f"data:{mime_type};base64,{payload}"
+
+
+def _extract_provider_tool_calls(message) -> list[ProviderToolCall]:
+    parsed_calls: list[ProviderToolCall] = []
+    for tool_call in getattr(message, "tool_calls", []) or []:
+        function = _tool_call_attr(tool_call, "function")
+        name = str(_tool_call_attr(function, "name") or "")
+        arguments_text = str(_tool_call_attr(function, "arguments") or "{}")
+        try:
+            arguments = json.loads(arguments_text)
+        except json.JSONDecodeError:
+            arguments = {"_raw_arguments": arguments_text}
+        if not isinstance(arguments, dict):
+            arguments = {"_raw_arguments": arguments_text}
+        parsed_calls.append(
+            ProviderToolCall(
+                call_id=str(_tool_call_attr(tool_call, "id") or ""),
+                name=name,
+                arguments=arguments,
+            )
+        )
+    return parsed_calls
+
+
+def _provider_tool_call_to_message_payload(tool_call) -> dict:
+    function = _tool_call_attr(tool_call, "function")
+    return {
+        "id": str(_tool_call_attr(tool_call, "id") or ""),
+        "type": "function",
+        "function": {
+            "name": str(_tool_call_attr(function, "name") or ""),
+            "arguments": str(_tool_call_attr(function, "arguments") or "{}"),
+        },
+    }
+
+
+def _tool_call_attr(value, name: str):
+    if isinstance(value, dict):
+        return value.get(name)
+    return getattr(value, name, None)
 
 
 def _extract_text_content(content) -> str:
@@ -969,6 +1338,44 @@ def _extract_part_text(part) -> str | None:
     return text_value
 
 
+def _mark_cacheable_system_message(message: dict) -> dict:
+    if message.get("role") != "system":
+        return message
+
+    content = message.get("content")
+    marked_message = dict(message)
+    if isinstance(content, str):
+        marked_message["content"] = [
+            {
+                "type": "text",
+                "text": content,
+                "cache_control": {"type": "ephemeral"},
+            }
+        ]
+        return marked_message
+
+    if isinstance(content, list) and content:
+        marked_parts = []
+        marked_index = _last_text_part_index(content)
+        for index, part in enumerate(content):
+            if index == marked_index and isinstance(part, dict):
+                marked_part = dict(part)
+                marked_part["cache_control"] = {"type": "ephemeral"}
+                marked_parts.append(marked_part)
+                continue
+            marked_parts.append(part)
+        marked_message["content"] = marked_parts
+    return marked_message
+
+
+def _last_text_part_index(parts: list) -> int | None:
+    for index in range(len(parts) - 1, -1, -1):
+        part = parts[index]
+        if isinstance(part, dict) and part.get("type") == "text":
+            return index
+    return None
+
+
 def _elapsed_ms(started_at: float) -> float:
     return round((perf_counter() - started_at) * 1000, 1)
 
@@ -1005,6 +1412,12 @@ def _format_usage(response) -> str:
         "cached_tokens",
         "prompt_tokens_details.cached_tokens",
         "input_tokens_details.cached_tokens",
+        "cache_write_tokens",
+        "cache_creation_input_tokens",
+        "prompt_tokens_details.cache_write_tokens",
+        "prompt_tokens_details.cache_creation_input_tokens",
+        "input_tokens_details.cache_write_tokens",
+        "input_tokens_details.cache_creation_input_tokens",
         "output_tokens_details.reasoning_tokens",
     ):
         value = flattened_usage.pop(key, None)
@@ -1032,6 +1445,7 @@ def _format_usage_summary(response) -> str:
         ("completion", ("completion_tokens", "output_tokens")),
         ("reasoning", ("reasoning_tokens", "output_tokens_details.reasoning_tokens")),
         ("cached", ("cached_tokens", "prompt_tokens_details.cached_tokens", "input_tokens_details.cached_tokens")),
+        ("cache_write", ("cache_write_tokens", "cache_creation_input_tokens", "prompt_tokens_details.cache_write_tokens", "prompt_tokens_details.cache_creation_input_tokens", "input_tokens_details.cache_write_tokens", "input_tokens_details.cache_creation_input_tokens")),
         ("cost", ("cost",)),
     ):
         for key in keys:

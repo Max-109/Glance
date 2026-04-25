@@ -74,7 +74,7 @@ export function GlanceAppShell({
       ) : null}
 
       <div className="grid h-[100dvh] grid-cols-1 overflow-hidden md:grid-cols-[17rem_minmax(0,1fr)]">
-        <aside className="hidden min-h-0 border-r border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.035),transparent_32%),var(--sidebar-bg)] md:flex md:flex-col">
+        <aside className="electron-drag-region hidden min-h-0 border-r border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.035),transparent_32%),var(--sidebar-bg)] md:flex md:flex-col">
           <div className="h-14 shrink-0" aria-hidden="true" />
 
           <div className="flex items-center gap-4 px-6 pb-6 text-[var(--text-muted)]">
@@ -97,7 +97,7 @@ export function GlanceAppShell({
             </div>
           </div>
 
-          <nav className="min-h-0 flex-1 overflow-y-auto px-4 pb-5" aria-label="Sections">
+          <nav className="electron-no-drag-region min-h-0 flex-1 overflow-y-auto px-4 pb-5" aria-label="Sections">
             {SECTION_GROUPS.map((group, index) => (
               <section
                 key={group.items[0]?.id ?? index}
@@ -147,7 +147,7 @@ export function GlanceAppShell({
         >
           <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-[linear-gradient(180deg,rgba(255,255,255,0.018),transparent)]" />
 
-          <header className="relative z-10 shrink-0 px-5 pb-4 pt-6 md:px-7 lg:px-9">
+          <header className="electron-drag-region relative z-10 shrink-0 px-5 pb-4 pt-6 md:px-7 lg:px-9">
             <h1 className="text-3xl font-semibold tracking-tight text-[var(--text-strong)]">
               {title}
             </h1>
@@ -160,14 +160,14 @@ export function GlanceAppShell({
             tabIndex={-1}
             data-scroll-host="true"
             className={cn(
-              "relative min-h-0 flex-1 overflow-y-auto px-5 pb-6 md:px-7 lg:px-9",
+              "electron-no-drag-region relative min-h-0 flex-1 overflow-y-auto px-5 pb-6 md:px-7 lg:px-9",
               selectOpen ? "z-40" : "z-10",
             )}
           >
             {children}
           </div>
 
-          <footer className="relative z-20 flex shrink-0 items-center justify-between gap-4 border-t border-white/8 bg-[rgba(9,9,10,0.92)] px-5 py-5 backdrop-blur-xl md:px-7 lg:px-9">
+          <footer className="electron-no-drag-region relative z-20 flex shrink-0 items-center justify-between gap-4 border-t border-white/8 bg-[rgba(9,9,10,0.92)] px-5 py-5 backdrop-blur-xl md:px-7 lg:px-9">
             <span className="min-w-0 truncate text-sm text-[var(--text-muted)]">
               {footerStatus}
             </span>

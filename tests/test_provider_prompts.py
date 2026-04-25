@@ -1,6 +1,7 @@
 import unittest
+from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 from src.models.settings import AppSettings
 from src.services.providers import (
@@ -12,6 +13,7 @@ from src.services.providers import (
     NagaTranscriptionProvider,
     OpenAICompatibleProvider,
     _format_usage,
+    _format_usage_summary,
     _preview_text,
 )
 
@@ -40,6 +42,33 @@ class ProviderPromptTests(unittest.TestCase):
             prompt,
         )
 
+    def test_system_prompt_starts_with_runtime_context(self) -> None:
+        moment = datetime(
+            2026,
+            4,
+            25,
+            12,
+            34,
+            tzinfo=timezone(timedelta(hours=3), "EEST"),
+        )
+
+        with patch(
+            "src.services.providers._current_local_datetime",
+            return_value=moment,
+        ), patch(
+            "src.services.providers._detect_user_country",
+            return_value="Lithuania",
+        ):
+            prompt = self.provider._build_system_prompt(match_user_language=False)
+
+        self.assertTrue(
+            prompt.startswith(
+                "Current day and time: Saturday, April 25, 2026, 12:34 EEST (UTC+03:00).\n"
+                "User country: Lithuania.\n"
+                "Use the current day, date, time, year, timezone, and user country above as the source of truth.\n\n"
+            )
+        )
+
     def test_text_prompt_override_replaces_default_base(self) -> None:
         self.provider._settings.text_prompt_override = "You are a terse text assistant."
 
@@ -56,18 +85,17 @@ class ProviderPromptTests(unittest.TestCase):
             prompt,
         )
 
-    def test_tts_preparation_prompt_encourages_contextual_vocal_tags(self) -> None:
+    def test_tts_preparation_prompt_is_strict_cleanup_not_rewrite(self) -> None:
         prompt = self.provider._build_tts_preparation_prompt()
 
-        self.assertIn("Actively apply Eleven v3 best practices", prompt)
-        self.assertIn(
-            "voice-related tags, non-verbal vocal sounds, accent tags, and sound effect tags",
-            prompt,
-        )
-        self.assertIn("include at least one suitable Eleven-style tag", prompt)
+        self.assertIn("strict cleanup step, not a new answer", prompt)
+        self.assertIn("Keep the same facts, meaning, speaker, perspective, and intent", prompt)
+        self.assertIn("Do not add facts, jokes, personal stories", prompt)
+        self.assertIn("Use simple, direct wording", prompt)
+        self.assertIn("Preserve or add emotional delivery on most replies", prompt)
+        self.assertIn("roughly 85 percent of the time", prompt)
+        self.assertIn("[reassuring]", prompt)
         self.assertIn("Never use angle-bracket tags like <laugh>", prompt)
-        self.assertIn("never use emoji", prompt)
-        self.assertIn("Reply only with the final speech text", prompt)
 
     def test_transcription_prompt_allows_high_confidence_context_inference(
         self,
@@ -102,18 +130,17 @@ class ProviderPromptTests(unittest.TestCase):
 
         self.assertIn("final spoken text", prompt)
         self.assertIn("Do not change speaker identity or perspective", prompt)
-        self.assertIn("Actively follow Eleven v3 best practices", prompt)
-        self.assertIn(
-            "Use only square-bracket Eleven-style tags",
-            prompt,
-        )
+        self.assertIn("simple terms first", prompt)
+        self.assertIn("Do not invent personal stories", prompt)
+        self.assertIn("Use emotional delivery on most replies", prompt)
+        self.assertIn("roughly 85 percent of the time", prompt)
+        self.assertIn("[curious]", prompt)
         self.assertIn("Never use angle-bracket tags like <laugh>", prompt)
         self.assertIn("never use emoji", prompt)
-        self.assertIn("place the main tag at the start of the reply", prompt)
         self.assertIn(
-            "Small conversational turns should usually be one short sentence", prompt
+            "Short casual turns should usually be one short sentence", prompt
         )
-        self.assertIn("ask at most one follow-up question", prompt)
+        self.assertIn("Ask at most one follow-up question", prompt)
 
     def test_voice_prompt_override_replaces_default_base(self) -> None:
         self.provider._settings.voice_prompt_override = "Speak with dry, understated clarity."
@@ -213,6 +240,26 @@ class ProviderPromptTests(unittest.TestCase):
             usage,
             "prompt_tokens=120,completion_tokens=25,total_tokens=145,prompt_tokens_details.cached_tokens=96",
         )
+
+    def test_format_usage_includes_cache_write_details(self) -> None:
+        response = {
+            "usage": {
+                "prompt_tokens": 120,
+                "completion_tokens": 25,
+                "total_tokens": 145,
+                "prompt_tokens_details": {
+                    "cached_tokens": 96,
+                    "cache_write_tokens": 24,
+                },
+            }
+        }
+
+        usage = _format_usage(response)
+        summary = _format_usage_summary(response)
+
+        self.assertIn("prompt_tokens_details.cache_write_tokens=24", usage)
+        self.assertIn("cached=96", summary)
+        self.assertIn("cache_write=24", summary)
 
     def test_live_reply_request_includes_prior_conversation_history(self) -> None:
         self.provider._settings.tts_voice_id = "UgBBYS2sOqTuMpoF3BR0"

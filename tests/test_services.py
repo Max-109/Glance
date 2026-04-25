@@ -29,7 +29,12 @@ class DummyProvider:
     def generate_reply(self, **kwargs):
         return "ok"
 
-    def prepare_speech_text(self, text: str) -> LiveSpeechReply:
+    def prepare_speech_text(
+        self,
+        text: str,
+        *,
+        session_id: str | None = None,
+    ) -> LiveSpeechReply:
         return LiveSpeechReply(
             voice_id="UgBBYS2sOqTuMpoF3BR0",
             text=text,
@@ -40,6 +45,7 @@ class DummyProvider:
         *,
         transcript: str,
         conversation_history=None,
+        session_id: str | None = None,
     ) -> LiveSpeechReply:
         return LiveSpeechReply(
             voice_id="UgBBYS2sOqTuMpoF3BR0",

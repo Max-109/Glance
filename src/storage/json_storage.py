@@ -173,6 +173,42 @@ class SessionDirectoryRepository(AbstractRepository[SessionRecord]):
                             start=1,
                         )
                     ]
+                if interaction.tool_calls:
+                    for tool_index, record in enumerate(
+                        interaction.tool_calls,
+                        start=1,
+                    ):
+                        tool_prefix = (
+                            f"{turn_prefix}-tool-{tool_index:02d}-"
+                            f"{_safe_artifact_stem(record.tool_name)}"
+                        )
+                        if record.result_path:
+                            record.result_path = _store_artifact(
+                                record.result_path,
+                                target_path=session_dir
+                                / f"{tool_prefix}-result{_path_suffix(record.result_path, '.txt')}",
+                                move_source=True,
+                                previous_dir=previous_dir,
+                                session_dir=session_dir,
+                            )
+                        if record.artifact_paths:
+                            record.artifact_paths = [
+                                _store_artifact(
+                                    artifact_path,
+                                    target_path=session_dir
+                                    / (
+                                        f"{tool_prefix}-artifact-{artifact_index:02d}"
+                                        f"{_path_suffix(artifact_path, '.bin')}"
+                                    ),
+                                    move_source=True,
+                                    previous_dir=previous_dir,
+                                    session_dir=session_dir,
+                                )
+                                for artifact_index, artifact_path in enumerate(
+                                    record.artifact_paths,
+                                    start=1,
+                                )
+                            ]
 
 
 def _session_folder_name(session: SessionRecord) -> str:
@@ -209,6 +245,10 @@ def _serialize_interaction_payload(payload: dict, session_dir: Path) -> dict:
             _relative_artifact_path(str(path_value), session_dir)
             for path_value in frame_paths
         ]
+    serialized["tool_calls"] = [
+        _serialize_tool_call_payload(tool_call, session_dir)
+        for tool_call in serialized.get("tool_calls", [])
+    ]
     return serialized
 
 
@@ -233,6 +273,38 @@ def _resolve_interaction_payload(payload: dict, session_dir: Path) -> dict:
         resolved["frame_paths"] = [
             _resolve_artifact_path(str(path_value), session_dir)
             for path_value in frame_paths
+        ]
+    resolved["tool_calls"] = [
+        _resolve_tool_call_payload(tool_call, session_dir)
+        for tool_call in resolved.get("tool_calls", [])
+    ]
+    return resolved
+
+
+def _serialize_tool_call_payload(payload: dict, session_dir: Path) -> dict:
+    serialized = dict(payload)
+    result_path = serialized.get("result_path")
+    if isinstance(result_path, str) and result_path:
+        serialized["result_path"] = _relative_artifact_path(result_path, session_dir)
+    artifact_paths = serialized.get("artifact_paths")
+    if isinstance(artifact_paths, list):
+        serialized["artifact_paths"] = [
+            _relative_artifact_path(str(path_value), session_dir)
+            for path_value in artifact_paths
+        ]
+    return serialized
+
+
+def _resolve_tool_call_payload(payload: dict, session_dir: Path) -> dict:
+    resolved = dict(payload)
+    result_path = resolved.get("result_path")
+    if isinstance(result_path, str) and result_path:
+        resolved["result_path"] = _resolve_artifact_path(result_path, session_dir)
+    artifact_paths = resolved.get("artifact_paths")
+    if isinstance(artifact_paths, list):
+        resolved["artifact_paths"] = [
+            _resolve_artifact_path(str(path_value), session_dir)
+            for path_value in artifact_paths
         ]
     return resolved
 
@@ -304,6 +376,14 @@ def _path_suffix(path_value: str, fallback: str) -> str:
     return suffix or fallback
 
 
+def _safe_artifact_stem(value: str) -> str:
+    safe = "".join(
+        character if character.isalnum() or character in {"-", "_"} else "-"
+        for character in value.strip().lower()
+    ).strip("-")
+    return safe or "tool"
+
+
 def _build_conversation_markdown(session: SessionRecord, session_dir: Path) -> str:
     lines = [
         f"# {session.mode.title()} session",
@@ -330,6 +410,27 @@ def _build_conversation_markdown(session: SessionRecord, session_dir: Path) -> s
                 lines.append(
                     f"Assistant audio: {_relative_artifact_path(interaction.speech_path, session_dir)}"
                 )
+            if interaction.tool_calls:
+                lines.extend(["", "Tool calls:"])
+                for record in interaction.tool_calls:
+                    line = f"- {record.tool_name}: {record.status}"
+                    if record.arguments_summary:
+                        line += f" ({record.arguments_summary})"
+                    lines.append(line)
+                    if record.result_preview:
+                        lines.append(f"  Preview: {record.result_preview}")
+                    if record.error:
+                        lines.append(f"  Error: {record.error}")
+                    if record.result_path:
+                        lines.append(
+                            f"  Result: {_relative_artifact_path(record.result_path, session_dir)}"
+                        )
+                    if record.artifact_paths:
+                        relative_artifacts = [
+                            _relative_artifact_path(path, session_dir)
+                            for path in record.artifact_paths
+                        ]
+                        lines.append(f"  Artifacts: {', '.join(relative_artifacts)}")
             continue
         if isinstance(interaction, QuickInteraction):
             lines.extend(

@@ -142,6 +142,7 @@ class LiveSessionController:
                         session=self._session,
                         recording_path=temp_file.name,
                         status_callback=self._set_status,
+                        announce_audio_callback=self._play_inline_notice,
                     )
                 except GlanceError as exc:
                     _cleanup_temp_file(recording_temp_path)
@@ -194,6 +195,17 @@ class LiveSessionController:
         self._state = state
         if self._on_status is not None:
             self._on_status(state, message)
+
+    def _play_inline_notice(self, audio_path: str) -> None:
+        if self._stop_event.is_set():
+            return
+        try:
+            self._playback_service.play_blocking(
+                audio_path,
+                stop_event=self._stop_event,
+            )
+        except GlanceError:
+            raise
 
 
 def _elapsed_ms(started_at: float) -> float:

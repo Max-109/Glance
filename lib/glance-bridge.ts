@@ -1,5 +1,5 @@
 export type SectionId =
-  | "capture"
+  | "tools"
   | "audio"
   | "api"
   | "voice"
@@ -108,7 +108,7 @@ export const SECTION_GROUPS: Array<{
 }> = [
   {
     items: [
-      { id: "capture", icon: "capture", title: "Capture" },
+      { id: "tools", icon: "tools", title: "Tools" },
       { id: "audio", icon: "audio", title: "Audio" },
     ],
   },
@@ -140,10 +140,10 @@ export function sectionMeta(section: SectionId): {
       description: "Choose a voice, preview it, and set a default language.",
     };
   }
-  if (section === "capture") {
+  if (section === "tools") {
     return {
-      title: "Capture",
-      description: "Set capture frequency and batch timing.",
+      title: "Tools",
+      description: "Choose what Glance can use during Live replies.",
     };
   }
   if (section === "audio") {
