@@ -4,11 +4,11 @@
   <p><strong>Press a shortcut. Speak. Get the answer back out loud.</strong></p>
   <p>
     <img alt="Coursework" src="https://img.shields.io/badge/coursework-OOP%202026-%23eaabab?style=for-the-badge&labelColor=3f3f46" />
-    <img alt="Runtime" src="https://img.shields.io/badge/runtime-Python-%23eaabab?style=for-the-badge&labelColor=3f3f46" />
-    <img alt="UI" src="https://img.shields.io/badge/UI-Electron%20%2B%20Next.js-%23eaabab?style=for-the-badge&labelColor=3f3f46" />
+    <img alt="Backend" src="https://img.shields.io/badge/backend-Python-%23eaabab?style=for-the-badge&labelColor=3f3f46" />
+    <img alt="Frontend" src="https://img.shields.io/badge/frontend-Electron%20%2B%20Next.js-%23eaabab?style=for-the-badge&labelColor=3f3f46" />
     <img alt="Voice" src="https://img.shields.io/badge/voice-Eleven%20v3-%23eaabab?style=for-the-badge&labelColor=3f3f46" />
   </p>
-  <img src="./docs/showcase.gif" alt="Glance app showcase" width="900" />
+  <img src="./docs/media/showcase.gif" alt="Glance app showcase" width="900" />
 </div>
 
 ## About
@@ -17,18 +17,15 @@ Glance is my OOP coursework project: a macOS live agent app that stays out of th
 
 I press a customizable shortcut, speak, and Glance runs a Live turn. If I only need text from the screen, I use OCR and Glance copies the extracted text to the clipboard.
 
-The app uses configurable OpenAI-compatible endpoints, so the reply model, transcription model, and voice model can be changed from settings.
-
 ## Features
 
-- Customizable shortcuts for Live, OCR, and opening settings.
+- Customizable shortcuts.
 - OpenAI-compatible provider fields for reply, transcription, and voice.
-- Eleven v3 voice output.
-- TEN VAD audio detection for natural speech turns.
-- Tool permissions, so the model only gets tools the user allowed.
+- Eleven v3 voice output, currently the best multilingual TTS model, with excellent voice quality and support for different emotions. (Supported by Glance.)
+- Advanced TEN VAD audio detection for natural speech turns.
+- Various tools available for the live agent to use.
 - Saved history with transcript, response, audio, screenshots, and tool records.
 - Saved memories that the live agent can read and update.
-- Electron + Next.js settings window, controlled by the Python runtime.
 
 ## Tools
 
@@ -41,7 +38,6 @@ The app uses configurable OpenAI-compatible endpoints, so the reply model, trans
 | Add memory | Saves a task, idea, preference, plan, follow-up, or project note. |
 | Read memory | Searches saved memories when the user asks what they saved or mentions an older note. |
 | Change memory | Updates a saved memory when the user asks to edit or correct it. |
-| End Live session | Stops listening when the user says they are done. |
 
 ## Using The App
 
@@ -58,12 +54,17 @@ Settings are saved in `~/.glance/config.json`. Sessions are saved under `~/.glan
 ## Running The App
 
 ```bash
+# Create and enter the Python virtual environment.
 python3 -m venv .venv
 source .venv/bin/activate
+
+# Install Python and frontend dependencies.
 python -m pip install -r requirements.txt
 
 bun install
 bun run build
+
+# Open the Python backend and Electron frontend.
 python3 main.py
 ```
 
@@ -71,7 +72,7 @@ Glance needs macOS permissions for microphone, screen recording, and accessibili
 
 ## Implementation
 
-The app has two main parts: Python runs the desktop agent, and Electron + Next.js renders the settings UI.
+The app has two main parts: Python is the backend, and Electron + Next.js is the frontend.
 
 | Area | Role |
 | --- | --- |
@@ -179,6 +180,4 @@ The tests cover settings validation, storage, history, live strategy behavior, t
 
 ## Conclusions
 
-Glance meets the coursework goal as a working OOP desktop app with real file persistence, tests, and separate runtime responsibilities.
-
-The next improvements would be packaging, easier first-run setup, and cleaner provider onboarding.
+It was fun to work on this project. Glance started as a coursework idea, but it became a real desktop app I can actually use.
