@@ -8,6 +8,9 @@ from src.models.prompt_defaults import (
     DEFAULT_TRANSCRIPTION_PROMPT,
     DEFAULT_TTS_PREPARATION_PROMPT,
     DEFAULT_VOICE_REPLY_PROMPT,
+    LEGACY_TEXT_REPLY_PROMPT,
+    LEGACY_TTS_PREPARATION_PROMPT,
+    LEGACY_VOICE_REPLY_PROMPT,
 )
 from src.models.settings import AppSettings
 from src.services.settings_manager import SettingsManager
@@ -140,6 +143,52 @@ class SettingsManagerTests(unittest.TestCase):
         self.assertEqual(
             saved_payload["transcription_prompt_override"],
             DEFAULT_TRANSCRIPTION_PROMPT,
+        )
+
+    def test_load_rewrites_legacy_prompt_defaults(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            config_path = temp_path / "config.json"
+            config_path.write_text(
+                json.dumps(
+                    {
+                        "llm_base_url": "https://persisted.example/v1",
+                        "llm_model_name": "claude-opus-4.6",
+                        "tts_base_url": "https://tts.example/v1",
+                        "text_prompt_override": LEGACY_TEXT_REPLY_PROMPT,
+                        "voice_prompt_override": LEGACY_VOICE_REPLY_PROMPT,
+                        "voice_polish_prompt_override": (
+                            LEGACY_TTS_PREPARATION_PROMPT
+                        ),
+                    },
+                    indent=2,
+                ),
+                encoding="utf-8",
+            )
+
+            manager = SettingsManager(store=JsonSettingsStore(config_path))
+            settings = manager.load()
+            saved_payload = json.loads(config_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(
+            settings.text_prompt_override, DEFAULT_TEXT_REPLY_PROMPT
+        )
+        self.assertEqual(
+            settings.voice_prompt_override, DEFAULT_VOICE_REPLY_PROMPT
+        )
+        self.assertEqual(
+            settings.voice_polish_prompt_override,
+            DEFAULT_TTS_PREPARATION_PROMPT,
+        )
+        self.assertEqual(
+            saved_payload["text_prompt_override"], DEFAULT_TEXT_REPLY_PROMPT
+        )
+        self.assertEqual(
+            saved_payload["voice_prompt_override"], DEFAULT_VOICE_REPLY_PROMPT
+        )
+        self.assertEqual(
+            saved_payload["voice_polish_prompt_override"],
+            DEFAULT_TTS_PREPARATION_PROMPT,
         )
 
 

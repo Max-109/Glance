@@ -7,6 +7,9 @@ from src.models.prompt_defaults import (
     DEFAULT_TRANSCRIPTION_PROMPT,
     DEFAULT_TTS_PREPARATION_PROMPT,
     DEFAULT_VOICE_REPLY_PROMPT,
+    LEGACY_TEXT_REPLY_PROMPT,
+    LEGACY_TTS_PREPARATION_PROMPT,
+    LEGACY_VOICE_REPLY_PROMPT,
 )
 from src.models.settings import (
     AppSettings,
@@ -367,6 +370,25 @@ class AppSettingsTests(unittest.TestCase):
         self.assertEqual(
             settings.transcription_prompt_override,
             DEFAULT_TRANSCRIPTION_PROMPT,
+        )
+
+    def test_from_mapping_normalizes_legacy_prompt_defaults(self) -> None:
+        settings = AppSettings.from_mapping(
+            {
+                "llm_base_url": "https://api.example.com/v1",
+                "llm_model_name": "model-a",
+                "tts_base_url": "https://tts.example/v1",
+                "text_prompt_override": LEGACY_TEXT_REPLY_PROMPT,
+                "voice_prompt_override": LEGACY_VOICE_REPLY_PROMPT,
+                "voice_polish_prompt_override": LEGACY_TTS_PREPARATION_PROMPT,
+            }
+        )
+
+        self.assertEqual(settings.text_prompt_override, DEFAULT_TEXT_REPLY_PROMPT)
+        self.assertEqual(settings.voice_prompt_override, DEFAULT_VOICE_REPLY_PROMPT)
+        self.assertEqual(
+            settings.voice_polish_prompt_override,
+            DEFAULT_TTS_PREPARATION_PROMPT,
         )
 
     def test_validate_rejects_invalid_accent_color(self) -> None:

@@ -85,8 +85,8 @@ export function PreferencesTab({
         id: "system_prompt_override",
         title: "Shared note",
         eyebrow: "Shared",
-        description: "Added after text and voice prompts.",
-        helper: "Leave this empty unless every reply needs the same extra rule.",
+        description: "A rule Glance adds to every reply.",
+        helper: "Use this for one extra rule that should apply to both typed and spoken replies.",
         icon: "settings",
         accent: "var(--accent)",
         defaultValue: "",
@@ -95,28 +95,28 @@ export function PreferencesTab({
         id: "text_prompt_override",
         title: "Text replies",
         eyebrow: "Text",
-        description: "Regular replies and screen questions.",
-        helper: "Used when Glance answers in text.",
+        description: "Typed answers and screen questions.",
+        helper: "Controls what Glance says when it replies in writing.",
         icon: "replies",
         accent: "#38bdf8",
         defaultValue: state.promptDefaults.text_prompt_override ?? "",
       },
       {
         id: "voice_prompt_override",
-        title: "Voice reply",
+        title: "Spoken replies",
         eyebrow: "Voice",
-        description: "The spoken answer before enhancement.",
-        helper: "Used before Glance adds Eleven delivery details.",
+        description: "The answer before speech delivery is added.",
+        helper: "Controls the spoken answer itself before emotion and pacing are added.",
         icon: "speaker",
         accent: "#f97316",
         defaultValue: state.promptDefaults.voice_prompt_override ?? "",
       },
       {
         id: "voice_polish_prompt_override",
-        title: "Speech enhancement",
-        eyebrow: "Enhance",
-        description: "Adds delivery, emotion, and Eleven tags.",
-        helper: "Used to add speech emotion and delivery details, not to answer again.",
+        title: "Speech delivery",
+        eyebrow: "Delivery",
+        description: "Adds emotion, pacing, and spoken style notes.",
+        helper: "Shapes how the answer is spoken. It should polish the delivery, not write a second answer.",
         icon: "wave",
         accent: "#a78bfa",
         defaultValue: state.promptDefaults.voice_polish_prompt_override ?? "",
@@ -125,8 +125,8 @@ export function PreferencesTab({
         id: "transcription_prompt_override",
         title: "Transcription",
         eyebrow: "Input",
-        description: "Turns raw audio into text.",
-        helper: "Used before Glance answers.",
+        description: "Turns your speech into clean text.",
+        helper: "Used to understand what you said before Glance responds.",
         icon: "mic",
         accent: "#22c55e",
         defaultValue: state.promptDefaults.transcription_prompt_override ?? "",
@@ -291,9 +291,9 @@ export function PreferencesTab({
                 style={promptStyle(activePrompt)}
                 aria-labelledby="active-prompt-title"
               >
-                <div className="flex min-w-0 items-start justify-between gap-3 border-b border-border px-4 py-4">
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
+                <div className="grid min-w-0 gap-3 border-b border-border px-4 py-4">
+                  <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
+                    <div className="flex min-w-0 flex-wrap items-center gap-2">
                       <span className="grid size-9 shrink-0 place-items-center rounded-2xl border border-[color-mix(in_srgb,var(--prompt-accent)_36%,transparent)] bg-[color-mix(in_srgb,var(--prompt-accent)_12%,transparent)] text-[var(--prompt-accent)]">
                         <Icon name={activePrompt.icon} className="size-4.5" />
                       </span>
@@ -307,23 +307,23 @@ export function PreferencesTab({
                         {activePrompt.eyebrow}
                       </span>
                     </div>
-                    <p className="mt-2 max-w-[68ch] text-sm leading-5 text-[var(--text-muted)]">
-                      {activePrompt.helper}
-                    </p>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <StatusBadge tone={activeIsCustom ? "accent" : "neutral"}>
+                        {activeIsCustom ? "custom" : "default"}
+                      </StatusBadge>
+                      <GlanceButton
+                        icon="undo"
+                        variant="ghost"
+                        disabled={!activeIsCustom}
+                        onClick={() => resetField(activePrompt.id, activePrompt.defaultValue)}
+                      >
+                        Reset
+                      </GlanceButton>
+                    </div>
                   </div>
-                  <div className="flex shrink-0 items-center gap-2">
-                    <StatusBadge tone={activeIsCustom ? "accent" : "neutral"}>
-                      {activeIsCustom ? "custom" : "default"}
-                    </StatusBadge>
-                    <GlanceButton
-                      icon="undo"
-                      variant="ghost"
-                      disabled={!activeIsCustom}
-                      onClick={() => resetField(activePrompt.id, activePrompt.defaultValue)}
-                    >
-                      Reset
-                    </GlanceButton>
-                  </div>
+                  <p className="max-w-[82ch] text-sm leading-5 text-[var(--text-muted)]">
+                    {activePrompt.helper}
+                  </p>
                 </div>
 
                 <div className="min-h-[43rem]">
