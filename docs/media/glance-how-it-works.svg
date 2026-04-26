@@ -1,0 +1,106 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 980" role="img" aria-labelledby="title desc">
+  <title id="title">How Glance works</title>
+  <desc id="desc">A styled flow showing Glance Live and OCR workflows.</desc>
+  <defs>
+    <marker id="arrow-accent" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#eaabab"/>
+    </marker>
+    <marker id="arrow-muted" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#71717a"/>
+    </marker>
+    <filter id="soft-shadow" x="-12%" y="-12%" width="124%" height="124%">
+      <feDropShadow dx="0" dy="14" stdDeviation="18" flood-color="#000000" flood-opacity="0.28"/>
+    </filter>
+    <style>
+      .bg { fill: #111114; }
+      .panel { fill: #18181b; stroke: #3f3f46; stroke-width: 1.5; }
+      .node { fill: #27272a; stroke: #52525b; stroke-width: 1.5; }
+      .node-live { fill: #2f2f34; stroke: #eaabab; stroke-width: 2; }
+      .node-accent { fill: #eaabab; stroke: #f1c3c3; stroke-width: 2; }
+      .node-saved { fill: #3f3f46; stroke: #eaabab; stroke-width: 2; }
+      .label { fill: #f4f4f5; font: 600 22px Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; text-anchor: middle; }
+      .label-small { fill: #d4d4d8; font: 600 18px Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; text-anchor: middle; }
+      .label-dark { fill: #18181b; font: 700 22px Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; text-anchor: middle; }
+      .section { fill: #eaabab; font: 800 18px Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; letter-spacing: 0.14em; text-anchor: middle; }
+      .muted-section { fill: #a1a1aa; font: 800 18px Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; letter-spacing: 0.14em; text-anchor: middle; }
+      .arrow-accent { fill: none; stroke: #eaabab; stroke-width: 3; marker-end: url(#arrow-accent); }
+      .arrow-muted { fill: none; stroke: #71717a; stroke-width: 3; marker-end: url(#arrow-muted); }
+    </style>
+  </defs>
+
+  <rect class="bg" width="1200" height="980" rx="28"/>
+  <rect x="28" y="28" width="1144" height="924" rx="22" fill="none" stroke="#3f3f46" stroke-width="1.5"/>
+  <path d="M 28 58 H 1172" stroke="#eaabab" stroke-width="4" opacity="0.9"/>
+
+  <text x="350" y="96" class="section">LIVE AGENT</text>
+  <text x="900" y="96" class="muted-section">OCR</text>
+
+  <g filter="url(#soft-shadow)">
+    <rect class="panel" x="72" y="118" width="556" height="796" rx="18"/>
+    <rect class="panel" x="688" y="118" width="440" height="596" rx="18"/>
+  </g>
+
+  <!-- Live flow nodes -->
+  <rect class="node-accent" x="160" y="150" width="380" height="64" rx="8"/>
+  <text x="350" y="190" class="label-dark">Press the Live shortcut</text>
+
+  <rect class="node-live" x="160" y="250" width="380" height="64" rx="8"/>
+  <text x="350" y="290" class="label">TEN VAD listens for speech</text>
+
+  <rect class="node-live" x="160" y="350" width="380" height="64" rx="8"/>
+  <text x="350" y="390" class="label">Glance records the turn</text>
+
+  <path class="node-live" d="M 350 452 L 438 530 L 350 608 L 262 530 Z"/>
+  <text x="350" y="524" class="label">Choose</text>
+  <text x="350" y="550" class="label-small">Live path</text>
+
+  <rect class="node" x="92" y="652" width="250" height="76" rx="8"/>
+  <text x="217" y="684" class="label-small">Normal</text>
+  <text x="217" y="710" class="label-small">speech becomes text</text>
+
+  <rect class="node" x="358" y="652" width="250" height="76" rx="8"/>
+  <text x="483" y="684" class="label-small">Multimodal</text>
+  <text x="483" y="710" class="label-small">audio goes to model</text>
+
+  <rect class="node-live" x="160" y="768" width="380" height="64" rx="8"/>
+  <text x="350" y="793" class="label">Live agent writes answer</text>
+  <text x="350" y="819" class="label-small">tools can help if enabled</text>
+
+  <rect class="node-saved" x="160" y="864" width="380" height="64" rx="8"/>
+  <text x="350" y="889" class="label">Eleven v3 speaks it</text>
+  <text x="350" y="915" class="label-small">session is saved</text>
+
+  <!-- OCR flow nodes -->
+  <rect class="node-accent" x="760" y="150" width="296" height="64" rx="8"/>
+  <text x="908" y="190" class="label-dark">Press the OCR shortcut</text>
+
+  <rect class="node" x="760" y="258" width="296" height="64" rx="8"/>
+  <text x="908" y="298" class="label">Capture the screen</text>
+
+  <rect class="node" x="760" y="366" width="296" height="64" rx="8"/>
+  <text x="908" y="392" class="label">Extract requested</text>
+  <text x="908" y="418" class="label-small">visible text</text>
+
+  <rect class="node" x="760" y="474" width="296" height="64" rx="8"/>
+  <text x="908" y="500" class="label">Copy text to</text>
+  <text x="908" y="526" class="label-small">the clipboard</text>
+
+  <rect class="node-saved" x="760" y="582" width="296" height="64" rx="8"/>
+  <text x="908" y="622" class="label">OCR result is saved</text>
+
+  <!-- Live flow arrows -->
+  <path class="arrow-accent" d="M 350 214 V 242"/>
+  <path class="arrow-accent" d="M 350 314 V 342"/>
+  <path class="arrow-accent" d="M 350 414 V 444"/>
+  <path class="arrow-accent" d="M 282 590 C 245 616 225 626 217 644"/>
+  <path class="arrow-accent" d="M 418 590 C 455 616 475 626 483 644"/>
+  <path class="arrow-accent" d="M 217 728 C 217 760 271 760 324 768"/>
+  <path class="arrow-accent" d="M 483 728 C 483 760 429 760 376 768"/>
+  <path class="arrow-accent" d="M 350 832 V 856"/>
+
+  <!-- OCR flow arrows -->
+  <path class="arrow-muted" d="M 908 214 V 250"/>
+  <path class="arrow-muted" d="M 908 322 V 358"/>
+  <path class="arrow-muted" d="M 908 430 V 466"/>
+  <path class="arrow-muted" d="M 908 538 V 574"/>
+</svg>

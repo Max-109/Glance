@@ -29,44 +29,9 @@ I press a customizable shortcut, speak, and Glance runs a Live turn. If I only n
 
 ## How It Works
 
-```mermaid
-%%{init: {"theme": "base", "themeVariables": {"background": "transparent", "primaryColor": "#3f3f46", "primaryTextColor": "#f4f4f5", "primaryBorderColor": "#eaabab", "lineColor": "#eaabab", "secondaryColor": "#27272a", "tertiaryColor": "#18181b", "fontFamily": "Inter, ui-sans-serif, system-ui"}}}%%
-flowchart TD
-    LiveShortcut[Press the Live shortcut]
-    Vad[TEN VAD listens for speech]
-    Recording[Glance records the turn]
-    Mode{Live mode}
-    Transcription[Speech becomes text]
-    Multimodal[Audio goes straight to a multimodal model]
-    Agent[The live agent writes an answer]
-    Tools[Optional tools: screen, OCR, web, memories]
-    Speech[Eleven v3 turns the answer into voice]
-    Saved[Transcript, answer, audio, and tool results are saved]
-
-    OcrShortcut[Press the OCR shortcut]
-    Screen[Capture the screen]
-    Extract[Extract the requested text]
-    Clipboard[Copy the text to the clipboard]
-    OcrSaved[Save the OCR result]
-
-    LiveShortcut --> Vad --> Recording --> Mode
-    Mode -->|Normal| Transcription --> Agent
-    Mode -->|Multimodal| Multimodal --> Agent
-    Agent --> Tools --> Agent
-    Agent --> Speech --> Saved
-
-    OcrShortcut --> Screen --> Extract --> Clipboard --> OcrSaved
-
-    classDef live fill:#3f3f46,stroke:#eaabab,color:#f4f4f5,stroke-width:2px
-    classDef ocr fill:#27272a,stroke:#71717a,color:#f4f4f5
-    classDef saved fill:#eaabab,stroke:#eaabab,color:#18181b
-    classDef decision fill:#18181b,stroke:#eaabab,color:#f4f4f5,stroke-width:2px
-
-    class LiveShortcut,Vad,Recording,Transcription,Multimodal,Agent,Tools,Speech live
-    class OcrShortcut,Screen,Extract,Clipboard ocr
-    class Saved,OcrSaved saved
-    class Mode decision
-```
+<p align="center">
+  <img src="./docs/media/glance-how-it-works.svg" alt="How Glance works" width="900" />
+</p>
 
 ## Tools
 
