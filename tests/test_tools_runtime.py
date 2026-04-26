@@ -1,7 +1,10 @@
+import tempfile
 import unittest
 from pathlib import Path
 
 from src.models.settings import AppSettings
+from src.services.memory_manager import MemoryManager
+from src.tools import runtime as runtime_module
 from src.tools import (
     RuntimeToolRegistry,
     ToolCallRequest,
@@ -94,6 +97,34 @@ class RuntimeToolTests(unittest.TestCase):
             "",
         )
 
+    def test_web_search_writes_result_artifact(self) -> None:
+        original_read_url = runtime_module._read_url
+        try:
+            runtime_module._read_url = lambda *args, **kwargs: (
+                '<a class="result__a" href="https://example.com/page">'
+                "Example result</a>"
+            )
+
+            result = runtime_module._web_search({"query": "example"})
+        finally:
+            runtime_module._read_url = original_read_url
+
+        result_path = Path(result.result_path)
+        self.assertTrue(result_path.exists())
+        self.assertEqual(result_path.suffix, ".json")
+        self.assertIn("Example result", result.content)
+        self.assertEqual(
+            result.metadata["results"][0]["url"], "https://example.com/page"
+        )
+        result_path.unlink(missing_ok=True)
+
+    def test_html_text_extractor_treats_br_as_boundary(self) -> None:
+        extractor = runtime_module._TextExtractor()
+
+        extractor.feed("<span>First</span><br><span>Second</span>")
+
+        self.assertEqual(extractor.parts, ["First", "\n", "Second"])
+
     def test_disabled_tool_is_not_exposed_and_does_not_execute(self) -> None:
         screen_capture_agent = FakeScreenCaptureAgent()
         registry = RuntimeToolRegistry(
@@ -143,6 +174,169 @@ class RuntimeToolTests(unittest.TestCase):
         self.assertEqual(record.tool_name, "end_live_session")
         self.assertEqual(result.content, "Live ended.")
         self.assertEqual(result.metadata["end_live_session"], True)
+
+    def test_add_memory_tool_saves_json_memory(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            memory_manager = MemoryManager(Path(temp_dir) / "memories.json")
+            registry = RuntimeToolRegistry(
+                _tool_settings(),
+                memory_manager=memory_manager,
+            )
+            executor = ToolExecutor(registry)
+
+            record, result = executor.execute(
+                ToolCallRequest(
+                    call_id="call-memory",
+                    name="add_memory",
+                    arguments={
+                        "title": "Add dashboard feature",
+                        "description": (
+                            "Remember to add a new dashboard feature to the "
+                            "project."
+                        ),
+                        "intent": "Add a new feature later.",
+                        "source_text": (
+                            "I need to remember to add a new feature."
+                        ),
+                    },
+                )
+            )
+
+            memories = memory_manager.list_memories()
+
+        self.assertEqual(record.status, "success")
+        self.assertEqual(record.tool_name, "add_memory")
+        self.assertEqual(
+            record.arguments_summary, "title: Add dashboard feature"
+        )
+        self.assertIn("Memory saved", result.content)
+        self.assertEqual(len(memories), 1)
+        self.assertEqual(memories[0].title, "Add dashboard feature")
+        self.assertEqual(
+            memories[0].source_text,
+            "I need to remember to add a new feature.",
+        )
+
+    def test_disabled_add_memory_tool_does_not_save(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            memory_manager = MemoryManager(Path(temp_dir) / "memories.json")
+            registry = RuntimeToolRegistry(
+                _tool_settings(tool_add_memory_policy="deny"),
+                memory_manager=memory_manager,
+            )
+            executor = ToolExecutor(registry)
+
+            exposed_names = {
+                definition.name for definition in registry.enabled_definitions
+            }
+            record, result = executor.execute(
+                ToolCallRequest(
+                    call_id="call-memory",
+                    name="add_memory",
+                    arguments={
+                        "title": "Save me",
+                        "description": "Remember this.",
+                    },
+                )
+            )
+            memories = memory_manager.list_memories()
+
+        self.assertNotIn("add_memory", exposed_names)
+        self.assertEqual(record.status, "error")
+        self.assertIn("disabled", result.content)
+        self.assertEqual(memories, [])
+
+    def test_read_memory_tool_returns_compact_ranked_results(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            memory_manager = MemoryManager(Path(temp_dir) / "memories.json")
+            memory_manager.add_memory(
+                title="Billing export",
+                description="Remember to add CSV export for invoices.",
+                intent="Improve admin billing workflow.",
+            )
+            memory_manager.add_memory(
+                title="Onboarding",
+                description="Add a first-run checklist.",
+                intent="Help new users start faster.",
+            )
+            registry = RuntimeToolRegistry(
+                _tool_settings(),
+                memory_manager=memory_manager,
+            )
+            executor = ToolExecutor(registry)
+
+            exposed_names = {
+                definition.name for definition in registry.enabled_definitions
+            }
+            record, result = executor.execute(
+                ToolCallRequest(
+                    call_id="call-read-memory",
+                    name="read_memory",
+                    arguments={
+                        "query": "what was the billing invoice thing",
+                        "max_results": 5,
+                    },
+                )
+            )
+
+        self.assertIn("read_memory", exposed_names)
+        self.assertEqual(record.status, "success")
+        self.assertEqual(record.tool_name, "read_memory")
+        self.assertEqual(
+            record.arguments_summary,
+            "query: what was the billing invoice thing",
+        )
+        self.assertIn("Matching memories:", result.content)
+        self.assertIn("Billing export", result.content)
+        self.assertNotIn('"memories"', result.content)
+
+    def test_read_memory_tool_returns_empty_state(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            memory_manager = MemoryManager(Path(temp_dir) / "memories.json")
+            registry = RuntimeToolRegistry(
+                _tool_settings(),
+                memory_manager=memory_manager,
+            )
+            executor = ToolExecutor(registry)
+
+            record, result = executor.execute(
+                ToolCallRequest(
+                    call_id="call-read-memory",
+                    name="read_memory",
+                    arguments={"query": "anything"},
+                )
+            )
+
+        self.assertEqual(record.status, "success")
+        self.assertEqual(result.content, "No memories saved yet.")
+
+    def test_disabled_read_memory_tool_does_not_search(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            memory_manager = MemoryManager(Path(temp_dir) / "memories.json")
+            memory_manager.add_memory(
+                title="Private thing",
+                description="Do not expose when disabled.",
+            )
+            registry = RuntimeToolRegistry(
+                _tool_settings(tool_read_memory_policy="deny"),
+                memory_manager=memory_manager,
+            )
+            executor = ToolExecutor(registry)
+
+            exposed_names = {
+                definition.name for definition in registry.enabled_definitions
+            }
+            record, result = executor.execute(
+                ToolCallRequest(
+                    call_id="call-read-memory",
+                    name="read_memory",
+                    arguments={"query": "private"},
+                )
+            )
+
+        self.assertNotIn("read_memory", exposed_names)
+        self.assertEqual(record.status, "error")
+        self.assertIn("disabled", result.content)
 
     def test_ocr_tool_extracts_screen_text_and_copies_clipboard(self) -> None:
         screen_capture_agent = FakeScreenCaptureAgent()

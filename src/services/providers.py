@@ -390,12 +390,15 @@ class OpenAICompatibleProvider:
         *,
         audio_path: str,
         conversation_history: list[dict[str, str]] | None = None,
+        enabled_tool_names: set[str] | None = None,
     ) -> list[dict]:
         audio_part = _audio_message_part_from_path(audio_path)
         messages: list[dict] = [
             {
                 "role": "system",
-                "content": self._build_live_tool_speech_system_prompt(),
+                "content": self._build_live_tool_speech_system_prompt(
+                    enabled_tool_names=enabled_tool_names
+                ),
             }
         ]
         messages.extend(_normalize_chat_messages(conversation_history))
@@ -408,11 +411,7 @@ class OpenAICompatibleProvider:
                         "Listen to the user's spoken audio below. Decide "
                         "whether to call an enabled tool or give the final "
                         "spoken answer. If no tool is needed, answer directly "
-                        "with the final speech text. Call end_live_session "
-                        "when the user clearly says they are done, says no to "
-                        "more help, says everything is fine, says thanks after "
-                        "a completed task, says goodbye or bye, or asks "
-                        "Glance to stop listening."
+                        "with the final speech text."
                     ),
                 },
                 audio_part,
@@ -441,28 +440,15 @@ class OpenAICompatibleProvider:
         *,
         transcript: str,
         conversation_history: list[dict[str, str]] | None = None,
+        enabled_tool_names: set[str] | None = None,
     ) -> list[dict]:
         system_prompt = self._build_system_prompt()
-        system_prompt += (
-            " You are running inside Glance Live mode with runtime tools "
-            "available. Use a tool only when it materially helps answer the "
-            "user's spoken request. Do not expose tool call names, JSON, "
-            "arguments, raw fetched text, or screenshot metadata to the "
-            "user. OCR is a clipboard action: when the user asks you to "
-            "copy, read, extract, grab, transcribe, or get visible text from "
-            "the screen, an image, a screenshot, a web page, a video frame, a "
-            "document, a table, a label, or any UI element, call ocr_screen "
-            "with the user's exact extraction instruction. The user does not "
-            "need to say OCR. Do not use take_screenshot for text extraction "
-            "requests; use ocr_screen so the result is copied to the "
-            "clipboard. Then let Glance confirm that the result was copied. "
-            "Never turn OCR output into the spoken final answer. "
-            "Call end_live_session when the user clearly says they are done, "
-            "says no to more help, says everything is fine, says thanks after "
-            "a completed task, says goodbye or bye, or asks Glance to stop "
-            "listening. When you have enough information, give only the final "
-            "natural answer text. Do not narrate the tool work in the final "
-            "answer; answer with the result directly."
+        system_prompt += _build_live_tool_runtime_prompt(
+            enabled_tool_names=enabled_tool_names,
+            final_answer_instruction=(
+                "When you have enough information, give only the final "
+                "natural answer text."
+            ),
         )
         messages: list[dict] = [{"role": "system", "content": system_prompt}]
         messages.extend(_normalize_chat_messages(conversation_history))
@@ -648,6 +634,7 @@ class OpenAICompatibleProvider:
                 "text_prompt_override", DEFAULT_TEXT_REPLY_PROMPT
             )
         )
+        prompt += _build_tool_settings_prompt(self._settings)
         override = self._shared_prompt_override()
         if override:
             prompt += f" Additional instructions: {override}"
@@ -658,30 +645,19 @@ class OpenAICompatibleProvider:
         )
         return prompt
 
-    def _build_live_tool_speech_system_prompt(self) -> str:
+    def _build_live_tool_speech_system_prompt(
+        self,
+        *,
+        enabled_tool_names: set[str] | None = None,
+    ) -> str:
         prompt = self._build_live_speech_system_prompt()
-        prompt += (
-            " Runtime tools are available in this live turn. Use a tool only "
-            "when it materially helps answer the user's spoken request. If "
-            "you need a tool, call the tool instead of giving a final "
-            "answer. Tool calls, tool names, JSON, arguments, raw fetched "
-            "text, and screenshot metadata are private runtime details; "
-            "never say them to the user. OCR is a clipboard action: when the "
-            "user asks you to copy, read, extract, grab, transcribe, or get "
-            "visible text from the screen, an image, a screenshot, a web "
-            "page, a video frame, a document, a table, a label, or any UI "
-            "element, call ocr_screen with the user's exact extraction "
-            "instruction. The user does not need to say OCR. Do not use "
-            "take_screenshot for text extraction requests; use ocr_screen so "
-            "the result is copied to the clipboard. Then let Glance confirm "
-            "that the result was copied. Never turn OCR output into the "
-            "spoken final answer. Call end_live_session when the user "
-            "clearly says they are done, says no to more help, says everything "
-            "is fine, says thanks after a completed task, says goodbye or bye, "
-            "or asks Glance to stop listening. When you have enough information, "
-            "give only the final spoken answer and follow all voice, "
-            "emotion, and VOICE_ID rules above. Do not narrate the tool work "
-            "in the final answer; answer with the result directly."
+        prompt += _build_live_tool_runtime_prompt(
+            enabled_tool_names=enabled_tool_names,
+            final_answer_instruction=(
+                "When you have enough information, give only the final spoken "
+                "answer and follow all voice, emotion, and VOICE_ID rules "
+                "above."
+            ),
         )
         return prompt
 
@@ -691,6 +667,7 @@ class OpenAICompatibleProvider:
                 "voice_prompt_override", DEFAULT_VOICE_REPLY_PROMPT
             )
         )
+        prompt += _build_tool_settings_prompt(self._settings)
         override = self._shared_prompt_override()
         if override:
             prompt += f" Additional instructions: {override}"
@@ -1058,6 +1035,168 @@ def _speech_response_format(output_path: Path) -> str:
     if suffix:
         return suffix
     return "mp3"
+
+
+def _build_live_tool_runtime_prompt(
+    *,
+    enabled_tool_names: set[str] | None,
+    final_answer_instruction: str,
+) -> str:
+    if enabled_tool_names is None:
+        enabled_tools = {
+            "ocr_screen",
+            "add_memory",
+            "read_memory",
+            "end_live_session",
+        }
+    else:
+        enabled_tools = set(enabled_tool_names)
+    prompt = _build_tool_settings_prompt(
+        None,
+        enabled_tool_names=enabled_tools,
+    )
+    user_facing_tools = enabled_tools - {"end_live_session"}
+    if user_facing_tools:
+        prompt += (
+            " Tools are available in this turn. You are running "
+            "inside Glance Live mode. Use a tool only when it materially "
+            "helps answer the user's spoken request. If you need a tool, call "
+            "the tool instead of giving a final answer. Tool calls, tool "
+            "names, JSON, arguments, raw fetched text, and screenshot "
+            "metadata are private runtime details; never say them to the "
+            "user."
+        )
+    if "ocr_screen" in enabled_tools:
+        prompt += (
+            " OCR is a clipboard action: when the user asks you to copy, "
+            "read, extract, grab, transcribe, or get visible text from the "
+            "screen, an image, a screenshot, a web page, a video frame, a "
+            "document, a table, a label, or any UI element, call ocr_screen "
+            "with the user's exact extraction instruction. The user does not "
+            "need to say OCR. Do not use take_screenshot for text extraction "
+            "requests; use ocr_screen so the result is copied to the "
+            "clipboard. Then let Glance confirm that the result was copied. "
+            "Never turn OCR output into the spoken final answer."
+        )
+    if "add_memory" in enabled_tools:
+        prompt += (
+            " When the user asks you to remember a task, idea, project note, "
+            "preference, or follow-up for later, call add_memory and keep the "
+            "saved wording close to what the user said."
+        )
+    if "read_memory" in enabled_tools:
+        prompt += (
+            " When the user asks what they saved, asks to be reminded, asks "
+            "what they needed to do about something, or refers to previous "
+            "memories, call read_memory with the user's wording as the query. "
+            "Use the returned matches to answer naturally, and do not mention "
+            "the tool name."
+        )
+    if "end_live_session" in enabled_tools:
+        prompt += (
+            " Call end_live_session when the user clearly says they are done, "
+            "says no to more help, says everything is fine, says thanks after "
+            "a completed task, says goodbye or bye, or asks Glance to stop "
+            "listening."
+        )
+    return (
+        f"{prompt} {final_answer_instruction} Do not narrate the tool work "
+        "in the final answer; answer with the result directly."
+    )
+
+
+def _build_tool_settings_prompt(
+    settings: AppSettings | None,
+    *,
+    enabled_tool_names: set[str] | None = None,
+) -> str:
+    enabled_tools = set(enabled_tool_names or set())
+    if settings is not None and not settings.tools_enabled:
+        return (
+            " Tools are not allowed in Settings. You do not have access "
+            "to web search, web page fetching, screen inspection, OCR, memory "
+            "saving, or memory reading in this turn. If the user asks for "
+            "one of those capabilities, say that the tool is not allowed in "
+            "Settings and they need to enable Tools in Settings to use "
+            "it. Do not claim you checked the web, inspected the screen, "
+            "copied text, saved a memory, or read a memory."
+        )
+
+    disabled_capabilities: list[str] = []
+    if settings is not None:
+        if (
+            settings.tool_web_search_policy != "allow"
+            and settings.tool_web_fetch_policy != "allow"
+        ):
+            disabled_capabilities.append(
+                "Web search and web page fetching are not allowed in "
+                "Settings. If the user asks for current web information, say "
+                "that the web tools are not allowed in Settings and they need "
+                "to enable them to use web lookup."
+            )
+        if (
+            settings.tool_take_screenshot_policy != "allow"
+            and settings.tool_ocr_policy != "allow"
+        ):
+            disabled_capabilities.append(
+                "Screen inspection and OCR are not allowed in Settings. If "
+                "the user asks you to inspect the screen or copy visible text, "
+                "say that those tools are not allowed in Settings and they "
+                "need to enable them to use screen or OCR tools."
+            )
+        if settings.tool_add_memory_policy != "allow":
+            disabled_capabilities.append(
+                "Memory saving is not allowed in Settings. If the user asks "
+                "you to remember something, say that memory saving is not "
+                "allowed in Settings and they need to enable it to save "
+                "memories."
+            )
+        if settings.tool_read_memory_policy != "allow":
+            disabled_capabilities.append(
+                "Memory reading is not allowed in Settings. If the user asks "
+                "you to recall saved memories, say that memory reading is not "
+                "allowed in Settings and they need to enable it to read "
+                "memories."
+            )
+    elif enabled_tool_names is not None:
+        if (
+            "web_search" not in enabled_tools
+            and "web_fetch" not in enabled_tools
+        ):
+            disabled_capabilities.append(
+                "Web search and web page fetching are not allowed in Settings. "
+                "If the user asks for current web information, say that the "
+                "web tools are not allowed in Settings and they need to enable "
+                "them to use web lookup."
+            )
+        if (
+            "take_screenshot" not in enabled_tools
+            and "ocr_screen" not in enabled_tools
+        ):
+            disabled_capabilities.append(
+                "Screen inspection and OCR are not allowed in Settings. If "
+                "the user asks you to inspect the screen or copy visible text, "
+                "say that those tools are not allowed in Settings and they "
+                "need to enable them to use screen or OCR tools."
+            )
+        if "add_memory" not in enabled_tools:
+            disabled_capabilities.append(
+                "Memory saving is not allowed in Settings. If the user asks "
+                "you to remember something, say that memory saving is not "
+                "allowed in Settings and they need to enable it to save "
+                "memories."
+            )
+        if "read_memory" not in enabled_tools:
+            disabled_capabilities.append(
+                "Memory reading is not allowed in Settings. If the user asks "
+                "you to recall saved memories, say that memory reading is not "
+                "allowed in Settings and they need to enable it to read "
+                "memories."
+            )
+
+    if not disabled_capabilities:
+        return ""
+    return " " + " ".join(disabled_capabilities)
 
 
 def _normalize_synthesized_audio(

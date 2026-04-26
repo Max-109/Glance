@@ -1,15 +1,21 @@
 from __future__ import annotations
 
+from hmac import compare_digest
 import json
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+import secrets
 from threading import Event, Lock, Thread
 from typing import Any, Callable
+from urllib.parse import urlparse
 
 from PySide6.QtCore import QObject, QThread, Signal, Slot
 
 from src.ui.runtime_visual import coerce_runtime_status, default_runtime_status
 from src.ui.settings_viewmodel import SettingsViewModel
+
+
+BRIDGE_TOKEN_HEADER = "X-Glance-Bridge-Token"
 
 
 class _UiThreadExecutor(QObject):
@@ -80,6 +86,7 @@ def _build_state_snapshot(viewmodel: SettingsViewModel) -> dict[str, Any]:
         "promptDefaults": viewmodel.promptDefaults,
         "historyPreview": viewmodel.buildHistoryPreview(),
         "historyStats": viewmodel.buildHistoryStats(),
+        "memories": viewmodel.buildMemories(),
     }
 
 
@@ -94,9 +101,12 @@ def _build_audio_state_snapshot(
 
 
 class SettingsBridgeServer:
-    def __init__(self, viewmodel: SettingsViewModel) -> None:
+    def __init__(
+        self, viewmodel: SettingsViewModel, *, bridge_token: str | None = None
+    ) -> None:
         self._viewmodel = viewmodel
         self._executor = _UiThreadExecutor()
+        self._bridge_token = bridge_token or secrets.token_urlsafe(32)
         self._state_lock = Lock()
         self._state_revision = 0
         self._runtime_lock = Lock()
@@ -116,6 +126,10 @@ class SettingsBridgeServer:
     def url(self) -> str:
         host, port = self._server.server_address
         return f"http://{host}:{port}"
+
+    @property
+    def token(self) -> str:
+        return self._bridge_token
 
     def close(self) -> None:
         self._server.shutdown()
@@ -184,6 +198,25 @@ class SettingsBridgeServer:
             )
             return self.snapshot()
 
+        if action == "updateMemory":
+            memory_id = str(payload.get("memoryId", "")).strip()
+            title = str(payload.get("title", "")).strip()
+            description = str(payload.get("description", "")).strip()
+            intent = str(payload.get("intent", "")).strip()
+            self._executor.call(
+                self._viewmodel.updateMemory,
+                memory_id,
+                title,
+                description,
+                intent,
+            )
+            return self.snapshot()
+
+        if action == "deleteMemory":
+            memory_id = str(payload.get("memoryId", "")).strip()
+            self._executor.call(self._viewmodel.deleteMemory, memory_id)
+            return self.snapshot()
+
         handler = action_map.get(action)
         if handler is None:
             raise ValueError(f"Unknown bridge action: {action}")
@@ -203,6 +236,7 @@ class SettingsBridgeServer:
             self._viewmodel.currentSectionChanged,
             self._viewmodel.bindingChanged,
             self._viewmodel.previewChanged,
+            self._viewmodel.memoriesChanged,
         ):
             signal.connect(self._bump_state_revision)
 
@@ -223,6 +257,9 @@ class SettingsBridgeServer:
                 self.end_headers()
 
             def do_GET(self) -> None:  # noqa: N802
+                if not self._request_authorized():
+                    self._send_error(HTTPStatus.FORBIDDEN, "Forbidden.")
+                    return
                 if self.path == "/api/state":
                     self._send_json({"ok": True, "state": bridge.snapshot()})
                     return
@@ -234,6 +271,9 @@ class SettingsBridgeServer:
                 self._send_error(HTTPStatus.NOT_FOUND, "Unknown route.")
 
             def do_POST(self) -> None:  # noqa: N802
+                if not self._request_authorized():
+                    self._send_error(HTTPStatus.FORBIDDEN, "Forbidden.")
+                    return
                 try:
                     payload = self._read_payload()
                     if self.path == "/api/field":
@@ -274,6 +314,10 @@ class SettingsBridgeServer:
             def log_message(self, format: str, *args: object) -> None:
                 del format, args
 
+            def _request_authorized(self) -> bool:
+                supplied_token = self.headers.get(BRIDGE_TOKEN_HEADER, "")
+                return _bridge_token_matches(supplied_token, bridge.token)
+
             def _read_payload(self) -> dict[str, Any]:
                 content_length = int(self.headers.get("Content-Length", "0"))
                 if content_length <= 0:
@@ -291,9 +335,15 @@ class SettingsBridgeServer:
                     ) from exc
 
             def _send_common_headers(self) -> None:
-                self.send_header("Access-Control-Allow-Origin", "*")
+                allowed_origin = _allowed_cors_origin(
+                    self.headers.get("Origin", "")
+                )
+                if allowed_origin:
+                    self.send_header("Access-Control-Allow-Origin", allowed_origin)
+                    self.send_header("Vary", "Origin")
                 self.send_header(
-                    "Access-Control-Allow-Headers", "Content-Type"
+                    "Access-Control-Allow-Headers",
+                    f"Content-Type, {BRIDGE_TOKEN_HEADER}",
                 )
                 self.send_header(
                     "Access-Control-Allow-Methods", "GET, POST, OPTIONS"
@@ -325,3 +375,22 @@ class SettingsBridgeServer:
                 self.wfile.write(response)
 
         return Handler
+
+
+def _allowed_cors_origin(origin: str) -> str:
+    normalized_origin = str(origin).strip()
+    if not normalized_origin:
+        return ""
+    parsed = urlparse(normalized_origin)
+    if parsed.scheme not in {"http", "https"}:
+        return ""
+    hostname = (parsed.hostname or "").lower()
+    if hostname in {"127.0.0.1", "::1", "localhost"}:
+        return normalized_origin
+    return ""
+
+
+def _bridge_token_matches(supplied_token: str, expected_token: str) -> bool:
+    if not supplied_token or not expected_token:
+        return False
+    return compare_digest(supplied_token, expected_token)

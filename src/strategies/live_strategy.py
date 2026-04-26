@@ -21,6 +21,7 @@ from src.models.settings import (
     DEFAULT_FIXED_TTS_VOICE,
 )
 from src.services.clipboard import ClipboardService
+from src.services.memory_manager import MemoryManager
 from src.services.ocr import OCRService
 from src.agents.tts_agent import TTSAgent
 from src.agents.transcription_agent import TranscriptionAgent
@@ -42,6 +43,14 @@ logger = logging.getLogger("glance.live_strategy")
 _MAX_TOOL_STEPS_PER_LIVE_TURN = 4
 _MAX_TOOL_CALLS_PER_LIVE_TURN = 6
 _TERMINAL_TOOL_NAMES = {"end_live_session"}
+_USER_FACING_TOOL_NAMES = {
+    "take_screenshot",
+    "ocr_screen",
+    "web_search",
+    "web_fetch",
+    "add_memory",
+    "read_memory",
+}
 _OCR_CONFIRMATION_TEXT = "Done, I copied it to your clipboard. Anything else?"
 _OCR_NO_TEXT_TEXT = "I didn't find any visible text. Anything else?"
 _OCR_FAILURE_TEXT = "I couldn't copy the text this time. Anything else?"
@@ -57,6 +66,7 @@ class LiveStrategy(ModeStrategy):
         ocr_agent: OCRAgent | None = None,
         clipboard_service: ClipboardService | None = None,
         settings: AppSettings | None = None,
+        memory_manager: MemoryManager | None = None,
         static_speech_dir: Path | None = None,
     ) -> None:
         self._transcription_agent = transcription_agent
@@ -66,6 +76,7 @@ class LiveStrategy(ModeStrategy):
         self._ocr_agent = ocr_agent
         self._clipboard_service = clipboard_service
         self._settings = settings
+        self._memory_manager = memory_manager
         self._static_speech_dir = static_speech_dir
 
     def execute(self, context: dict) -> LiveInteraction:
@@ -79,9 +90,15 @@ class LiveStrategy(ModeStrategy):
             self._settings is not None
             and getattr(self._settings, "multimodal_live_enabled", False)
         )
-        tools_enabled = self._settings is not None
+        runtime_tools_allowed = bool(
+            self._settings is not None and self._settings.tools_enabled
+        )
+        user_tools_available = self._has_user_facing_tools_available()
         tool_records = []
-        if tools_enabled and multimodal:
+
+        # live has four paths: audio with tools, transcript with tools,
+        # audio-only, or transcript-only.
+        if runtime_tools_allowed and user_tools_available and multimodal:
             _emit_stage_status(
                 status_callback, "generating", "Listening and checking..."
             )
@@ -108,7 +125,7 @@ class LiveStrategy(ModeStrategy):
                     final_text
                 )
             transcript = ""
-        elif tools_enabled:
+        elif runtime_tools_allowed and user_tools_available:
             _emit_stage_status(
                 status_callback, "transcribing", "Transcribing..."
             )
@@ -159,6 +176,22 @@ class LiveStrategy(ModeStrategy):
             transcript = self._transcription_agent.run(
                 audio_path=recording_path
             )
+            local_end = self._maybe_end_live_locally(
+                transcript=transcript,
+                conversation_history=conversation_history,
+                context=context,
+            )
+            if local_end is not None:
+                final_text, tool_records, terminal_tool = local_end
+                if terminal_tool:
+                    return LiveInteraction(
+                        mode="live",
+                        recording_path=recording_path,
+                        transcript=transcript,
+                        response=final_text,
+                        speech_path="",
+                        tool_calls=tool_records,
+                    )
             _emit_stage_status(
                 status_callback, "generating", "Writing a reply..."
             )
@@ -203,6 +236,42 @@ class LiveStrategy(ModeStrategy):
             tool_calls=tool_records,
         )
 
+    def _has_user_facing_tools_available(self) -> bool:
+        if self._settings is None or not self._settings.tools_enabled:
+            return False
+        registry = RuntimeToolRegistry(
+            self._settings,
+            screen_capture_agent=self._screen_capture_agent,
+            ocr_service=self._build_ocr_service(),
+            memory_manager=self._memory_manager,
+            include_live_control_tools=True,
+        )
+        return any(
+            definition.name in _USER_FACING_TOOL_NAMES
+            for definition in registry.enabled_definitions
+        )
+
+    def _maybe_end_live_locally(
+        self,
+        *,
+        transcript: str,
+        conversation_history: list[dict[str, str]],
+        context: dict,
+    ) -> tuple[str, list[ToolCallRecord], bool] | None:
+        if self._settings is None:
+            return None
+        if not _should_end_live_from_transcript(transcript, conversation_history):
+            return None
+        registry = RuntimeToolRegistry(
+            self._settings,
+            include_live_control_tools=True,
+        )
+        return _local_end_live_session(
+            ToolExecutor(registry),
+            context.get("status_callback"),
+            reason="user declined more help",
+        )
+
     def _generate_tool_reply(
         self,
         *,
@@ -217,6 +286,7 @@ class LiveStrategy(ModeStrategy):
             self._settings,
             screen_capture_agent=self._screen_capture_agent,
             ocr_service=self._build_ocr_service(),
+            memory_manager=self._memory_manager,
             include_live_control_tools=True,
         )
         executor = ToolExecutor(registry)
@@ -227,9 +297,11 @@ class LiveStrategy(ModeStrategy):
                 reason="user declined more help",
             )
         enabled_tools = registry.enabled_definitions
+        enabled_tool_names = {definition.name for definition in enabled_tools}
         messages = self._llm_agent.build_live_tool_messages(
             transcript=transcript,
             conversation_history=conversation_history,
+            enabled_tool_names=enabled_tool_names,
         )
         tool_payloads = [
             definition.provider_payload() for definition in enabled_tools
@@ -259,13 +331,22 @@ class LiveStrategy(ModeStrategy):
             self._settings,
             screen_capture_agent=self._screen_capture_agent,
             ocr_service=self._build_ocr_service(),
+            memory_manager=self._memory_manager,
             include_live_control_tools=True,
         )
         executor = ToolExecutor(registry)
         enabled_tools = registry.enabled_definitions
+        enabled_tools = [
+            definition
+            for definition in enabled_tools
+            if definition.name in _USER_FACING_TOOL_NAMES
+            or definition.name in _TERMINAL_TOOL_NAMES
+        ]
+        enabled_tool_names = {definition.name for definition in enabled_tools}
         messages = self._llm_agent.build_live_tool_messages_from_audio(
             audio_path=audio_path,
             conversation_history=conversation_history,
+            enabled_tool_names=enabled_tool_names,
         )
         tool_payloads = [
             definition.provider_payload() for definition in enabled_tools
@@ -298,6 +379,9 @@ class LiveStrategy(ModeStrategy):
         status_callback = context.get("status_callback")
         notice_context = ToolNoticeContext(user_context=user_context)
 
+        # each pass saves the assistant tool-call message, runs the tools,
+        # then feeds tool results and images back into the next provider turn.
+        # if the caps are hit, the last turn runs without tools and must answer.
         for _step in range(_MAX_TOOL_STEPS_PER_LIVE_TURN):
             previous_messages = list(messages)
             turn = turn_runner(
@@ -347,6 +431,8 @@ class LiveStrategy(ModeStrategy):
                     notice_context.record_result(call, record, result)
                 tool_records.append(record)
                 if call.name == "ocr_screen":
+                    # ocr is a clipboard action. keep the copied text out of
+                    # the spoken answer and use the short follow-up instead.
                     status = _ocr_tool_status(record, result)
                     _emit_stage_status(status_callback, "idle", status)
                     return (
@@ -397,6 +483,8 @@ class LiveStrategy(ModeStrategy):
     ) -> None:
         if not notice:
             return
+        # tool notices are quick spoken progress updates before the final reply.
+        # they use throwaway audio because the real reply audio is created later.
         _emit_stage_status(status_callback, "speaking", notice)
         notice_callback = context.get("tool_notice_callback")
         if callable(notice_callback):
@@ -948,8 +1036,35 @@ def _meaning_words(text: str) -> list[str]:
 
 
 _DRIFT_STOPWORDS = {
-    "theandforthatthisyouyourarewaswerewithfrombutnotcanjustitsit'si'mimemywe"
-    "ourtheythemthereherelookslike",
+    "the",
+    "and",
+    "for",
+    "that",
+    "this",
+    "you",
+    "your",
+    "are",
+    "was",
+    "were",
+    "with",
+    "from",
+    "but",
+    "not",
+    "can",
+    "just",
+    "its",
+    "it's",
+    "i'm",
+    "im",
+    "my",
+    "we",
+    "our",
+    "they",
+    "them",
+    "there",
+    "here",
+    "looks",
+    "like",
 }
 
 _ALWAYS_STOP_REQUESTS = {

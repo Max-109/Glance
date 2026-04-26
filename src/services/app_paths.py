@@ -10,6 +10,7 @@ class AppPaths:
     config_file: Path
     audio_feedback_dir: Path
     sessions_dir: Path
+    memories_file: Path
 
 
 def build_app_paths() -> AppPaths:
@@ -24,4 +25,5 @@ def build_app_paths() -> AppPaths:
         config_file=root_dir / "config.json",
         audio_feedback_dir=audio_feedback_dir,
         sessions_dir=sessions_dir,
+        memories_file=root_dir / "memories.json",
     )

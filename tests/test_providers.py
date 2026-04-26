@@ -164,7 +164,7 @@ class ProviderToolTurnTests(unittest.TestCase):
 
         provider.run_tool_turn(
             messages=[
-                {"role": "system", "content": "stable live tool prompt"},
+                {"role": "system", "content": "stable tool prompt"},
                 {"role": "user", "content": "look at this"},
             ],
             tools=[],
@@ -186,7 +186,7 @@ class ProviderToolTurnTests(unittest.TestCase):
         )
         self.assertEqual(
             kwargs["messages"][0]["content"][0]["text"],
-            "stable live tool prompt",
+            "stable tool prompt",
         )
         self.assertEqual(kwargs["messages"][1]["content"], "look at this")
 
@@ -367,9 +367,10 @@ class ProviderAudioUploadTests(unittest.TestCase):
                     conversation_history=[
                         {"role": "assistant", "content": "previous"}
                     ],
+                    enabled_tool_names={"web_search", "end_live_session"},
                 )
 
-        self.assertIn("Runtime tools are available", messages[0]["content"])
+        self.assertIn("Tools are available", messages[0]["content"])
         self.assertIn("VOICE_ID", messages[0]["content"])
         self.assertEqual(
             messages[1], {"role": "assistant", "content": "previous"}

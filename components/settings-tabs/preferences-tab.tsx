@@ -153,6 +153,7 @@ export function PreferencesTab({
     {
       id: "live_keybind",
       title: "Live",
+      description: "Talk hands-free.",
       icon: "zap",
       value: String(state.settings.live_keybind || "-"),
       active: state.bindingField === "live_keybind",
@@ -160,6 +161,7 @@ export function PreferencesTab({
     {
       id: "ocr_keybind",
       title: "OCR",
+      description: "Capture screen text.",
       icon: "capture",
       value: String(state.settings.ocr_keybind || "-"),
       active: state.bindingField === "ocr_keybind",

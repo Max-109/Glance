@@ -25,6 +25,7 @@ class ProviderPromptTests(unittest.TestCase):
                 "llm_base_url": "https://api.example.com/v1",
                 "llm_model_name": "model-a",
                 "tts_base_url": "https://tts.example.com/v1",
+                "tools_enabled": True,
                 "system_prompt_override": (
                     "Be extra attentive to follow-up questions."
                 ),
@@ -157,8 +158,21 @@ class ProviderPromptTests(unittest.TestCase):
         text_prompt = self.provider.build_live_tool_messages(
             transcript="what is the weather in Vilnius",
             conversation_history=[],
+            enabled_tool_names={
+                "ocr_screen",
+                "add_memory",
+                "read_memory",
+                "end_live_session",
+            },
         )[0]["content"]
-        audio_prompt = self.provider._build_live_tool_speech_system_prompt()
+        audio_prompt = self.provider._build_live_tool_speech_system_prompt(
+            enabled_tool_names={
+                "ocr_screen",
+                "add_memory",
+                "read_memory",
+                "end_live_session",
+            },
+        )
 
         for prompt in (text_prompt, audio_prompt):
             with self.subTest(prompt=prompt[:40]):
@@ -179,11 +193,79 @@ class ProviderPromptTests(unittest.TestCase):
                     "Never turn OCR output into the spoken final answer",
                     prompt,
                 )
+                self.assertIn("call add_memory", prompt)
+                self.assertIn("keep the saved wording close", prompt)
+                self.assertIn("call read_memory", prompt)
+                self.assertIn("asks to be reminded", prompt)
                 self.assertIn("Call end_live_session", prompt)
                 self.assertIn("says everything is fine", prompt)
                 self.assertIn("says thanks after a completed task", prompt)
                 self.assertIn("goodbye or bye", prompt)
                 self.assertIn("tool", prompt)
+
+    def test_disabled_live_tools_prompt_names_settings_state(self) -> None:
+        self.provider._settings.tools_enabled = False
+
+        text_prompt = self.provider.build_live_tool_messages(
+            transcript="what is the weather in Vilnius",
+            conversation_history=[],
+            enabled_tool_names=set(),
+        )[0]["content"]
+        audio_prompt = self.provider._build_live_speech_system_prompt()
+
+        for prompt in (text_prompt, audio_prompt):
+            with self.subTest(prompt=prompt[:40]):
+                self.assertIn(
+                    "Tools are not allowed in Settings", prompt
+                )
+                self.assertIn(
+                    "they need to enable Tools in Settings", prompt
+                )
+                self.assertNotIn(
+                    "Tools are available in this turn",
+                    prompt,
+                )
+
+    def test_live_tool_prompts_only_name_enabled_optional_tools(self) -> None:
+        text_prompt = self.provider.build_live_tool_messages(
+            transcript="remember this",
+            conversation_history=[],
+            enabled_tool_names={"web_search", "end_live_session"},
+        )[0]["content"]
+        audio_prompt = self.provider._build_live_tool_speech_system_prompt(
+            enabled_tool_names={"web_search", "end_live_session"}
+        )
+
+        for prompt in (text_prompt, audio_prompt):
+            with self.subTest(prompt=prompt[:40]):
+                self.assertNotIn("ocr_screen", prompt)
+                self.assertNotIn("add_memory", prompt)
+                self.assertNotIn("read_memory", prompt)
+                self.assertIn("Call end_live_session", prompt)
+                self.assertIn(
+                    "Screen inspection and OCR are not allowed in Settings",
+                    prompt,
+                )
+                self.assertIn(
+                    "Memory saving is not allowed in Settings",
+                    prompt,
+                )
+
+    def test_disabled_web_tools_prompt_names_settings_state(self) -> None:
+        self.provider._settings.tool_web_search_policy = "deny"
+        self.provider._settings.tool_web_fetch_policy = "deny"
+
+        prompt = self.provider.build_live_tool_messages(
+            transcript="what is the weather in Vilnius",
+            conversation_history=[],
+            enabled_tool_names={"ocr_screen", "end_live_session"},
+        )[0]["content"]
+
+        self.assertIn(
+            "Web search and web page fetching are not allowed in Settings",
+            prompt,
+        )
+        self.assertIn("they need to enable them to use web lookup", prompt)
 
     def test_extract_text_includes_user_ocr_request(self) -> None:
         captured = {}

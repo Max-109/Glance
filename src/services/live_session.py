@@ -74,7 +74,8 @@ class LiveSessionController:
             return
         if self._orchestrator is None:
             self._set_status(
-                "idleFinish setting up your providers to use Live.",
+                "idle",
+                "Finish setting up your providers to use Live.",
             )
             return
         if self._recorder is None:

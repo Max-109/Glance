@@ -42,6 +42,8 @@ class AppSettingsTests(unittest.TestCase):
         self.assertEqual(settings.tool_ocr_policy, "allow")
         self.assertEqual(settings.tool_web_search_policy, "allow")
         self.assertEqual(settings.tool_web_fetch_policy, "allow")
+        self.assertEqual(settings.tool_add_memory_policy, "allow")
+        self.assertEqual(settings.tool_read_memory_policy, "allow")
 
     def test_from_mapping_loads_tool_settings(self) -> None:
         settings = AppSettings.from_mapping(
@@ -54,6 +56,8 @@ class AppSettingsTests(unittest.TestCase):
                 "tool_ocr_policy": "deny",
                 "tool_web_search_policy": "allow",
                 "tool_web_fetch_policy": "deny",
+                "tool_add_memory_policy": "deny",
+                "tool_read_memory_policy": "deny",
             }
         )
 
@@ -62,6 +66,8 @@ class AppSettingsTests(unittest.TestCase):
         self.assertEqual(settings.tool_ocr_policy, "deny")
         self.assertEqual(settings.tool_web_search_policy, "allow")
         self.assertEqual(settings.tool_web_fetch_policy, "deny")
+        self.assertEqual(settings.tool_add_memory_policy, "deny")
+        self.assertEqual(settings.tool_read_memory_policy, "deny")
 
     def test_from_mapping_ignores_removed_tool_limit_settings(self) -> None:
         settings = AppSettings.from_mapping(

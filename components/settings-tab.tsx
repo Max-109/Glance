@@ -1,5 +1,6 @@
 import { AudioTab } from "./settings-tabs/audio-tab";
 import { HistoryTab } from "./settings-tabs/history-tab";
+import { MemoriesTab } from "./settings-tabs/memories-tab";
 import { PreferencesTab } from "./settings-tabs/preferences-tab";
 import { ProvidersTab } from "./settings-tabs/providers-tab";
 import type { SettingsTabProps } from "./settings-tabs/shared";
@@ -25,6 +26,10 @@ export function SettingsTab(props: SettingsTabProps) {
 
   if (props.state.currentSection === "history") {
     return <HistoryTab {...props} />;
+  }
+
+  if (props.state.currentSection === "memories") {
+    return <MemoriesTab {...props} />;
   }
 
   return <PreferencesTab {...props} />;

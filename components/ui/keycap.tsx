@@ -29,7 +29,15 @@ function prettyKey(part: string): string {
   return KEY_LABELS[upper] ?? upper;
 }
 
-export function KeyCap({ value, active = false }: { value: string; active?: boolean }) {
+export function KeyCap({
+  value,
+  active = false,
+  size = "default",
+}: {
+  value: string;
+  active?: boolean;
+  size?: "default" | "lg";
+}) {
   const parts = value
     .replace(/\s+/g, "")
     .split(/[+\-]/)
@@ -39,17 +47,22 @@ export function KeyCap({ value, active = false }: { value: string; active?: bool
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 font-mono text-xs text-muted-foreground",
+        "inline-flex min-w-0 items-center gap-1.5 font-mono text-xs text-muted-foreground",
+        size === "lg" && "gap-2 text-sm",
         active && "text-[var(--accent-strong)]",
       )}
       translate="no"
     >
       {keys.map((part, index) => (
-        <span key={`${part}-${index}`} className="inline-flex items-center gap-1.5">
-          {index > 0 ? <span className="opacity-45">+</span> : null}
+        <span key={`${part}-${index}`} className="inline-flex min-w-0 items-center gap-1.5">
+          {index > 0 ? (
+            <span className={cn("opacity-45", size === "lg" && "px-0.5 text-base")}>+</span>
+          ) : null}
           <span
             className={cn(
               "grid min-w-8 place-items-center rounded-xl border border-border bg-background px-2.5 py-1.5 text-sm font-semibold text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]",
+              size === "lg" &&
+                "min-w-11 rounded-2xl px-3.5 py-2.5 text-lg shadow-[inset_0_1px_0_rgba(255,255,255,0.055),0_10px_24px_-22px_rgba(0,0,0,0.8)]",
               active &&
                 "border-[color-mix(in_srgb,var(--accent)_48%,transparent)] bg-[color-mix(in_srgb,var(--accent)_12%,transparent)] text-[var(--accent-strong)]",
             )}

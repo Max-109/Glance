@@ -6,6 +6,7 @@ from types import SimpleNamespace
 from src.models.interactions import LiveInteraction, SessionRecord
 from src.models.settings import AppSettings
 from src.services.providers import LiveSpeechReply
+from src.strategies import live_strategy as live_strategy_module
 from src.strategies.live_strategy import (
     LiveStrategy,
     ToolNoticeContext,
@@ -88,14 +89,16 @@ class FakeToolLLMAgent:
         self.turns = list(turns)
         self.tool_payloads: list[list[dict]] = []
         self.message_snapshots: list[list[dict]] = []
+        self.enabled_tool_name_sets: list[set[str]] = []
         self.audio_paths: list[str] = []
         self.multimodal_turn_count = 0
         self.prepare_inputs: list[str] = []
         self.prepared_reply_text = prepared_reply_text
 
     def build_live_tool_messages(
-        self, *, transcript, conversation_history=None
+        self, *, transcript, conversation_history=None, enabled_tool_names=None
     ):
+        self.enabled_tool_name_sets.append(set(enabled_tool_names or set()))
         return [
             {"role": "system", "content": "tool system"},
             *list(conversation_history or []),
@@ -103,8 +106,9 @@ class FakeToolLLMAgent:
         ]
 
     def build_live_tool_messages_from_audio(
-        self, *, audio_path, conversation_history=None
+        self, *, audio_path, conversation_history=None, enabled_tool_names=None
     ):
+        self.enabled_tool_name_sets.append(set(enabled_tool_names or set()))
         self.audio_paths.append(audio_path)
         return [
             {"role": "system", "content": "multimodal tool system"},
@@ -436,6 +440,14 @@ class LiveStrategyTests(unittest.TestCase):
         self.assertEqual(interaction.response, final_answer)
         self.assertEqual(tts_agent.calls[0][0], f"{final_answer}...")
 
+    def test_speech_drift_meaning_words_ignore_common_stopwords(self) -> None:
+        self.assertEqual(
+            live_strategy_module._meaning_words(
+                "The quick answer and the result looks like this"
+            ),
+            ["quick", "answer", "result"],
+        )
+
     def test_tool_mode_exposes_only_enabled_tools_to_provider(self) -> None:
         llm_agent = FakeToolLLMAgent([_tool_turn(content="No tool needed.")])
         strategy = LiveStrategy(
@@ -458,25 +470,85 @@ class LiveStrategyTests(unittest.TestCase):
             for payload in llm_agent.tool_payloads[0]
         ]
         self.assertEqual(tool_names, ["web_search", "end_live_session"])
+        self.assertEqual(
+            llm_agent.enabled_tool_name_sets[0],
+            {"web_search", "end_live_session"},
+        )
 
-    def test_live_control_tool_is_available_when_runtime_tools_are_off(
+    def test_tools_disabled_uses_normal_live_reply_without_provider_tools(
         self,
     ) -> None:
-        llm_agent = FakeToolLLMAgent([_tool_turn(content="No tool needed.")])
+        llm_agent = FakeLLMAgent()
+        tts_agent = FakeTTSAgent()
         strategy = LiveStrategy(
             transcription_agent=FakeTranscriptionAgent(),
+            llm_agent=llm_agent,
+            tts_agent=tts_agent,
+            settings=_tool_settings(tools_enabled=False),
+        )
+
+        interaction = strategy.execute({"recording_path": "input.wav"})
+
+        self.assertEqual(len(llm_agent.calls), 1)
+        self.assertEqual(
+            llm_agent.calls[0]["transcript"], "transcript for input.wav"
+        )
+        self.assertEqual(interaction.tool_calls, [])
+        self.assertEqual(interaction.response, "[curious] Hello there!")
+
+    def test_tools_disabled_weather_request_uses_normal_live_reply(
+        self,
+    ) -> None:
+        llm_agent = FakeLLMAgent()
+        strategy = LiveStrategy(
+            transcription_agent=FakePhraseTranscriptionAgent(
+                "what is the weather in Vilnius"
+            ),
             llm_agent=llm_agent,
             tts_agent=FakeTTSAgent(),
             settings=_tool_settings(tools_enabled=False),
         )
 
-        strategy.execute({"recording_path": "input.wav"})
+        interaction = strategy.execute({"recording_path": "input.wav"})
 
-        tool_names = [
-            payload["function"]["name"]
-            for payload in llm_agent.tool_payloads[0]
-        ]
-        self.assertEqual(tool_names, ["end_live_session"])
+        self.assertEqual(len(llm_agent.calls), 1)
+        self.assertEqual(
+            llm_agent.calls[0]["transcript"],
+            "what is the weather in Vilnius",
+        )
+        self.assertEqual(interaction.tool_calls, [])
+
+    def test_tools_disabled_stop_request_ends_locally_without_model_turn(
+        self,
+    ) -> None:
+        llm_agent = FakeLLMAgent()
+        tts_agent = FakeTTSAgent()
+        session = SessionRecord(mode="live")
+        session.add_interaction(
+            LiveInteraction(
+                mode="live",
+                recording_path="previous.wav",
+                transcript="copy the headline",
+                response="Done, I copied it to your clipboard. Anything else?",
+                speech_path="reply.wav",
+            )
+        )
+        strategy = LiveStrategy(
+            transcription_agent=FakePhraseTranscriptionAgent("no thanks"),
+            llm_agent=llm_agent,
+            tts_agent=tts_agent,
+            settings=_tool_settings(tools_enabled=False),
+        )
+
+        interaction = strategy.execute(
+            {"recording_path": "input.wav", "session": session}
+        )
+
+        self.assertEqual(llm_agent.calls, [])
+        self.assertEqual(tts_agent.calls, [])
+        self.assertEqual(interaction.response, "Live ended.")
+        self.assertEqual(interaction.speech_path, "")
+        self.assertEqual(interaction.tool_calls[0].tool_name, "end_live_session")
 
     def test_tool_mode_ocr_tool_captures_extracts_and_copies_screen_text(
         self,
@@ -611,7 +683,7 @@ class LiveStrategyTests(unittest.TestCase):
             transcription_agent=FakeTranscriptionAgent(),
             llm_agent=llm_agent,
             tts_agent=tts_agent,
-            settings=_tool_settings(tools_enabled=False),
+            settings=_tool_settings(tools_enabled=True),
         )
 
         interaction = strategy.execute(

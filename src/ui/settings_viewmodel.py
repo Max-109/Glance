@@ -39,6 +39,7 @@ from src.services.keybinds import (
     keybinds_are_unique,
     normalize_keybind,
 )
+from src.services.memory_manager import MemoryManager
 from src.services.settings_manager import SettingsManager
 
 
@@ -74,6 +75,7 @@ class SettingsViewModel(QObject):
     currentSectionChanged = Signal()
     bindingChanged = Signal()
     previewChanged = Signal()
+    memoriesChanged = Signal()
     _previewStatusRequested = Signal(str, str)
     _previewStarted = Signal(str)
     _previewFinished = Signal(str)
@@ -85,6 +87,7 @@ class SettingsViewModel(QObject):
         self,
         settings_manager: SettingsManager,
         history_manager: HistoryManager,
+        memory_manager: MemoryManager,
         audio_device_service: AudioDeviceService | None = None,
         audio_monitor_factory: Callable[[AppSettings], AudioMonitorService]
         | None = None,
@@ -96,6 +99,7 @@ class SettingsViewModel(QObject):
         super().__init__()
         self._settings_manager = settings_manager
         self._history_manager = history_manager
+        self._memory_manager = memory_manager
         self._audio_device_service = (
             audio_device_service or AudioDeviceService()
         )
@@ -295,6 +299,25 @@ class SettingsViewModel(QObject):
             self.stopSpeakerTest()
         self._current_section = section
         self.currentSectionChanged.emit()
+
+    @Slot(str, str, str, str)
+    def updateMemory(
+        self, memory_id: str, title: str, description: str, intent: str
+    ) -> None:
+        self._memory_manager.update_memory(
+            memory_id,
+            title=title,
+            description=description,
+            intent=intent,
+        )
+        self._apply_status_update("Memory updated.", "success")
+        self.memoriesChanged.emit()
+
+    @Slot(str)
+    def deleteMemory(self, memory_id: str) -> None:
+        self._memory_manager.delete_memory(memory_id)
+        self._apply_status_update("Memory deleted.", "success")
+        self.memoriesChanged.emit()
 
     @Slot(str, "QVariant")
     def setField(self, field_name: str, value: Any) -> None:
@@ -622,6 +645,8 @@ class SettingsViewModel(QObject):
         self._coerce_tool_policy(payload, "tool_ocr_policy", errors)
         self._coerce_tool_policy(payload, "tool_web_search_policy", errors)
         self._coerce_tool_policy(payload, "tool_web_fetch_policy", errors)
+        self._coerce_tool_policy(payload, "tool_add_memory_policy", errors)
+        self._coerce_tool_policy(payload, "tool_read_memory_policy", errors)
         self._coerce_positive_float(payload, "screenshot_interval", errors)
         self._coerce_positive_float(payload, "batch_window_duration", errors)
         self._coerce_ratio(payload, "screen_change_threshold", errors)
@@ -1027,6 +1052,20 @@ class SettingsViewModel(QObject):
             "oldestAt": sessions[0].created_at if sessions else "",
             "newestAt": sessions[-1].created_at if sessions else "",
         }
+
+    def buildMemories(self) -> list[dict[str, Any]]:
+        return [
+            {
+                "id": memory.entity_id,
+                "createdAt": memory.created_at,
+                "updatedAt": memory.updated_at,
+                "title": memory.title,
+                "description": memory.description,
+                "intent": memory.intent,
+                "sourceText": memory.source_text,
+            }
+            for memory in self._memory_manager.list_memories()
+        ]
 
     def _apply_autosave(self) -> None:
         settings = self._validate_current_settings(

@@ -69,6 +69,8 @@ const EMPTY_STATE: BridgeState = {
     tool_ocr_policy: "allow",
     tool_web_search_policy: "allow",
     tool_web_fetch_policy: "allow",
+    tool_add_memory_policy: "allow",
+    tool_read_memory_policy: "allow",
     screenshot_interval: 1.5,
     screen_change_threshold: 0.08,
     batch_window_duration: 4,
@@ -144,6 +146,7 @@ const EMPTY_STATE: BridgeState = {
     oldestAt: "",
     newestAt: "",
   },
+  memories: [],
 };
 
 function pickRuntimeStatus(snapshot: RuntimeStatusPayload): RuntimeStatusPayload {

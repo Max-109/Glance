@@ -88,6 +88,11 @@ class OCRServiceTests(unittest.TestCase):
             "A\nB",
         )
 
+    def test_sanitize_ocr_output_removes_short_intro_labels(self) -> None:
+        for intro in ("Extracted text:", "OCR result:", "OCR output:"):
+            with self.subTest(intro=intro):
+                self.assertEqual(sanitize_ocr_output(f"{intro}\nA\nB"), "A\nB")
+
     def test_sanitize_no_visible_text_sentinel_into_empty_text(
         self,
     ) -> None:

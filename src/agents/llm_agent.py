@@ -50,10 +50,12 @@ class LLMAgent(BaseAgent):
         *,
         transcript: str,
         conversation_history: list[dict[str, str]] | None = None,
+        enabled_tool_names: set[str] | None = None,
     ):
         return self._provider.build_live_tool_messages(
             transcript=transcript,
             conversation_history=conversation_history,
+            enabled_tool_names=enabled_tool_names,
         )
 
     def build_live_tool_messages_from_audio(
@@ -61,10 +63,12 @@ class LLMAgent(BaseAgent):
         *,
         audio_path: str,
         conversation_history: list[dict[str, str]] | None = None,
+        enabled_tool_names: set[str] | None = None,
     ):
         return self._provider.build_live_tool_messages_from_audio(
             audio_path=audio_path,
             conversation_history=conversation_history,
+            enabled_tool_names=enabled_tool_names,
         )
 
     def run_tool_turn(

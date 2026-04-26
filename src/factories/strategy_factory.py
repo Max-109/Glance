@@ -10,6 +10,7 @@ from src.agents.transcription_agent import TranscriptionAgent
 from src.exceptions.app_exceptions import ValidationError
 from src.models.settings import AppSettings
 from src.services.clipboard import ClipboardService
+from src.services.memory_manager import MemoryManager
 from src.strategies.live_strategy import LiveStrategy
 from src.strategies.mode_strategy import ModeStrategy
 from src.strategies.ocr_strategy import OCRStrategy
@@ -30,6 +31,7 @@ class ModeStrategyFactory:
         tts_agent: TTSAgent,
         clipboard_service: ClipboardService,
         settings: AppSettings | None = None,
+        memory_manager: MemoryManager | None = None,
     ) -> ModeStrategy:
         normalized_mode = mode.strip().lower()
         if normalized_mode == "ocr":
@@ -47,6 +49,7 @@ class ModeStrategyFactory:
                 ocr_agent=ocr_agent,
                 clipboard_service=clipboard_service,
                 settings=settings,
+                memory_manager=memory_manager,
                 static_speech_dir=self._static_speech_dir,
             )
         raise ValidationError(f"Unsupported mode: {mode!r}")

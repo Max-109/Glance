@@ -11,6 +11,7 @@ from src.models.settings import AppSettings
 from src.services.app_paths import AppPaths, build_app_paths
 from src.services.clipboard import ClipboardService
 from src.services.history_manager import HistoryManager
+from src.services.memory_manager import MemoryManager
 from src.services.providers import (
     NagaSpeechProvider,
     NagaTranscriptionProvider,
@@ -29,6 +30,7 @@ class Orchestrator:
         *,
         settings: AppSettings,
         history_manager: HistoryManager,
+        memory_manager: MemoryManager,
         strategy_factory: ModeStrategyFactory,
         screen_capture_agent: ScreenCaptureAgent,
         transcription_agent: TranscriptionAgent,
@@ -39,6 +41,7 @@ class Orchestrator:
     ) -> None:
         self._settings = settings
         self._history_manager = history_manager
+        self._memory_manager = memory_manager
         self._strategy_factory = strategy_factory
         self._screen_capture_agent = screen_capture_agent
         self._transcription_agent = transcription_agent
@@ -70,6 +73,7 @@ class Orchestrator:
             tts_agent=self._tts_agent,
             clipboard_service=self._clipboard_service,
             settings=self._settings,
+            memory_manager=self._memory_manager,
         )
         active_session = session or self._history_manager.start_session(mode)
         execution_context = dict(context)
@@ -94,6 +98,7 @@ def build_orchestrator() -> Orchestrator:
         settings.history_length,
         retention_enabled=settings.history_retention_enabled,
     )
+    memory_manager = MemoryManager(paths.memories_file)
     llm_provider = OpenAICompatibleProvider(settings)
     transcription_provider = NagaTranscriptionProvider(settings)
     tts_provider = NagaSpeechProvider(settings)
@@ -101,6 +106,7 @@ def build_orchestrator() -> Orchestrator:
         settings=settings,
         paths=paths,
         history_manager=history_manager,
+        memory_manager=memory_manager,
         llm_provider=llm_provider,
         transcription_provider=transcription_provider,
         tts_provider=tts_provider,
@@ -112,6 +118,7 @@ def build_orchestrator_with_dependencies(
     settings: AppSettings,
     paths: AppPaths,
     history_manager: HistoryManager,
+    memory_manager: MemoryManager,
     llm_provider,
     transcription_provider,
     tts_provider,
@@ -119,6 +126,7 @@ def build_orchestrator_with_dependencies(
     return Orchestrator(
         settings=settings,
         history_manager=history_manager,
+        memory_manager=memory_manager,
         strategy_factory=ModeStrategyFactory(
             static_speech_dir=paths.audio_feedback_dir
         ),

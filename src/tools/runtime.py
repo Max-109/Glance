@@ -19,6 +19,7 @@ from src.agents.screen_capture_agent import ScreenCaptureAgent
 from src.exceptions.app_exceptions import GlanceError, ValidationError
 from src.models.interactions import ToolCallRecord
 from src.models.settings import AppSettings
+from src.services.memory_manager import MemoryManager
 from src.services.ocr import OCRService
 
 
@@ -74,11 +75,13 @@ class RuntimeToolRegistry:
         *,
         screen_capture_agent: ScreenCaptureAgent | None = None,
         ocr_service: OCRService | None = None,
+        memory_manager: MemoryManager | None = None,
         include_live_control_tools: bool = False,
     ) -> None:
         self._settings = settings
         self._screen_capture_agent = screen_capture_agent
         self._ocr_service = ocr_service
+        self._memory_manager = memory_manager
         self._include_live_control_tools = include_live_control_tools
         self._definitions = self._build_definitions()
 
@@ -121,10 +124,14 @@ class RuntimeToolRegistry:
             return self._settings.tool_web_search_policy
         if name == "web_fetch":
             return self._settings.tool_web_fetch_policy
+        if name == "add_memory":
+            return self._settings.tool_add_memory_policy
+        if name == "read_memory":
+            return self._settings.tool_read_memory_policy
         return "deny"
 
     def _build_definitions(self) -> dict[str, ToolDefinition]:
-        return {
+        definitions = {
             "take_screenshot": ToolDefinition(
                 name="take_screenshot",
                 description=(
@@ -259,6 +266,93 @@ class RuntimeToolRegistry:
                 executor=self._end_live_session,
             ),
         }
+        if self._memory_manager is not None:
+            definitions["add_memory"] = ToolDefinition(
+                name="add_memory",
+                description=(
+                    "Save a memory for the user. Use this when the user asks "
+                    "Glance to remember a task, idea, preference, plan, "
+                    "follow-up, project note, or anything they want to come "
+                    "back to later. Keep the wording close to what the user "
+                    "said. Do not use this for normal conversation unless "
+                    "the user clearly wants something saved."
+                ),
+                parameters_schema={
+                    "type": "object",
+                    "properties": {
+                        "title": {
+                            "type": "string",
+                            "description": (
+                                "Short human name for the memory."
+                            ),
+                        },
+                        "description": {
+                            "type": "string",
+                            "description": (
+                                "The saved note, written close to the user's "
+                                "own wording."
+                            ),
+                        },
+                        "intent": {
+                            "type": "string",
+                            "description": (
+                                "What the user wants to do or remember."
+                            ),
+                        },
+                        "source_text": {
+                            "type": "string",
+                            "description": (
+                                "The user's original phrasing when useful."
+                            ),
+                        },
+                    },
+                    "required": ["title", "description"],
+                    "additionalProperties": False,
+                },
+                timeout_seconds=2,
+                executor=self._add_memory,
+            )
+            definitions["read_memory"] = ToolDefinition(
+                name="read_memory",
+                description=(
+                    "Search the user's saved memories. Use this when the "
+                    "user asks what they saved, asks to be reminded, asks "
+                    "what they needed to do about something, or refers to "
+                    "previous memories. Pass the user's natural lookup "
+                    "request as query. The tool returns compact ranked "
+                    "matches and recent titles instead of the whole memory "
+                    "file."
+                ),
+                parameters_schema={
+                    "type": "object",
+                    "properties": {
+                        "query": {
+                            "type": "string",
+                            "description": (
+                                "The user's natural lookup request, such as "
+                                "'feature ideas for the project' or 'what "
+                                "did I want to do about onboarding'. Use an "
+                                "empty string only when the user asks what "
+                                "memories exist in general."
+                            ),
+                        },
+                        "max_results": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 10,
+                            "description": (
+                                "Maximum number of detailed memories to "
+                                "return. Defaults to 5."
+                            ),
+                        },
+                    },
+                    "required": ["query"],
+                    "additionalProperties": False,
+                },
+                timeout_seconds=2,
+                executor=self._read_memory,
+            )
+        return definitions
 
     def _take_screenshot(self, arguments: dict[str, Any]) -> ToolResult:
         if self._screen_capture_agent is None:
@@ -329,6 +423,35 @@ class RuntimeToolRegistry:
         return ToolResult(
             content="Live ended.",
             metadata={"reason": reason, "end_live_session": True},
+        )
+
+    def _add_memory(self, arguments: dict[str, Any]) -> ToolResult:
+        if self._memory_manager is None:
+            raise ToolExecutionError("Memory saving is not available.")
+        memory = self._memory_manager.add_memory(
+            title=str(arguments.get("title", "")),
+            description=str(arguments.get("description", "")),
+            intent=str(arguments.get("intent", "")),
+            source_text=str(arguments.get("source_text", "")),
+        )
+        return ToolResult(
+            content=f"Memory saved: {memory.title}",
+            metadata={
+                "memory_id": memory.entity_id,
+                "title": memory.title,
+            },
+        )
+
+    def _read_memory(self, arguments: dict[str, Any]) -> ToolResult:
+        if self._memory_manager is None:
+            raise ToolExecutionError("Memory search is not available.")
+        search_result = self._memory_manager.search_memories(
+            str(arguments.get("query", "")),
+            max_results=int(arguments.get("max_results", 5)),
+        )
+        return ToolResult(
+            content=_format_memory_search_result(search_result),
+            metadata=search_result,
         )
 
 
@@ -474,7 +597,8 @@ def _web_search(arguments: dict[str, Any]) -> ToolResult:
     return ToolResult(
         content=content,
         result_path=_write_temp_result(
-            "glance-web-search-.json",
+            "glance-web-search-",
+            ".json",
             json.dumps({"query": query, "results": results}, indent=2),
         ),
         metadata={
@@ -600,7 +724,15 @@ class _TextExtractor(HTMLParser):
         if tag in {"script", "style", "noscript", "svg"}:
             self._skip_depth += 1
         if tag in {
-            "pbrlih1h2h3h4articlesection",
+            "p",
+            "br",
+            "li",
+            "h1",
+            "h2",
+            "h3",
+            "h4",
+            "article",
+            "section",
         }:
             self.parts.append("\n")
 
@@ -719,7 +851,56 @@ def _arguments_summary(tool_name: str, arguments: dict[str, Any]) -> str:
         return parsed.netloc or _preview(
             str(arguments.get("url", "")), limit=80
         )
+    if tool_name == "add_memory":
+        return f"title: {_preview(str(arguments.get('title', '')), limit=80)}"
+    if tool_name == "read_memory":
+        return f"query: {_preview(str(arguments.get('query', '')), limit=80)}"
     return _preview(json.dumps(arguments, ensure_ascii=False), limit=120)
+
+
+def _format_memory_search_result(search_result: dict[str, Any]) -> str:
+    status = str(search_result.get("status", ""))
+    titles = [
+        str(title)
+        for title in search_result.get("available_titles", [])
+        if str(title).strip()
+    ]
+    if status == "empty":
+        return "No memories saved yet."
+
+    lines: list[str] = []
+    if status == "titles":
+        lines.append("Recent memory titles:")
+        lines.extend(f"- {title}" for title in titles)
+        return "\n".join(lines) if titles else "No memories saved yet."
+
+    matches = [
+        match
+        for match in search_result.get("matches", [])
+        if isinstance(match, dict)
+    ]
+    if not matches:
+        lines.append("No close matches.")
+        if titles:
+            lines.append("Recent memory titles:")
+            lines.extend(f"- {title}" for title in titles)
+        return "\n".join(lines)
+
+    lines.append("Matching memories:")
+    for index, match in enumerate(matches, start=1):
+        title = _preview(str(match.get("title", "")), limit=120)
+        description = _preview(
+            str(match.get("description", "")), limit=700
+        )
+        intent = _preview(str(match.get("intent", "")), limit=240)
+        lines.append(f"{index}. {title}")
+        if intent:
+            lines.append(f"   Intent: {intent}")
+        lines.append(f"   Note: {description}")
+        created_at = str(match.get("created_at", "")).strip()
+        if created_at:
+            lines.append(f"   Saved: {created_at}")
+    return "\n".join(lines)
 
 
 def _preview(value: str, *, limit: int = 260) -> str:

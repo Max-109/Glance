@@ -137,6 +137,8 @@ class AppSettings:
     tool_ocr_policy: str = DEFAULT_TOOL_POLICY
     tool_web_search_policy: str = DEFAULT_TOOL_POLICY
     tool_web_fetch_policy: str = DEFAULT_TOOL_POLICY
+    tool_add_memory_policy: str = DEFAULT_TOOL_POLICY
+    tool_read_memory_policy: str = DEFAULT_TOOL_POLICY
     screenshot_interval: float = 1.5
     screen_change_threshold: float = 0.08
     batch_window_duration: float = 4.0
@@ -199,6 +201,8 @@ class AppSettings:
             "tool_ocr_policy",
             "tool_web_search_policy",
             "tool_web_fetch_policy",
+            "tool_add_memory_policy",
+            "tool_read_memory_policy",
         ):
             policy = getattr(self, field_name)
             if policy not in TOOL_POLICY_OPTIONS:
@@ -320,6 +324,14 @@ class AppSettings:
             ),
             tool_web_fetch_policy=normalize_tool_policy(
                 data.get("tool_web_fetch_policy", cls.tool_web_fetch_policy)
+            ),
+            tool_add_memory_policy=normalize_tool_policy(
+                data.get("tool_add_memory_policy", cls.tool_add_memory_policy)
+            ),
+            tool_read_memory_policy=normalize_tool_policy(
+                data.get(
+                    "tool_read_memory_policy", cls.tool_read_memory_policy
+                )
             ),
             screenshot_interval=float(
                 data.get("screenshot_interval", cls.screenshot_interval)

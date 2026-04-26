@@ -189,6 +189,26 @@ class LiveSessionControllerTests(unittest.TestCase):
         self.assertEqual(playback_service.calls, [])
         self.assertEqual(statuses, [("idle", message)])
 
+    def test_missing_orchestrator_shows_provider_setup_message(self) -> None:
+        statuses: list[tuple[str, str]] = []
+        playback_service = FakePlaybackService()
+
+        controller = LiveSessionController(
+            orchestrator=None,
+            recorder=FakeRecorder(),
+            playback_service=playback_service,
+            on_status=lambda state, message: statuses.append((state, message)),
+        )
+
+        controller.start()
+
+        self.assertIsNone(controller._thread)
+        self.assertEqual(playback_service.calls, [])
+        self.assertEqual(
+            statuses,
+            [("idle", "Finish setting up your providers to use Live.")],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

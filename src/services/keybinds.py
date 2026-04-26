@@ -31,6 +31,18 @@ SPECIAL_KEYS = {
     "LEFT": "LEFT",
     "RIGHT": "RIGHT",
 }
+PYNPUT_SPECIAL_KEYS = {
+    "SPACE": "space",
+    "TAB": "tab",
+    "ENTER": "enter",
+    "ESC": "esc",
+    "BACKSPACE": "backspace",
+    "DELETE": "delete",
+    "UP": "up",
+    "DOWN": "down",
+    "LEFT": "left",
+    "RIGHT": "right",
+}
 
 def normalize_keybind(value: str) -> str:
     parts = [
@@ -85,22 +97,8 @@ def to_pynput_hotkey(value: str) -> str:
     last_part = parts[-1]
     if last_part.startswith("F") and last_part[1:].isdigit():
         converted.append(f"<{last_part.lower()}>")
-    elif last_part in {
-        "SPACETABENTERESCBACKSPACEDELETEUPDOWNLEFTRIGHT",
-    }:
-        translated = {
-            "SPACE": "space",
-            "TAB": "tab",
-            "ENTER": "enter",
-            "ESC": "esc",
-            "BACKSPACE": "backspace",
-            "DELETE": "delete",
-            "UP": "up",
-            "DOWN": "down",
-            "LEFT": "left",
-            "RIGHT": "right",
-        }
-        converted.append(f"<{translated[last_part]}>")
+    elif last_part in PYNPUT_SPECIAL_KEYS:
+        converted.append(f"<{PYNPUT_SPECIAL_KEYS[last_part]}>")
     else:
         converted.append(last_part.lower())
     return "+".join(converted)

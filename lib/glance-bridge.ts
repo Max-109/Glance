@@ -4,7 +4,8 @@ export type SectionId =
   | "api"
   | "voice"
   | "advanced"
-  | "history";
+  | "history"
+  | "memories";
 
 interface HistoryPreviewItem {
   id: string;
@@ -19,6 +20,16 @@ interface HistoryStats {
   totalSessions: number;
   oldestAt: string;
   newestAt: string;
+}
+
+export interface MemoryItem {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+  title: string;
+  description: string;
+  intent: string;
+  sourceText: string;
 }
 
 export interface RuntimeStatusPayload {
@@ -67,6 +78,7 @@ export interface BridgeState {
   promptDefaults: Record<string, string>;
   historyPreview: HistoryPreviewItem[];
   historyStats: HistoryStats;
+  memories: MemoryItem[];
 }
 
 interface AudioBridgeState {
@@ -119,6 +131,9 @@ export const SECTION_GROUPS: Array<{
     ],
   },
   {
+    items: [{ id: "memories", icon: "memory", title: "Memories" }],
+  },
+  {
     items: [{ id: "history", icon: "history", title: "History" }],
   },
 ];
@@ -155,6 +170,12 @@ export function sectionMeta(section: SectionId): {
     return {
       title: "History",
       description: "Choose how much history to keep.",
+    };
+  }
+  if (section === "memories") {
+    return {
+      title: "Memories",
+      description: "Ideas and follow-ups Glance saved for later.",
     };
   }
   return {

@@ -39,6 +39,7 @@ from src.services.audio_signal import AudioTestSignalService
 from src.services.global_hotkeys import GlobalHotkeyManager
 from src.services.history_manager import HistoryManager
 from src.services.live_session import LiveSessionController
+from src.services.memory_manager import MemoryManager
 from src.services.providers import (
     NagaSpeechProvider,
     NagaTranscriptionProvider,
@@ -290,11 +291,15 @@ def run_settings_app() -> int:
         history_limit=settings.history_length,
         retention_enabled=settings.history_retention_enabled,
     )
-    controller = SettingsViewModel(settings_manager, history_manager)
+    memory_manager = MemoryManager(paths.memories_file)
+    controller = SettingsViewModel(
+        settings_manager, history_manager, memory_manager
+    )
     settings_bridge = SettingsBridgeServer(controller)
     live_controller = _build_live_controller(
         settings_manager=settings_manager,
         history_manager=history_manager,
+        memory_manager=memory_manager,
         paths=paths,
     )
     live_cue_controller = _build_live_cue_controller(
@@ -316,6 +321,7 @@ def run_settings_app() -> int:
         orchestrator_factory=lambda: _build_runtime_orchestrator(
             settings_manager=settings_manager,
             history_manager=history_manager,
+            memory_manager=memory_manager,
             paths=paths,
         ),
         on_message=show_ocr_message,
@@ -340,6 +346,7 @@ def run_settings_app() -> int:
 
     settings_window = _build_settings_window(
         bridge_url=settings_bridge.url,
+        bridge_token=settings_bridge.token,
         logger=logger,
         initial_width=settings.electron_window_width,
         initial_height=settings.electron_window_height,
@@ -384,6 +391,7 @@ def run_settings_app() -> int:
                 _build_runtime_orchestrator(
                     settings_manager=settings_manager,
                     history_manager=history_manager,
+                    memory_manager=memory_manager,
                     paths=paths,
                 )
             )
@@ -532,6 +540,7 @@ def _set_macos_process_name(process_info) -> None:
 def _build_settings_window(
     *,
     bridge_url: str,
+    bridge_token: str,
     logger: logging.Logger,
     initial_width: int,
     initial_height: int,
@@ -541,6 +550,7 @@ def _build_settings_window(
     window = ElectronShellController(
         project_root=Path(__file__).resolve().parents[2],
         bridge_url=bridge_url,
+        bridge_token=bridge_token,
         logger=logger,
         initial_width=initial_width,
         initial_height=initial_height,
@@ -809,6 +819,7 @@ def _build_runtime_orchestrator(
     *,
     settings_manager: SettingsManager,
     history_manager: HistoryManager,
+    memory_manager: MemoryManager,
     paths,
 ):
     settings = settings_manager.current()
@@ -816,6 +827,7 @@ def _build_runtime_orchestrator(
         settings=settings,
         paths=paths,
         history_manager=history_manager,
+        memory_manager=memory_manager,
         llm_provider=OpenAICompatibleProvider(settings),
         transcription_provider=NagaTranscriptionProvider(settings),
         tts_provider=NagaSpeechProvider(settings),
@@ -826,6 +838,7 @@ def _build_live_controller(
     *,
     settings_manager: SettingsManager,
     history_manager: HistoryManager,
+    memory_manager: MemoryManager,
     paths,
 ) -> LiveSessionController:
     settings = settings_manager.current()
@@ -834,6 +847,7 @@ def _build_live_controller(
         orchestrator = _build_runtime_orchestrator(
             settings_manager=settings_manager,
             history_manager=history_manager,
+            memory_manager=memory_manager,
             paths=paths,
         )
     except Exception as exc:

@@ -56,6 +56,7 @@ class ElectronShellController(QObject):
         *,
         project_root: Path,
         bridge_url: str,
+        bridge_token: str,
         logger: logging.Logger,
         initial_width: int = DEFAULT_ELECTRON_WINDOW_WIDTH,
         initial_height: int = DEFAULT_ELECTRON_WINDOW_HEIGHT,
@@ -65,6 +66,7 @@ class ElectronShellController(QObject):
         super().__init__()
         self._project_root = project_root
         self._bridge_url = bridge_url
+        self._bridge_token = bridge_token
         self._logger = logger
         self._on_bounds_changed = on_bounds_changed
         self._on_quit_requested = on_quit_requested
@@ -164,6 +166,7 @@ class ElectronShellController(QObject):
 
         environment = os.environ.copy()
         environment["GLANCE_BRIDGE_URL"] = self._bridge_url
+        environment["GLANCE_BRIDGE_TOKEN"] = self._bridge_token
         environment["GLANCE_PROJECT_ROOT"] = str(self._project_root)
         environment["GLANCE_WINDOW_WIDTH"] = str(self._width)
         environment["GLANCE_WINDOW_HEIGHT"] = str(self._height)

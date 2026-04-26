@@ -74,8 +74,12 @@ def _strip_intro_line(text: str) -> str:
         return text
     first_line = lines[0].strip().lower().rstrip(":")
     if first_line in {
-        "here is the extracted texthere's the extracted textextracted "
-        "textthe extracted text isocr resultocr output",
+        "here is the extracted text",
+        "here's the extracted text",
+        "extracted text",
+        "the extracted text is",
+        "ocr result",
+        "ocr output",
     }:
         return "\n".join(lines[1:])
     if (

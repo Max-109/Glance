@@ -1,6 +1,7 @@
 const { contextBridge, ipcRenderer } = require("electron");
 
 const bridgeUrl = process.env.GLANCE_BRIDGE_URL || "";
+const bridgeToken = process.env.GLANCE_BRIDGE_TOKEN || "";
 const runtimeStatusListeners = new Map();
 let nextRuntimeSubscriptionId = 1;
 
@@ -9,6 +10,7 @@ async function request(path, options = {}) {
     ...options,
     headers: {
       "Content-Type": "application/json",
+      "X-Glance-Bridge-Token": bridgeToken,
       ...(options.headers || {}),
     },
   });

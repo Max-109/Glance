@@ -36,6 +36,20 @@ const TOOL_CARDS = [
     policyField: "tool_web_fetch_policy",
     description: "Open a specific page when the link matters.",
   },
+  {
+    id: "memory",
+    title: "Memory",
+    icon: "memory",
+    policyField: "tool_add_memory_policy",
+    description: "Save tasks, ideas, and project notes when you ask.",
+  },
+  {
+    id: "read-memory",
+    title: "Read Memory",
+    icon: "memory",
+    policyField: "tool_read_memory_policy",
+    description: "Find saved notes when you ask about them.",
+  },
 ] as const;
 
 function policyEnabled(value: string) {
@@ -71,20 +85,20 @@ export function ToolsTab({
               </span>
               <div className="min-w-0">
                 <div className="flex min-w-0 flex-wrap items-center gap-3">
-                  <CardTitle className="text-base font-semibold">Live tools</CardTitle>
+                  <CardTitle className="text-base font-semibold">Tools</CardTitle>
                   <StatusBadge tone={masterEnabled ? "accent" : "disabled"}>
                     {masterEnabled ? `${enabledCount} enabled` : "off"}
                   </StatusBadge>
                 </div>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Let Glance decide when screen or web context helps.
+                  Choose which tools Glance can access.
                 </p>
               </div>
             </div>
             <Switch
               checked={masterEnabled}
               onCheckedChange={(value) => onSetField("tools_enabled", value)}
-              aria-label="Enable Live tools"
+              aria-label="Enable tools"
             />
           </div>
         </CardHeader>
@@ -95,7 +109,7 @@ export function ToolsTab({
               className={cn(
                 "flex min-h-[24rem] flex-col rounded-2xl border border-[var(--panel-border)] bg-[var(--panel-bg-deep)] p-5 transition-[background-color,opacity]",
               )}
-              aria-label="Live tools access"
+              aria-label="Tools access"
             >
               <div className="flex min-w-0 items-start justify-between gap-4">
                 <span
@@ -109,7 +123,7 @@ export function ToolsTab({
                 <Switch
                   checked={masterEnabled}
                   onCheckedChange={(value) => onSetField("tools_enabled", value)}
-                  aria-label="Enable Live tools"
+                  aria-label="Enable tools"
                 />
               </div>
 

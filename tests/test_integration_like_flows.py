@@ -8,6 +8,7 @@ from src.exceptions.app_exceptions import ValidationError
 from src.factories.strategy_factory import ModeStrategyFactory
 from src.models.settings import AppSettings
 from src.services.history_manager import HistoryManager
+from src.services.memory_manager import MemoryManager
 from src.services.providers import LiveSpeechReply
 from src.storage.json_storage import SessionDirectoryRepository
 
@@ -57,8 +58,9 @@ class FakeLLMAgent:
         )
 
     def build_live_tool_messages(
-        self, *, transcript, conversation_history=None
+        self, *, transcript, conversation_history=None, enabled_tool_names=None
     ):
+        del enabled_tool_names
         return [
             {"role": "system", "content": "tool system"},
             *list(conversation_history or []),
@@ -118,6 +120,7 @@ class OrchestratorFlowTests(unittest.TestCase):
         temp_path = Path(self.temp_dir.name)
         history_repo = SessionDirectoryRepository(temp_path / "sessions")
         history_manager = HistoryManager(history_repo, history_limit=5)
+        memory_manager = MemoryManager(temp_path / "memories.json")
         settings = AppSettings.from_mapping(
             {
                 "llm_base_url": "https://api.example.com/v1",
@@ -130,6 +133,7 @@ class OrchestratorFlowTests(unittest.TestCase):
         self.orchestrator = Orchestrator(
             settings=settings,
             history_manager=history_manager,
+            memory_manager=memory_manager,
             strategy_factory=ModeStrategyFactory(),
             screen_capture_agent=FakeScreenCaptureAgent(),
             transcription_agent=FakeTranscriptionAgent(),
