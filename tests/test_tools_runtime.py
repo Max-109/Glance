@@ -288,6 +288,10 @@ class RuntimeToolTests(unittest.TestCase):
         )
         self.assertIn("Matching memories:", result.content)
         self.assertIn("Billing export", result.content)
+        self.assertIn("Memory ID:", result.content)
+        self.assertIn(result.metadata["matches"][0]["id"], result.content)
+        self.assertIn("Description:", result.content)
+        self.assertNotIn("Note:", result.content)
         self.assertNotIn('"memories"', result.content)
 
     def test_read_memory_tool_returns_empty_state(self) -> None:
@@ -337,6 +341,214 @@ class RuntimeToolTests(unittest.TestCase):
         self.assertNotIn("read_memory", exposed_names)
         self.assertEqual(record.status, "error")
         self.assertIn("disabled", result.content)
+
+    def test_change_memory_tool_updates_memory_by_id(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            memory_manager = MemoryManager(Path(temp_dir) / "memories.json")
+            memory = memory_manager.add_memory(
+                title="Onboarding",
+                description="Add a first-run checklist.",
+                intent="Help new users.",
+            )
+            registry = RuntimeToolRegistry(
+                _tool_settings(),
+                memory_manager=memory_manager,
+            )
+            executor = ToolExecutor(registry)
+
+            exposed_names = {
+                definition.name for definition in registry.enabled_definitions
+            }
+            record, result = executor.execute(
+                ToolCallRequest(
+                    call_id="call-change-memory",
+                    name="change_memory",
+                    arguments={
+                        "memory_id": memory.entity_id,
+                        "description": "Add a first-run checklist and tips.",
+                    },
+                )
+            )
+            saved = memory_manager.list_memories()[0]
+
+        self.assertIn("change_memory", exposed_names)
+        self.assertEqual(record.status, "success")
+        self.assertEqual(record.tool_name, "change_memory")
+        self.assertEqual(
+            record.arguments_summary,
+            f"memory: {memory.entity_id}",
+        )
+        self.assertIn("Memory updated", result.content)
+        self.assertEqual(saved.title, "Onboarding")
+        self.assertEqual(
+            saved.description,
+            "Add a first-run checklist and tips.",
+        )
+
+    def test_change_memory_tool_accepts_note_alias(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            memory_manager = MemoryManager(Path(temp_dir) / "memories.json")
+            memory = memory_manager.add_memory(
+                title="Computer Architecture Assignment",
+                description="User needs to do the assignment.",
+            )
+            registry = RuntimeToolRegistry(
+                _tool_settings(),
+                memory_manager=memory_manager,
+            )
+            executor = ToolExecutor(registry)
+
+            record, result = executor.execute(
+                ToolCallRequest(
+                    call_id="call-change-memory",
+                    name="change_memory",
+                    arguments={
+                        "memory_id": memory.entity_id,
+                        "note": (
+                            "Computer architecture assignment due April 5th."
+                        ),
+                    },
+                )
+            )
+            saved = memory_manager.list_memories()[0]
+
+        self.assertEqual(record.status, "success")
+        self.assertIn("Memory updated", result.content)
+        self.assertEqual(
+            saved.description,
+            "Computer architecture assignment due April 5th.",
+        )
+
+    def test_change_memory_tool_updates_single_query_match(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            memory_manager = MemoryManager(Path(temp_dir) / "memories.json")
+            memory_manager.add_memory(
+                title="Billing export",
+                description="Remember CSV export for invoices.",
+            )
+            memory_manager.add_memory(
+                title="Onboarding",
+                description="Add a first-run checklist.",
+            )
+            registry = RuntimeToolRegistry(
+                _tool_settings(),
+                memory_manager=memory_manager,
+            )
+            executor = ToolExecutor(registry)
+
+            record, result = executor.execute(
+                ToolCallRequest(
+                    call_id="call-change-memory",
+                    name="change_memory",
+                    arguments={
+                        "query": "onboarding",
+                        "intent": "Help new users start faster.",
+                    },
+                )
+            )
+            saved = memory_manager.search_memories("onboarding")["matches"][0]
+
+        self.assertEqual(record.status, "success")
+        self.assertIn("Memory updated", result.content)
+        self.assertEqual(saved["intent"], "Help new users start faster.")
+
+    def test_change_memory_tool_refuses_ambiguous_query(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            memory_manager = MemoryManager(Path(temp_dir) / "memories.json")
+            memory_manager.add_memory(
+                title="Billing export",
+                description="Remember billing CSV export.",
+            )
+            memory_manager.add_memory(
+                title="Billing reminder",
+                description="Remember billing email follow-up.",
+            )
+            registry = RuntimeToolRegistry(
+                _tool_settings(),
+                memory_manager=memory_manager,
+            )
+            executor = ToolExecutor(registry)
+
+            record, result = executor.execute(
+                ToolCallRequest(
+                    call_id="call-change-memory",
+                    name="change_memory",
+                    arguments={
+                        "query": "billing",
+                        "description": "Updated billing note.",
+                    },
+                )
+            )
+            memories = memory_manager.list_memories()
+
+        self.assertEqual(record.status, "success")
+        self.assertIn("could not tell which memory", result.content)
+        self.assertIn("Billing export", result.content)
+        self.assertIn("Billing reminder", result.content)
+        self.assertNotIn('"memories"', result.content)
+        self.assertEqual(
+            [memory.description for memory in memories],
+            [
+                "Remember billing email follow-up.",
+                "Remember billing CSV export.",
+            ],
+        )
+
+    def test_change_memory_tool_returns_empty_state(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            memory_manager = MemoryManager(Path(temp_dir) / "memories.json")
+            registry = RuntimeToolRegistry(
+                _tool_settings(),
+                memory_manager=memory_manager,
+            )
+            executor = ToolExecutor(registry)
+
+            record, result = executor.execute(
+                ToolCallRequest(
+                    call_id="call-change-memory",
+                    name="change_memory",
+                    arguments={
+                        "query": "anything",
+                        "description": "Updated note.",
+                    },
+                )
+            )
+
+        self.assertEqual(record.status, "success")
+        self.assertEqual(result.content, "No memories saved yet.")
+
+    def test_disabled_change_memory_tool_does_not_update(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            memory_manager = MemoryManager(Path(temp_dir) / "memories.json")
+            memory = memory_manager.add_memory(
+                title="Private thing",
+                description="Do not change when disabled.",
+            )
+            registry = RuntimeToolRegistry(
+                _tool_settings(tool_change_memory_policy="deny"),
+                memory_manager=memory_manager,
+            )
+            executor = ToolExecutor(registry)
+
+            exposed_names = {
+                definition.name for definition in registry.enabled_definitions
+            }
+            record, result = executor.execute(
+                ToolCallRequest(
+                    call_id="call-change-memory",
+                    name="change_memory",
+                    arguments={
+                        "memory_id": memory.entity_id,
+                        "description": "Changed.",
+                    },
+                )
+            )
+            saved = memory_manager.list_memories()[0]
+
+        self.assertNotIn("change_memory", exposed_names)
+        self.assertEqual(record.status, "error")
+        self.assertIn("disabled", result.content)
+        self.assertEqual(saved.description, "Do not change when disabled.")
 
     def test_ocr_tool_extracts_screen_text_and_copies_clipboard(self) -> None:
         screen_capture_agent = FakeScreenCaptureAgent()

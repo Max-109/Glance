@@ -50,6 +50,7 @@ _USER_FACING_TOOL_NAMES = {
     "web_fetch",
     "add_memory",
     "read_memory",
+    "change_memory",
 }
 _OCR_CONFIRMATION_TEXT = "Done, I copied it to your clipboard. Anything else?"
 _OCR_NO_TEXT_TEXT = "I didn't find any visible text. Anything else?"
@@ -448,6 +449,10 @@ class LiveStrategy(ModeStrategy):
                         status_callback, "idle", terminal_status
                     )
                     return terminal_status, tool_records, True
+                if call.name == "change_memory":
+                    status = _memory_change_followup(record, result)
+                    _emit_stage_status(status_callback, "idle", status)
+                    return status, tool_records, False
                 messages.append(_tool_result_message(call, result))
                 image_messages.extend(_image_context_messages(call, result))
             messages.extend(image_messages)
@@ -907,6 +912,44 @@ def _terminal_tool_status(
     if call.name == "end_live_session" and record.status == "success":
         return "Live ended."
     return f"{call.name} failed: {record.error or result.content}"
+
+
+def _memory_change_followup(
+    record: ToolCallRecord, result: ToolResult
+) -> str:
+    if record.status != "success":
+        if "not found" in record.error.lower():
+            return "I could not find that saved memory."
+        return "I could not update that memory."
+    status = str(result.metadata.get("status", ""))
+    if status == "updated":
+        return "Done, I updated that memory."
+    if status == "empty":
+        return "You do not have any saved memories yet."
+
+    candidates = [
+        candidate
+        for candidate in result.metadata.get("candidates", [])
+        if isinstance(candidate, dict)
+    ]
+    titles = [
+        _squash_notice_text(str(candidate.get("title", "")))
+        for candidate in candidates[:3]
+        if str(candidate.get("title", "")).strip()
+    ]
+    if status == "ambiguous":
+        if titles:
+            return (
+                "I am not sure which memory to update. I found "
+                f"{', '.join(titles)}. Which one did you mean?"
+            )
+        return "I am not sure which memory to update. Which one did you mean?"
+    if titles:
+        return (
+            "I could not find a close memory match. I found "
+            f"{', '.join(titles)}. Which one did you mean?"
+        )
+    return "I could not find a close memory match."
 
 
 def _is_speakable_source(source: str) -> bool:

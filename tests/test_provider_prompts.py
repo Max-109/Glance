@@ -162,6 +162,7 @@ class ProviderPromptTests(unittest.TestCase):
                 "ocr_screen",
                 "add_memory",
                 "read_memory",
+                "change_memory",
                 "end_live_session",
             },
         )[0]["content"]
@@ -170,6 +171,7 @@ class ProviderPromptTests(unittest.TestCase):
                 "ocr_screen",
                 "add_memory",
                 "read_memory",
+                "change_memory",
                 "end_live_session",
             },
         )
@@ -195,8 +197,15 @@ class ProviderPromptTests(unittest.TestCase):
                 )
                 self.assertIn("call add_memory", prompt)
                 self.assertIn("keep the saved wording close", prompt)
+                self.assertIn("Do not call add_memory", prompt)
                 self.assertIn("call read_memory", prompt)
                 self.assertIn("asks to be reminded", prompt)
+                self.assertIn("Memory ID", prompt)
+                self.assertIn("never use a tool call id", prompt)
+                self.assertIn("call change_memory", prompt)
+                self.assertIn("edit, rename, correct, update", prompt)
+                self.assertIn("call read_memory first", prompt)
+                self.assertIn("description, not note", prompt)
                 self.assertIn(
                     "you must call end_live_session",
                     prompt,
@@ -253,6 +262,7 @@ class ProviderPromptTests(unittest.TestCase):
                 self.assertNotIn("ocr_screen", prompt)
                 self.assertNotIn("add_memory", prompt)
                 self.assertNotIn("read_memory", prompt)
+                self.assertNotIn("change_memory", prompt)
                 self.assertIn("you must call end_live_session", prompt)
                 self.assertIn(
                     "Screen inspection and OCR are not allowed in Settings",
@@ -260,6 +270,14 @@ class ProviderPromptTests(unittest.TestCase):
                 )
                 self.assertIn(
                     "Memory saving is not allowed in Settings",
+                    prompt,
+                )
+                self.assertIn(
+                    "Memory reading is not allowed in Settings",
+                    prompt,
+                )
+                self.assertIn(
+                    "Memory changes are not allowed in Settings",
                     prompt,
                 )
 

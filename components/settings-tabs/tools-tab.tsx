@@ -50,6 +50,13 @@ const TOOL_CARDS = [
     policyField: "tool_read_memory_policy",
     description: "Find saved notes when you ask about them.",
   },
+  {
+    id: "change-memory",
+    title: "Change Memory",
+    icon: "memory",
+    policyField: "tool_change_memory_policy",
+    description: "Update a saved note when you ask.",
+  },
 ] as const;
 
 function policyEnabled(value: string) {

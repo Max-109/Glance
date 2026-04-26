@@ -44,6 +44,7 @@ class AppSettingsTests(unittest.TestCase):
         self.assertEqual(settings.tool_web_fetch_policy, "allow")
         self.assertEqual(settings.tool_add_memory_policy, "allow")
         self.assertEqual(settings.tool_read_memory_policy, "allow")
+        self.assertEqual(settings.tool_change_memory_policy, "allow")
 
     def test_from_mapping_loads_tool_settings(self) -> None:
         settings = AppSettings.from_mapping(
@@ -58,6 +59,7 @@ class AppSettingsTests(unittest.TestCase):
                 "tool_web_fetch_policy": "deny",
                 "tool_add_memory_policy": "deny",
                 "tool_read_memory_policy": "deny",
+                "tool_change_memory_policy": "deny",
             }
         )
 
@@ -68,6 +70,7 @@ class AppSettingsTests(unittest.TestCase):
         self.assertEqual(settings.tool_web_fetch_policy, "deny")
         self.assertEqual(settings.tool_add_memory_policy, "deny")
         self.assertEqual(settings.tool_read_memory_policy, "deny")
+        self.assertEqual(settings.tool_change_memory_policy, "deny")
 
     def test_from_mapping_ignores_removed_tool_limit_settings(self) -> None:
         settings = AppSettings.from_mapping(
@@ -94,9 +97,7 @@ class AppSettingsTests(unittest.TestCase):
             }
         )
 
-        self.assertEqual(
-            settings.transcription_base_url, "https://api.naga.ac/v1"
-        )
+        self.assertEqual(settings.transcription_base_url, "https://api.naga.ac/v1")
         self.assertEqual(settings.transcription_api_key, "")
 
     def test_default_audio_detection_is_balanced(self) -> None:
@@ -133,6 +134,7 @@ class AppSettingsTests(unittest.TestCase):
                 "live_keybind": "cmd+shift+l",
                 "quick_keybind": "ctrl+alt+q",
                 "ocr_keybind": "cmd+o",
+                "open_glance_keybind": "cmd+shift+g",
                 "llm_base_url": "https://api.example.com/v1",
                 "llm_model_name": "model-a",
                 "tts_base_url": "https://tts.example.com/v1",
@@ -141,8 +143,23 @@ class AppSettingsTests(unittest.TestCase):
 
         self.assertEqual(settings.live_keybind, "CMD+SHIFT+L")
         self.assertEqual(settings.ocr_keybind, "CMD+O")
+        self.assertEqual(settings.open_glance_keybind, "CMD+SHIFT+G")
         self.assertFalse(hasattr(settings, "quick_keybind"))
         self.assertNotIn("quick_keybind", settings.to_dict())
+
+    def test_from_mapping_migrates_open_menu_keybind(self) -> None:
+        settings = AppSettings.from_mapping(
+            {
+                "open_menu_keybind": "cmd+alt+g",
+                "llm_base_url": "https://api.example.com/v1",
+                "llm_model_name": "model-a",
+                "tts_base_url": "https://tts.example.com/v1",
+            }
+        )
+
+        self.assertEqual(settings.open_glance_keybind, "CMD+ALT+G")
+        self.assertFalse(hasattr(settings, "open_menu_keybind"))
+        self.assertNotIn("open_menu_keybind", settings.to_dict())
 
     def test_validate_rejects_invalid_threshold(self) -> None:
         with self.assertRaises(ValidationError):
@@ -279,12 +296,8 @@ class AppSettingsTests(unittest.TestCase):
             }
         )
 
-        self.assertEqual(
-            settings.electron_window_width, MIN_ELECTRON_WINDOW_WIDTH
-        )
-        self.assertEqual(
-            settings.electron_window_height, MIN_ELECTRON_WINDOW_HEIGHT
-        )
+        self.assertEqual(settings.electron_window_width, MIN_ELECTRON_WINDOW_WIDTH)
+        self.assertEqual(settings.electron_window_height, MIN_ELECTRON_WINDOW_HEIGHT)
 
     def test_from_mapping_uses_default_electron_window_size_for_bad_values(
         self,
@@ -299,9 +312,7 @@ class AppSettingsTests(unittest.TestCase):
             }
         )
 
-        self.assertEqual(
-            settings.electron_window_width, DEFAULT_ELECTRON_WINDOW_WIDTH
-        )
+        self.assertEqual(settings.electron_window_width, DEFAULT_ELECTRON_WINDOW_WIDTH)
         self.assertEqual(
             settings.electron_window_height, DEFAULT_ELECTRON_WINDOW_HEIGHT
         )
@@ -316,18 +327,13 @@ class AppSettingsTests(unittest.TestCase):
                 "text_prompt_override": "Text mode custom prompt.",
                 "voice_prompt_override": "Voice mode custom prompt.",
                 "voice_polish_prompt_override": "Voice polish custom prompt.",
-                "transcription_prompt_override": (
-                    "Transcription custom prompt."
-                ),
-            })
+                "transcription_prompt_override": ("Transcription custom prompt."),
+            }
+        )
 
         self.assertEqual(settings.system_prompt_override, "Be crisp.")
-        self.assertEqual(
-            settings.text_prompt_override, "Text mode custom prompt."
-        )
-        self.assertEqual(
-            settings.voice_prompt_override, "Voice mode custom prompt."
-        )
+        self.assertEqual(settings.text_prompt_override, "Text mode custom prompt.")
+        self.assertEqual(settings.voice_prompt_override, "Voice mode custom prompt.")
         self.assertEqual(
             settings.voice_polish_prompt_override,
             "Voice polish custom prompt.",
@@ -352,12 +358,8 @@ class AppSettingsTests(unittest.TestCase):
             }
         )
 
-        self.assertEqual(
-            settings.text_prompt_override, DEFAULT_TEXT_REPLY_PROMPT
-        )
-        self.assertEqual(
-            settings.voice_prompt_override, DEFAULT_VOICE_REPLY_PROMPT
-        )
+        self.assertEqual(settings.text_prompt_override, DEFAULT_TEXT_REPLY_PROMPT)
+        self.assertEqual(settings.voice_prompt_override, DEFAULT_VOICE_REPLY_PROMPT)
         self.assertEqual(
             settings.voice_polish_prompt_override,
             DEFAULT_TTS_PREPARATION_PROMPT,

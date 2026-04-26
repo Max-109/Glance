@@ -55,6 +55,7 @@ class SettingsViewModel(QObject):
             "llm_model_name",
             "live_keybind",
             "ocr_keybind",
+            "open_glance_keybind",
             "tts_base_url",
             "tts_api_key",
             "tts_model",
@@ -92,30 +93,23 @@ class SettingsViewModel(QObject):
         audio_monitor_factory: Callable[[AppSettings], AudioMonitorService]
         | None = None,
         audio_signal_service: AudioTestSignalService | None = None,
-        playback_service_factory: Callable[[], QtAudioPlaybackService]
-        | None = None,
+        playback_service_factory: Callable[[], QtAudioPlaybackService] | None = None,
         voice_preview_dir: Path | None = None,
     ) -> None:
         super().__init__()
         self._settings_manager = settings_manager
         self._history_manager = history_manager
         self._memory_manager = memory_manager
-        self._audio_device_service = (
-            audio_device_service or AudioDeviceService()
-        )
+        self._audio_device_service = audio_device_service or AudioDeviceService()
         self._audio_monitor_factory = audio_monitor_factory or (
             lambda settings: AudioMonitorService(
                 settings,
                 device_service=self._audio_device_service,
             )
         )
-        self._audio_signal_service = (
-            audio_signal_service or AudioTestSignalService()
-        )
+        self._audio_signal_service = audio_signal_service or AudioTestSignalService()
         self._playback_service_factory = playback_service_factory or (
-            lambda: QtAudioPlaybackService(
-                device_service=self._audio_device_service
-            )
+            lambda: QtAudioPlaybackService(device_service=self._audio_device_service)
         )
         current_settings = settings_manager.load()
         self._baseline_map = current_settings.to_dict()
@@ -131,9 +125,7 @@ class SettingsViewModel(QObject):
         self._previewing_voice = ""
         self._preview_stop_event: Event | None = None
         self._preview_playback_service: QtAudioPlaybackService | None = None
-        self._voice_preview_dir = (
-            voice_preview_dir or _default_voice_preview_dir()
-        )
+        self._voice_preview_dir = voice_preview_dir or _default_voice_preview_dir()
         self._audio_input_options = ["default"]
         self._audio_output_options = ["default"]
         self._audio_input_labels = {"default": "System Default Input"}
@@ -148,9 +140,7 @@ class SettingsViewModel(QObject):
         self._previewStarted.connect(self._handle_preview_started)
         self._previewFinished.connect(self._handle_preview_finished)
         self._audioLevelRequested.connect(self._apply_audio_level)
-        self._audioInputTestFinished.connect(
-            self._handle_audio_input_test_finished
-        )
+        self._audioInputTestFinished.connect(self._handle_audio_input_test_finished)
         self._speakerTestFinished.connect(self._handle_speaker_test_finished)
         self.refreshAudioDevices()
         self._status_timer = QTimer(self)
@@ -188,8 +178,7 @@ class SettingsViewModel(QObject):
     @Property(bool, notify=dirtyChanged)
     def manualSaveDirty(self) -> bool:
         return any(
-            self._settings_map.get(field_name)
-            != self._baseline_map.get(field_name)
+            self._settings_map.get(field_name) != self._baseline_map.get(field_name)
             for field_name in self._MANUAL_SAVE_FIELDS
         )
 
@@ -280,8 +269,7 @@ class SettingsViewModel(QObject):
     @Property("QVariantMap", constant=True)
     def voiceOptionLabels(self) -> dict[str, str]:
         return {
-            voice_id: get_tts_voice_label(voice_id)
-            for voice_id in TTS_VOICE_OPTIONS
+            voice_id: get_tts_voice_label(voice_id) for voice_id in TTS_VOICE_OPTIONS
         }
 
     @Property("QVariantMap", constant=True)
@@ -349,9 +337,7 @@ class SettingsViewModel(QObject):
         self._set_saving(True)
         try:
             status_message = (
-                "Provider changes saved."
-                if self.manualSaveDirty
-                else "Settings saved."
+                "Provider changes saved." if self.manualSaveDirty else "Settings saved."
             )
             self._persist_settings(settings, status_message=status_message)
         finally:
@@ -385,13 +371,15 @@ class SettingsViewModel(QObject):
 
     @Slot(str)
     def startKeybindCapture(self, field_name: str) -> None:
-        if field_name not in {"live_keybind", "ocr_keybind"}:
+        if field_name not in {
+            "live_keybind",
+            "ocr_keybind",
+            "open_glance_keybind",
+        }:
             return
         self._binding_field = field_name
         self.bindingChanged.emit()
-        self._set_status(
-            "Press a new keybind. Press Escape to cancel.", "neutral"
-        )
+        self._set_status("Press a new shortcut. Press Escape to cancel.", "neutral")
 
     @Slot()
     def cancelKeybindCapture(self) -> None:
@@ -399,11 +387,15 @@ class SettingsViewModel(QObject):
             return
         self._binding_field = ""
         self.bindingChanged.emit()
-        self._set_status("Keybind capture canceled.", "neutral")
+        self._set_status("Shortcut capture canceled.", "neutral")
 
     @Slot(str, str)
     def assignKeybind(self, field_name: str, keybind: str) -> None:
-        if field_name not in {"live_keybind", "ocr_keybind"}:
+        if field_name not in {
+            "live_keybind",
+            "ocr_keybind",
+            "open_glance_keybind",
+        }:
             return
         try:
             normalized_keybind = normalize_keybind(keybind)
@@ -413,13 +405,11 @@ class SettingsViewModel(QObject):
             self._set_status(str(exc), "error")
             return
 
-        conflicts_with = self._find_keybind_conflict(
-            field_name, normalized_keybind
-        )
+        conflicts_with = self._find_keybind_conflict(field_name, normalized_keybind)
         if conflicts_with is not None:
             self._errors[field_name] = f"Already used by {conflicts_with}."
             self.errorsChanged.emit()
-            self._set_status("Each keybind must be unique.", "error")
+            self._set_status("Each shortcut must be unique.", "error")
             return
 
         if self._binding_field:
@@ -427,7 +417,7 @@ class SettingsViewModel(QObject):
             self.bindingChanged.emit()
         self.setField(field_name, normalized_keybind)
         self._set_status(
-            f"{self._binding_label(field_name)} keybind saved.",
+            f"{self._binding_label(field_name)} shortcut saved.",
             "success",
         )
 
@@ -443,9 +433,7 @@ class SettingsViewModel(QObject):
 
         try:
             self.stopSpeakerTest()
-            self._prepare_preview_playback_service(
-                preview_settings.audio_output_device
-            )
+            self._prepare_preview_playback_service(preview_settings.audio_output_device)
         except Exception as exc:
             self._set_status(f"Voice preview unavailable: {exc}", "error")
             return
@@ -507,8 +495,7 @@ class SettingsViewModel(QObject):
             self._audio_device_status = "Using system default audio devices."
         else:
             self._audio_device_status = (
-                f"{total_inputs} input · {total_outputs} output devices "
-                "available."
+                f"{total_inputs} input · {total_outputs} output devices available."
             )
         self.audioDevicesChanged.emit()
 
@@ -551,9 +538,7 @@ class SettingsViewModel(QObject):
         try:
             self.stopAudioInputTest()
             self.stopVoicePreview()
-            self._prepare_preview_playback_service(
-                settings.audio_output_device
-            )
+            self._prepare_preview_playback_service(settings.audio_output_device)
         except Exception as exc:
             self._set_status(f"Speaker test unavailable: {exc}", "error")
             return
@@ -632,6 +617,7 @@ class SettingsViewModel(QObject):
         self._require_text(payload, "tts_voice_id", errors)
         self._require_text(payload, "live_keybind", errors)
         self._require_text(payload, "ocr_keybind", errors)
+        self._require_text(payload, "open_glance_keybind", errors)
         self._require_text(payload, "transcription_model_name", errors)
         self._coerce_bool(payload, "llm_reasoning_enabled")
         self._coerce_bool(payload, "transcription_reasoning_enabled")
@@ -639,40 +625,35 @@ class SettingsViewModel(QObject):
         self._coerce_bool(payload, "history_retention_enabled")
         self._coerce_positive_int(payload, "history_length", errors)
         self._coerce_bool(payload, "tools_enabled")
-        self._coerce_tool_policy(
-            payload, "tool_take_screenshot_policy", errors
-        )
+        self._coerce_tool_policy(payload, "tool_take_screenshot_policy", errors)
         self._coerce_tool_policy(payload, "tool_ocr_policy", errors)
         self._coerce_tool_policy(payload, "tool_web_search_policy", errors)
         self._coerce_tool_policy(payload, "tool_web_fetch_policy", errors)
         self._coerce_tool_policy(payload, "tool_add_memory_policy", errors)
         self._coerce_tool_policy(payload, "tool_read_memory_policy", errors)
+        self._coerce_tool_policy(payload, "tool_change_memory_policy", errors)
         self._coerce_positive_float(payload, "screenshot_interval", errors)
         self._coerce_positive_float(payload, "batch_window_duration", errors)
         self._coerce_ratio(payload, "screen_change_threshold", errors)
         self._coerce_ratio(payload, "audio_vad_threshold", errors)
-        self._coerce_endpoint_patience(
-            payload, "audio_endpoint_patience", errors
-        )
+        self._coerce_endpoint_patience(payload, "audio_endpoint_patience", errors)
         self._coerce_bool(payload, "audio_wait_for_speech_enabled")
         self._coerce_positive_float(payload, "audio_max_wait_seconds", errors)
         self._coerce_bool(payload, "audio_max_turn_length_enabled")
-        self._coerce_positive_float(
-            payload, "audio_max_record_seconds", errors
-        )
+        self._coerce_positive_float(payload, "audio_max_record_seconds", errors)
         self._coerce_bool(payload, "audio_preroll_enabled")
-        self._coerce_non_negative_float(
-            payload, "audio_preroll_seconds", errors
-        )
+        self._coerce_non_negative_float(payload, "audio_preroll_seconds", errors)
         self._coerce_theme(payload, "theme_preference", errors)
         self._coerce_hex_color(payload, "accent_color", errors)
 
-        for keybind_field in ("live_keybind", "ocr_keybind"):
+        for keybind_field in (
+            "live_keybind",
+            "ocr_keybind",
+            "open_glance_keybind",
+        ):
             if keybind_field not in errors:
                 try:
-                    payload[keybind_field] = normalize_keybind(
-                        payload[keybind_field]
-                    )
+                    payload[keybind_field] = normalize_keybind(payload[keybind_field])
                 except ValidationError as exc:
                     errors[keybind_field] = str(exc)
 
@@ -680,19 +661,19 @@ class SettingsViewModel(QObject):
             [
                 payload["live_keybind"],
                 payload["ocr_keybind"],
+                payload["open_glance_keybind"],
             ]
         ):
-            duplicate_message = "Each keybind must be unique."
+            duplicate_message = "Each shortcut must be unique."
             errors["live_keybind"] = duplicate_message
             errors["ocr_keybind"] = duplicate_message
+            errors["open_glance_keybind"] = duplicate_message
 
         if errors:
             self._errors = errors
             self.errorsChanged.emit()
             if show_status:
-                self._set_status(
-                    "Fix the highlighted fields before saving.", "error"
-                )
+                self._set_status("Fix the highlighted fields before saving.", "error")
             return None
 
         try:
@@ -726,9 +707,7 @@ class SettingsViewModel(QObject):
             )
         self._apply_status(message, kind, duration_ms)
 
-    def _set_transient_status(
-        self, message: str, kind: str = "neutral"
-    ) -> None:
+    def _set_transient_status(self, message: str, kind: str = "neutral") -> None:
         self._status_revision += 1
         revision = self._status_revision
         if self._status_message:
@@ -834,16 +813,15 @@ class SettingsViewModel(QObject):
         if self._status_message == "Playing test sound.":
             self._set_transient_status("Speaker test stopped.", "neutral")
 
-    def _find_keybind_conflict(
-        self, current_field: str, value: str
-    ) -> str | None:
-        for field_name in ("live_keybind", "ocr_keybind"):
+    def _find_keybind_conflict(self, current_field: str, value: str) -> str | None:
+        for field_name in (
+            "live_keybind",
+            "ocr_keybind",
+            "open_glance_keybind",
+        ):
             if field_name == current_field:
                 continue
-            if (
-                normalize_keybind(str(self._settings_map.get(field_name, "")))
-                == value
-            ):
+            if normalize_keybind(str(self._settings_map.get(field_name, ""))) == value:
                 return self._binding_label(field_name)
         return None
 
@@ -852,6 +830,7 @@ class SettingsViewModel(QObject):
         labels = {
             "live_keybind": "Live",
             "ocr_keybind": "OCR",
+            "open_glance_keybind": "Open Glance",
         }
         return labels.get(field_name, field_name)
 
@@ -898,9 +877,7 @@ class SettingsViewModel(QObject):
         self, output_device_id: str
     ) -> QtAudioPlaybackService:
         playback_service = self._ensure_preview_playback_service()
-        set_output_device = getattr(
-            playback_service, "set_output_device_id", None
-        )
+        set_output_device = getattr(playback_service, "set_output_device_id", None)
         if callable(set_output_device):
             set_output_device(output_device_id)
         return playback_service
@@ -922,9 +899,7 @@ class SettingsViewModel(QObject):
             if stop_event.is_set():
                 return
             playback_service = self._ensure_preview_playback_service()
-            playback_service.play_blocking(
-                str(preview_path), stop_event=stop_event
-            )
+            playback_service.play_blocking(str(preview_path), stop_event=stop_event)
             if not stop_event.is_set():
                 self._previewStatusRequested.emit(
                     f"Previewed {self._voice_preview_label(voice_name)}.",
@@ -971,9 +946,7 @@ class SettingsViewModel(QObject):
             self._set_status(f"{error_prefix}: {exc}", "error")
             return None
 
-    def _run_audio_input_test(
-        self, settings: AppSettings, stop_event: Event
-    ) -> None:
+    def _run_audio_input_test(self, settings: AppSettings, stop_event: Event) -> None:
         try:
             monitor = self._audio_monitor_factory(settings)
             monitor.monitor_levels(
@@ -1002,13 +975,9 @@ class SettingsViewModel(QObject):
             if stop_event.is_set():
                 return
             playback_service = self._ensure_preview_playback_service()
-            playback_service.play_blocking(
-                str(output_path), stop_event=stop_event
-            )
+            playback_service.play_blocking(str(output_path), stop_event=stop_event)
             if not stop_event.is_set():
-                self._previewStatusRequested.emit(
-                    "Speaker test completed.", "success"
-                )
+                self._previewStatusRequested.emit("Speaker test completed.", "success")
         except Exception as exc:
             if not stop_event.is_set():
                 self._previewStatusRequested.emit(
@@ -1037,9 +1006,7 @@ class SettingsViewModel(QObject):
                     "title": self._history_preview_title(
                         session.mode, latest_interaction
                     ),
-                    "excerpt": self._history_preview_excerpt(
-                        latest_interaction
-                    ),
+                    "excerpt": self._history_preview_excerpt(latest_interaction),
                     "interactionCount": len(session.interactions),
                 }
             )
@@ -1103,9 +1070,7 @@ class SettingsViewModel(QObject):
         self.settingsChanged.emit()
         self.dirtyChanged.emit()
 
-    def _persist_settings(
-        self, settings: AppSettings, *, status_message: str
-    ) -> None:
+    def _persist_settings(self, settings: AppSettings, *, status_message: str) -> None:
         self._settings_manager.save(settings, validate=False)
         self._history_manager.set_history_policy(
             settings.history_length,
@@ -1250,9 +1215,7 @@ class SettingsViewModel(QObject):
         errors: dict[str, str],
     ) -> None:
         try:
-            payload[field_name] = normalize_hex_color(
-                payload.get(field_name, "")
-            )
+            payload[field_name] = normalize_hex_color(payload.get(field_name, ""))
         except ValidationError:
             errors[field_name] = "Use a valid hex color such as #A7FFDE."
 

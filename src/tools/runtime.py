@@ -128,6 +128,8 @@ class RuntimeToolRegistry:
             return self._settings.tool_add_memory_policy
         if name == "read_memory":
             return self._settings.tool_read_memory_policy
+        if name == "change_memory":
+            return self._settings.tool_change_memory_policy
         return "deny"
 
     def _build_definitions(self) -> dict[str, ToolDefinition]:
@@ -352,6 +354,71 @@ class RuntimeToolRegistry:
                 timeout_seconds=2,
                 executor=self._read_memory,
             )
+            definitions["change_memory"] = ToolDefinition(
+                name="change_memory",
+                description=(
+                    "Update one of the user's saved memories. Use this when "
+                    "the user asks to edit, rename, correct, update, or add "
+                    "details to an existing memory. Prefer memory_id when it "
+                    "is known from read_memory. If memory_id is not known, "
+                    "pass the user's natural description as query; the tool "
+                    "will refuse to update when the target is unclear."
+                ),
+                parameters_schema={
+                    "type": "object",
+                    "properties": {
+                        "memory_id": {
+                            "type": "string",
+                            "description": (
+                                "Saved memory id from the read_memory result. "
+                                "Do not use a tool call id."
+                            ),
+                        },
+                        "query": {
+                            "type": "string",
+                            "description": (
+                                "The user's natural description of which "
+                                "memory to change."
+                            ),
+                        },
+                        "title": {
+                            "type": "string",
+                            "description": "New title, if the title changes.",
+                        },
+                        "description": {
+                            "type": "string",
+                            "description": (
+                                "New saved note text, written close to the "
+                                "user's wording."
+                            ),
+                        },
+                        "note": {
+                            "type": "string",
+                            "description": (
+                                "Alias for description. Use description when "
+                                "possible."
+                            ),
+                        },
+                        "intent": {
+                            "type": "string",
+                            "description": (
+                                "Updated intent, if what the user wants to "
+                                "do or remember changes."
+                            ),
+                        },
+                        "source_text": {
+                            "type": "string",
+                            "description": (
+                                "The user's original phrasing for the change "
+                                "when useful."
+                            ),
+                        },
+                    },
+                    "additionalProperties": False,
+                },
+                timeout_seconds=2,
+                executor=self._change_memory,
+            )
         return definitions
 
     def _take_screenshot(self, arguments: dict[str, Any]) -> ToolResult:
@@ -452,6 +519,24 @@ class RuntimeToolRegistry:
         return ToolResult(
             content=_format_memory_search_result(search_result),
             metadata=search_result,
+        )
+
+    def _change_memory(self, arguments: dict[str, Any]) -> ToolResult:
+        if self._memory_manager is None:
+            raise ToolExecutionError("Memory changes are not available.")
+        change_result = self._memory_manager.change_memory(
+            memory_id=str(arguments.get("memory_id", "")),
+            query=str(arguments.get("query", "")),
+            title=_optional_text(arguments.get("title")),
+            description=_optional_text(
+                arguments.get("description", arguments.get("note"))
+            ),
+            intent=_optional_text(arguments.get("intent")),
+            source_text=_optional_text(arguments.get("source_text")),
+        )
+        return ToolResult(
+            content=_format_memory_change_result(change_result),
+            metadata=change_result,
         )
 
 
@@ -855,6 +940,11 @@ def _arguments_summary(tool_name: str, arguments: dict[str, Any]) -> str:
         return f"title: {_preview(str(arguments.get('title', '')), limit=80)}"
     if tool_name == "read_memory":
         return f"query: {_preview(str(arguments.get('query', '')), limit=80)}"
+    if tool_name == "change_memory":
+        memory_id = str(arguments.get("memory_id", "")).strip()
+        if memory_id:
+            return f"memory: {_preview(memory_id, limit=80)}"
+        return f"query: {_preview(str(arguments.get('query', '')), limit=80)}"
     return _preview(json.dumps(arguments, ensure_ascii=False), limit=120)
 
 
@@ -894,13 +984,57 @@ def _format_memory_search_result(search_result: dict[str, Any]) -> str:
         )
         intent = _preview(str(match.get("intent", "")), limit=240)
         lines.append(f"{index}. {title}")
+        memory_id = str(match.get("id", "")).strip()
+        if memory_id:
+            lines.append(f"   Memory ID: {memory_id}")
         if intent:
             lines.append(f"   Intent: {intent}")
-        lines.append(f"   Note: {description}")
+        lines.append(f"   Description: {description}")
         created_at = str(match.get("created_at", "")).strip()
         if created_at:
             lines.append(f"   Saved: {created_at}")
     return "\n".join(lines)
+
+
+def _format_memory_change_result(change_result: dict[str, Any]) -> str:
+    status = str(change_result.get("status", ""))
+    if status == "empty":
+        return "No memories saved yet."
+
+    memory = change_result.get("memory")
+    if status == "updated" and isinstance(memory, dict):
+        title = _preview(str(memory.get("title", "")), limit=120)
+        updated_at = str(memory.get("updated_at", "")).strip()
+        if updated_at:
+            return f"Memory updated: {title}\nUpdated: {updated_at}"
+        return f"Memory updated: {title}"
+
+    candidates = [
+        candidate
+        for candidate in change_result.get("candidates", [])
+        if isinstance(candidate, dict)
+    ]
+    lines = [
+        "I could not tell which memory to update."
+        if status == "ambiguous"
+        else "No close memory match to update."
+    ]
+    if candidates:
+        lines.append("Possible memories:")
+        for candidate in candidates:
+            title = _preview(str(candidate.get("title", "")), limit=120)
+            memory_id = str(candidate.get("id", "")).strip()
+            if memory_id:
+                lines.append(f"- {title} ({memory_id})")
+            else:
+                lines.append(f"- {title}")
+    return "\n".join(lines)
+
+
+def _optional_text(value: Any) -> str | None:
+    if value is None:
+        return None
+    return str(value)
 
 
 def _preview(value: str, *, limit: int = 260) -> str:

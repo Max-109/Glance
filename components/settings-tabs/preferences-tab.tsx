@@ -166,6 +166,13 @@ export function PreferencesTab({
       value: String(state.settings.ocr_keybind || "-"),
       active: state.bindingField === "ocr_keybind",
     },
+    {
+      id: "open_glance_keybind",
+      title: "Open Glance",
+      icon: "monitor",
+      value: String(state.settings.open_glance_keybind || "-"),
+      active: state.bindingField === "open_glance_keybind",
+    },
   ];
 
   return (

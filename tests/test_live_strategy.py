@@ -5,6 +5,7 @@ from types import SimpleNamespace
 
 from src.models.interactions import LiveInteraction, SessionRecord
 from src.models.settings import AppSettings
+from src.services.memory_manager import MemoryManager
 from src.services.providers import LiveSpeechReply
 from src.strategies import live_strategy as live_strategy_module
 from src.strategies.live_strategy import (
@@ -439,6 +440,107 @@ class LiveStrategyTests(unittest.TestCase):
         self.assertEqual(llm_agent.prepare_inputs, [final_answer])
         self.assertEqual(interaction.response, final_answer)
         self.assertEqual(tts_agent.calls[0][0], f"{final_answer}...")
+
+    def test_change_memory_stops_before_model_can_add_duplicate_memory(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            memory_manager = MemoryManager(Path(temp_dir) / "memories.json")
+            memory_manager.add_memory(
+                title="Billing export",
+                description="Remember billing CSV export.",
+            )
+            memory_manager.add_memory(
+                title="Billing reminder",
+                description="Remember billing email follow-up.",
+            )
+            llm_agent = FakeToolLLMAgent(
+                [
+                    _tool_turn(
+                        tool_calls=[
+                            _tool_call(
+                                "change_memory",
+                                {
+                                    "query": "billing",
+                                    "description": "Updated billing note.",
+                                },
+                            )
+                        ]
+                    ),
+                    _tool_turn(
+                        tool_calls=[
+                            _tool_call(
+                                "add_memory",
+                                {
+                                    "title": "Duplicate billing",
+                                    "description": "Updated billing note.",
+                                },
+                            )
+                        ]
+                    ),
+                ]
+            )
+            tts_agent = FakeTTSAgent()
+            strategy = LiveStrategy(
+                transcription_agent=FakeTranscriptionAgent(),
+                llm_agent=llm_agent,
+                tts_agent=tts_agent,
+                settings=_tool_settings(),
+                memory_manager=memory_manager,
+            )
+
+            interaction = strategy.execute({"recording_path": "input.wav"})
+            memories = memory_manager.list_memories()
+
+        self.assertEqual(len(interaction.tool_calls), 1)
+        self.assertEqual(interaction.tool_calls[0].tool_name, "change_memory")
+        self.assertEqual(len(llm_agent.message_snapshots), 1)
+        self.assertIn("not sure which memory", llm_agent.prepare_inputs[0])
+        self.assertEqual(
+            interaction.response, f"spoken:{llm_agent.prepare_inputs[0]}"
+        )
+        self.assertEqual(len(memories), 2)
+        self.assertEqual(
+            [memory.description for memory in memories],
+            [
+                "Remember billing email follow-up.",
+                "Remember billing CSV export.",
+            ],
+        )
+
+    def test_change_memory_missing_id_uses_clear_followup(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            llm_agent = FakeToolLLMAgent(
+                [
+                    _tool_turn(
+                        tool_calls=[
+                            _tool_call(
+                                "change_memory",
+                                {
+                                    "memory_id": (
+                                        "tool-call-id-not-memory-id"
+                                    ),
+                                    "description": "Updated note.",
+                                },
+                            )
+                        ]
+                    )
+                ]
+            )
+            strategy = LiveStrategy(
+                transcription_agent=FakeTranscriptionAgent(),
+                llm_agent=llm_agent,
+                tts_agent=FakeTTSAgent(),
+                settings=_tool_settings(),
+                memory_manager=MemoryManager(
+                    Path(temp_dir) / "memories.json"
+                ),
+            )
+
+            interaction = strategy.execute({"recording_path": "input.wav"})
+
+        self.assertEqual(interaction.tool_calls[0].status, "error")
+        self.assertIn("not find", llm_agent.prepare_inputs[0])
 
     def test_speech_drift_meaning_words_ignore_common_stopwords(self) -> None:
         self.assertEqual(

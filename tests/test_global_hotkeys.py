@@ -144,6 +144,34 @@ class GlobalHotkeyManagerTests(unittest.TestCase):
         self.assertEqual(len(keyboard_module.listeners), 1)
         self.assertEqual(keyboard_module.hotkeys[-1].keys, "<cmd>+k")
 
+    def test_update_bindings_registers_open_glance_callback(self) -> None:
+        keyboard_module = FakeKeyboardModule()
+        opened = []
+        manager = global_hotkeys.GlobalHotkeyManager(
+            {
+                "live": lambda: None,
+                "ocr": lambda: None,
+                "open_glance": lambda: opened.append(True),
+            }
+        )
+
+        with (
+            patch.object(global_hotkeys, "keyboard", keyboard_module),
+            patch.object(
+                global_hotkeys,
+                "_input_monitoring_is_trusted",
+                return_value=True,
+            ),
+        ):
+            manager.update_bindings(AppSettings())
+
+        self.assertEqual(
+            [hotkey.keys for hotkey in keyboard_module.hotkeys],
+            ["<cmd>+<shift>+l", "<cmd>+<shift>+o", "<cmd>+<shift>+g"],
+        )
+        keyboard_module.hotkeys[-1].on_activate()
+        self.assertEqual(opened, [True])
+
     def test_update_bindings_raises_permission_error_when_untrusted(
         self,
     ) -> None:

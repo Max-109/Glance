@@ -676,14 +676,17 @@ class OpenAICompatibleProvider:
             prompt += (
                 " Auto voice selection is active. First choose the single "
                 "best voice ID from the allowed list below, based on the "
-                "emotional shape and style of your answer. Output the first "
-                "line exactly as `VOICE_ID: <id>`, then leave one blank "
-                "line, then output only the final speech text. Never output "
-                "any voice ID outside this list. Do not default to the same "
-                "upbeat voice for every positive or generic answer. For "
-                "ordinary everyday conversation and casual back-and-forth, "
-                "prefer Mark unless another voice is clearly a better fit. "
-                "Choose the voice before composing the final reply."
+                "user's request, mood, topic, language, stakes, and the "
+                "emotional shape and style of your answer. Use the whole "
+                "voice list when it fits: choose serious, bold, grounded, "
+                "casual, mysterious, polished, upbeat, or expressive voices "
+                "according to the moment instead of defaulting to one voice. "
+                "Output the first line exactly as `VOICE_ID: <id>`, then "
+                "leave one blank line, then output only the final speech "
+                "text. Voice names are only labels; never output a name like "
+                "`Mark`, `James`, or `Hope` as the VOICE_ID. Never output any "
+                "voice ID outside this list. Choose the voice before "
+                "composing the final reply."
             )
             for voice in ELEVEN_V3_VOICES:
                 prompt += (
@@ -748,10 +751,16 @@ class OpenAICompatibleProvider:
             prompt += (
                 " Auto voice selection is active. First choose the single "
                 "best voice ID from the allowed list below, based on the "
-                "emotional shape and style of the reply. Output the first "
-                "line exactly as `VOICE_ID: <id>`, then leave one blank "
-                "line, then output only the final speech text. Never output "
-                "any voice ID outside this list."
+                "user's request, mood, topic, language, stakes, and the "
+                "emotional shape and style of the reply. Use the whole voice "
+                "list when it fits: choose serious, bold, grounded, casual, "
+                "mysterious, polished, upbeat, or expressive voices according "
+                "to the moment instead of defaulting to one voice. Output the "
+                "first line exactly as `VOICE_ID: <id>`, then leave one blank "
+                "line, then output only the final speech text. Voice names are "
+                "only labels; never output a name like `Mark`, `James`, or "
+                "`Hope` as the VOICE_ID. Never output any voice ID outside "
+                "this list."
             )
             for voice in ELEVEN_V3_VOICES:
                 prompt += (
@@ -1047,6 +1056,7 @@ def _build_live_tool_runtime_prompt(
             "ocr_screen",
             "add_memory",
             "read_memory",
+            "change_memory",
             "end_live_session",
         }
     else:
@@ -1082,7 +1092,8 @@ def _build_live_tool_runtime_prompt(
         prompt += (
             " When the user asks you to remember a task, idea, project note, "
             "preference, or follow-up for later, call add_memory and keep the "
-            "saved wording close to what the user said."
+            "saved wording close to what the user said. Do not call "
+            "add_memory when the user is asking to edit an existing memory."
         )
     if "read_memory" in enabled_tools:
         prompt += (
@@ -1090,7 +1101,19 @@ def _build_live_tool_runtime_prompt(
             "what they needed to do about something, or refers to previous "
             "memories, call read_memory with the user's wording as the query. "
             "Use the returned matches to answer naturally, and do not mention "
-            "the tool name."
+            "the tool name. If you later edit a memory, use the Memory ID "
+            "shown in the read_memory result; never use a tool call id as a "
+            "memory id."
+        )
+    if "change_memory" in enabled_tools:
+        prompt += (
+            " When the user asks to edit, rename, correct, update, or add "
+            "details to a saved memory, call change_memory. If you are not "
+            "sure which memory they mean, call read_memory first, then only "
+            "change the memory when the target is clear. Use memory_id only "
+            "when it came from a Memory ID in a read_memory result; otherwise "
+            "use query. Put updated note text in description, not note. Do "
+            "not mention the tool name."
         )
     if "end_live_session" in enabled_tools:
         prompt += (
@@ -1118,11 +1141,12 @@ def _build_tool_settings_prompt(
         return (
             " Tools are not allowed in Settings. You do not have access "
             "to web search, web page fetching, screen inspection, OCR, memory "
-            "saving, or memory reading in this turn. If the user asks for "
-            "one of those capabilities, say that the tool is not allowed in "
-            "Settings and they need to enable Tools in Settings to use "
-            "it. Do not claim you checked the web, inspected the screen, "
-            "copied text, saved a memory, or read a memory."
+            "saving, memory reading, or memory changes in this turn. If the "
+            "user asks for one of those capabilities, say that the tool is "
+            "not allowed in Settings and they need to enable Tools in "
+            "Settings to use it. Do not claim you checked the web, inspected "
+            "the screen, copied text, saved a memory, read a memory, or "
+            "changed a memory."
         )
 
     disabled_capabilities: list[str] = []
@@ -1161,6 +1185,13 @@ def _build_tool_settings_prompt(
                 "allowed in Settings and they need to enable it to read "
                 "memories."
             )
+        if settings.tool_change_memory_policy != "allow":
+            disabled_capabilities.append(
+                "Memory changes are not allowed in Settings. If the user asks "
+                "you to edit or update a saved memory, say that memory changes "
+                "are not allowed in Settings and they need to enable them to "
+                "change memories."
+            )
     elif enabled_tool_names is not None:
         if (
             "web_search" not in enabled_tools
@@ -1195,6 +1226,13 @@ def _build_tool_settings_prompt(
                 "you to recall saved memories, say that memory reading is not "
                 "allowed in Settings and they need to enable it to read "
                 "memories."
+            )
+        if "change_memory" not in enabled_tools:
+            disabled_capabilities.append(
+                "Memory changes are not allowed in Settings. If the user asks "
+                "you to edit or update a saved memory, say that memory changes "
+                "are not allowed in Settings and they need to enable them to "
+                "change memories."
             )
 
     if not disabled_capabilities:

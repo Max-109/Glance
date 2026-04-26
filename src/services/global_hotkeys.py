@@ -81,6 +81,7 @@ class GlobalHotkeyManager:
         mapping = {
             settings.live_keybind: self._callbacks.get("live"),
             settings.ocr_keybind: self._callbacks.get("ocr"),
+            settings.open_glance_keybind: self._callbacks.get("open_glance"),
         }
         return [
             (to_pynput_hotkey(keybind), callback)

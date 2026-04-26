@@ -353,6 +353,13 @@ def run_settings_app() -> int:
         on_bounds_changed=persist_electron_window_size,
         on_quit_requested=app.quit,
     )
+
+    def open_glance() -> None:
+        _toggle_window(settings_window, force_show=True)
+
+    def toggle_glance() -> None:
+        _toggle_window(settings_window)
+
     tray = _build_tray_icon(
         app,
         settings_window,
@@ -366,13 +373,12 @@ def run_settings_app() -> int:
     tray_holder["tray"] = tray
     tray.show()
     if _env_flag_enabled("GLANCE_AUTO_OPEN"):
-        QTimer.singleShot(
-            0, lambda: _toggle_window(settings_window, force_show=True)
-        )
+        QTimer.singleShot(0, open_glance)
     hotkey_manager = GlobalHotkeyManager(
         callbacks={
             "live": live_controller.toggle,
             "ocr": ocr_controller.start,
+            "open_glance": toggle_glance,
         })
     runtime_refresh_timer = QTimer(app)
     runtime_refresh_timer.setSingleShot(True)
@@ -605,6 +611,9 @@ def _build_tray_icon(
 
     def update_keybind_actions() -> None:
         settings = controller.settings
+        show_action.setText(
+            f"Open Glance: {settings.get('open_glance_keybind', '--')}"
+        )
         live_action.setText(f"Live: {settings.get('live_keybind', '--')}")
         ocr_action.setText(f"OCR: {settings.get('ocr_keybind', '--')}")
 

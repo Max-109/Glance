@@ -11,6 +11,7 @@ from src.models.memories import MemoryRecord
 
 _TITLE_LIMIT = 20
 _DETAIL_LIMIT = 5
+_CANDIDATE_LIMIT = 5
 _STOP_WORDS = {
     "a",
     "about",
@@ -108,6 +109,90 @@ class MemoryManager:
             self._save_locked()
         return memory
 
+    def change_memory(
+        self,
+        *,
+        memory_id: str = "",
+        query: str = "",
+        title: str | None = None,
+        description: str | None = None,
+        intent: str | None = None,
+        source_text: str | None = None,
+    ) -> dict:
+        updates = _memory_updates(
+            title=title,
+            description=description,
+            intent=intent,
+            source_text=source_text,
+        )
+        if not updates:
+            raise ValidationError("Tell me what to change.")
+
+        memory_id = str(memory_id).strip()
+        query_text = str(query).strip()
+        with self._lock:
+            if memory_id:
+                memory = self._find_locked(memory_id)
+                _apply_memory_updates(memory, updates)
+                self._save_locked()
+                return {
+                    "status": "updated",
+                    "memory": _memory_payload(memory),
+                }
+
+            memories = list(reversed(self._memories))
+            if not memories:
+                return {
+                    "status": "empty",
+                    "query": query_text,
+                    "memory": None,
+                    "candidates": [],
+                }
+
+            query_terms = _query_terms(query_text)
+            if not query_terms:
+                return {
+                    "status": "ambiguous",
+                    "query": query_text,
+                    "memory": None,
+                    "candidates": [
+                        _memory_candidate_payload(memory)
+                        for memory in memories[:_CANDIDATE_LIMIT]
+                    ],
+                }
+
+            ranked = _rank_memories(memories, query_text, query_terms)
+            if not ranked:
+                return {
+                    "status": "none",
+                    "query": query_text,
+                    "memory": None,
+                    "candidates": [
+                        _memory_candidate_payload(memory)
+                        for memory in memories[:_CANDIDATE_LIMIT]
+                    ],
+                }
+            if len(ranked) > 1:
+                return {
+                    "status": "ambiguous",
+                    "query": query_text,
+                    "memory": None,
+                    "candidates": [
+                        _memory_candidate_payload(memory)
+                        for _, memory in ranked[:_CANDIDATE_LIMIT]
+                    ],
+                }
+
+            memory = ranked[0][1]
+            _apply_memory_updates(memory, updates)
+            self._save_locked()
+            return {
+                "status": "updated",
+                "query": query_text,
+                "memory": _memory_payload(memory),
+                "candidates": [],
+            }
+
     def update_memory(
         self,
         memory_id: str,
@@ -115,6 +200,7 @@ class MemoryManager:
         title: str,
         description: str,
         intent: str = "",
+        source_text: str | None = None,
     ) -> MemoryRecord:
         with self._lock:
             memory = self._find_locked(memory_id)
@@ -122,6 +208,11 @@ class MemoryManager:
                 title=_trim_text(title, 120),
                 description=_trim_text(description, 4000),
                 intent=_trim_text(intent, 1000),
+                source_text=(
+                    _trim_text(source_text, 4000)
+                    if source_text is not None
+                    else None
+                ),
             )
             self._save_locked()
             return memory
@@ -216,6 +307,64 @@ def _memory_score(
             if term in text:
                 score += weight
     return score
+
+
+def _rank_memories(
+    memories: list[MemoryRecord],
+    query_text: str,
+    query_terms: list[str],
+) -> list[tuple[int, MemoryRecord]]:
+    return [
+        (score, memory)
+        for score, memory in sorted(
+            [
+                (_memory_score(memory, query_text, query_terms), memory)
+                for memory in memories
+            ],
+            key=lambda item: (item[0], item[1].created_at),
+            reverse=True,
+        )
+        if score > 0
+    ]
+
+
+def _memory_updates(
+    *,
+    title: str | None = None,
+    description: str | None = None,
+    intent: str | None = None,
+    source_text: str | None = None,
+) -> dict[str, str]:
+    updates = {}
+    if title is not None and str(title).strip():
+        updates["title"] = _trim_text(title, 120)
+    if description is not None and str(description).strip():
+        updates["description"] = _trim_text(description, 4000)
+    if intent is not None and str(intent).strip():
+        updates["intent"] = _trim_text(intent, 1000)
+    if source_text is not None and str(source_text).strip():
+        updates["source_text"] = _trim_text(source_text, 4000)
+    return updates
+
+
+def _apply_memory_updates(
+    memory: MemoryRecord, updates: dict[str, str]
+) -> None:
+    memory.update(
+        title=updates.get("title", memory.title),
+        description=updates.get("description", memory.description),
+        intent=updates.get("intent", memory.intent),
+        source_text=updates.get("source_text"),
+    )
+
+
+def _memory_candidate_payload(memory: MemoryRecord) -> dict:
+    return {
+        "id": memory.entity_id,
+        "title": memory.title,
+        "created_at": memory.created_at,
+        "updated_at": memory.updated_at,
+    }
 
 
 def _memory_payload(memory: MemoryRecord) -> dict:

@@ -19,7 +19,7 @@ export function Keybinds({
   onActivate: (fieldName: string) => void;
 }) {
   return (
-    <div className="grid gap-3 md:grid-cols-2" aria-label="Keybinds">
+    <div className="grid gap-3 md:grid-cols-3" aria-label="Keyboard shortcuts">
       {rows.map((row) => (
         <button
           key={row.id}
