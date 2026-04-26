@@ -1094,9 +1094,12 @@ def _build_live_tool_runtime_prompt(
         )
     if "end_live_session" in enabled_tools:
         prompt += (
-            " Call end_live_session when the user clearly says they are done, "
-            "says no to more help, says everything is fine, says thanks after "
-            "a completed task, says goodbye or bye, or asks Glance to stop "
+            " To end the Live session, you must call end_live_session. Do not "
+            "only say that you closed, ended, stopped, or wrapped up the "
+            "session; that spoken text does not stop Live. Call "
+            "end_live_session when the user clearly says they are done, says "
+            "no to more help, says everything is fine, says thanks after a "
+            "completed task, says goodbye or bye, or asks Glance to stop "
             "listening."
         )
     return (

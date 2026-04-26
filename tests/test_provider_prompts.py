@@ -197,7 +197,19 @@ class ProviderPromptTests(unittest.TestCase):
                 self.assertIn("keep the saved wording close", prompt)
                 self.assertIn("call read_memory", prompt)
                 self.assertIn("asks to be reminded", prompt)
-                self.assertIn("Call end_live_session", prompt)
+                self.assertIn(
+                    "you must call end_live_session",
+                    prompt,
+                )
+                self.assertIn(
+                    "Do not only say that you closed, ended, stopped, or "
+                    "wrapped up the session",
+                    prompt,
+                )
+                self.assertIn(
+                    "that spoken text does not stop Live",
+                    prompt,
+                )
                 self.assertIn("says everything is fine", prompt)
                 self.assertIn("says thanks after a completed task", prompt)
                 self.assertIn("goodbye or bye", prompt)
@@ -241,7 +253,7 @@ class ProviderPromptTests(unittest.TestCase):
                 self.assertNotIn("ocr_screen", prompt)
                 self.assertNotIn("add_memory", prompt)
                 self.assertNotIn("read_memory", prompt)
-                self.assertIn("Call end_live_session", prompt)
+                self.assertIn("you must call end_live_session", prompt)
                 self.assertIn(
                     "Screen inspection and OCR are not allowed in Settings",
                     prompt,
