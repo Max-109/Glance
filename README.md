@@ -30,6 +30,7 @@ I press a customizable shortcut, speak, and Glance runs a Live turn. If I only n
 ## How It Works
 
 ```mermaid
+%%{init: {"theme": "base", "themeVariables": {"background": "transparent", "primaryColor": "#3f3f46", "primaryTextColor": "#f4f4f5", "primaryBorderColor": "#eaabab", "lineColor": "#eaabab", "secondaryColor": "#27272a", "tertiaryColor": "#18181b", "fontFamily": "Inter, ui-sans-serif, system-ui"}}}%%
 flowchart TD
     LiveShortcut[Press the Live shortcut]
     Vad[TEN VAD listens for speech]
@@ -55,6 +56,16 @@ flowchart TD
     Agent --> Speech --> Saved
 
     OcrShortcut --> Screen --> Extract --> Clipboard --> OcrSaved
+
+    classDef live fill:#3f3f46,stroke:#eaabab,color:#f4f4f5,stroke-width:2px
+    classDef ocr fill:#27272a,stroke:#71717a,color:#f4f4f5
+    classDef saved fill:#eaabab,stroke:#eaabab,color:#18181b
+    classDef decision fill:#18181b,stroke:#eaabab,color:#f4f4f5,stroke-width:2px
+
+    class LiveShortcut,Vad,Recording,Transcription,Multimodal,Agent,Tools,Speech live
+    class OcrShortcut,Screen,Extract,Clipboard ocr
+    class Saved,OcrSaved saved
+    class Mode decision
 ```
 
 ## Tools
