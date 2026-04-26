@@ -20,12 +20,26 @@ I press a customizable shortcut, speak, and Glance runs a Live turn. If I only n
 ## Features
 
 - Customizable shortcuts.
-- Configurable OpenAI-compatible endpoints for reply, transcription, voice, and multimodal models that can handle both listening and replying, like Gemini 3 Flash.
+- Configurable OpenAI-compatible endpoints for reply, transcription, and voice. (Multimodal models are also supported, so one model can handle audio input and reply generation.)
 - Eleven v3 voice output, currently the best multilingual TTS model, with excellent voice quality and support for different emotions. (Supported by Glance.)
 - Advanced TEN VAD audio detection for natural speech turns.
 - Various tools available for the live agent to use.
 - Saved history with transcript, response, audio, screenshots, and tool records.
 - Saved memories that the live agent can read and update.
+
+## Live Flow
+
+```mermaid
+flowchart TD
+    Shortcut[Press the Live shortcut]
+    Record[Glance records your voice]
+    Transcribe[Speech becomes text]
+    Agent[The live agent replies and can use tools]
+    Voice[Glance speaks the answer]
+    History[Session is saved]
+
+    Shortcut --> Record --> Transcribe --> Agent --> Voice --> History
+```
 
 ## Tools
 
