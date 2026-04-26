@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import ast
 from dataclasses import replace
 import os
 import sys
 import logging
 from pathlib import Path
+import re
 from threading import Thread
 
 from PySide6.QtCore import (
@@ -65,6 +67,132 @@ from src.ui.settings_viewmodel import SettingsViewModel
 
 
 APP_NAME = "Glance"
+_RUNTIME_ERROR_NOTICE_SUPPRESS_MS = 60_000
+_INPUT_AUDIO_UNSUPPORTED_NOTICE = (
+    "Live failed: the selected model does not support input audio. "
+    "Choose an audio-capable live model in Providers."
+)
+
+
+def _summarize_runtime_error_notice(message: str) -> str:
+    if not _is_runtime_error_message(message):
+        return ""
+
+    reason = _clean_runtime_error_message(message)
+    normalized_reason = reason.lower()
+    if (
+        "no endpoints found that support input audio" in normalized_reason
+        or "support input audio" in normalized_reason
+    ):
+        return _INPUT_AUDIO_UNSUPPORTED_NOTICE
+
+    if not reason:
+        reason = "Unknown error."
+    if reason.lower().startswith("live failed:"):
+        return reason
+    return f"Live failed: {reason}"
+
+
+def _is_runtime_error_message(message: str) -> bool:
+    normalized = str(message).strip().lower()
+    if not normalized:
+        return False
+    if normalized.startswith("live failed:"):
+        return True
+    return any(
+        token in normalized
+        for token in (
+            " failed",
+            " unavailable",
+            " error",
+            "error:",
+        )
+    )
+
+
+def _clean_runtime_error_message(message: str) -> str:
+    cleaned = str(message).strip()
+    if not cleaned:
+        return ""
+
+    payload_message = _extract_provider_payload_message(cleaned)
+    if payload_message:
+        cleaned = payload_message
+
+    wrappers = (
+        "Live failed:",
+        "Tool-capable live request failed:",
+        "Multimodal live reply request failed:",
+        "Live reply request failed:",
+        "LLM request failed:",
+        "Transcription request failed:",
+        "TTS request failed:",
+    )
+    changed = True
+    while changed:
+        changed = False
+        for wrapper in wrappers:
+            if cleaned.lower().startswith(wrapper.lower()):
+                cleaned = cleaned[len(wrapper):].strip()
+                changed = True
+
+    payload_message = _extract_provider_payload_message(cleaned)
+    if payload_message:
+        cleaned = payload_message
+
+    if "\n" in cleaned:
+        cleaned = next(
+            (line.strip() for line in cleaned.splitlines() if line.strip()),
+            cleaned,
+        )
+    cleaned = re.sub(r"^Error code:\s*\d+\s*-\s*", "", cleaned).strip()
+    return cleaned or "Unknown error."
+
+
+def _extract_provider_payload_message(message: str) -> str:
+    match = re.search(r"(?P<payload>\{.*\})", message)
+    if not match:
+        return ""
+    try:
+        payload = ast.literal_eval(match.group("payload"))
+    except (SyntaxError, ValueError):
+        return ""
+    if not isinstance(payload, dict):
+        return ""
+    error = payload.get("error")
+    if isinstance(error, dict):
+        nested_message = error.get("message")
+        if isinstance(nested_message, str):
+            return nested_message.strip()
+    nested_message = payload.get("message")
+    if isinstance(nested_message, str):
+        return nested_message.strip()
+    return ""
+
+
+def _runtime_notice_key(message: str) -> str:
+    return " ".join(message.lower().split())
+
+
+class RuntimeErrorNoticeController:
+    def __init__(self, suppress_ms: int = _RUNTIME_ERROR_NOTICE_SUPPRESS_MS):
+        self._suppress_ms = suppress_ms
+        self._last_notices: dict[str, int] = {}
+
+    def maybe_notice(self, message: str, *, now_ms: int | None = None) -> str:
+        notice = _summarize_runtime_error_notice(message)
+        if not notice:
+            return ""
+        resolved_now_ms = current_epoch_ms() if now_ms is None else int(now_ms)
+        key = _runtime_notice_key(notice)
+        last_shown_at_ms = self._last_notices.get(key)
+        if (
+            last_shown_at_ms is not None
+            and resolved_now_ms - last_shown_at_ms < self._suppress_ms
+        ):
+            return ""
+        self._last_notices[key] = resolved_now_ms
+        return notice
 
 
 class LiveStatusBridge(QObject):
@@ -310,7 +438,7 @@ def run_settings_app() -> int:
     tray_holder = {}
 
     def show_ocr_message(message: str, kind: str) -> None:
-        controller._apply_status_update(message, kind)
+        controller.showStatus(message, kind)
         if kind == "success" and live_cue_controller is not None:
             live_cue_controller.play_cue("quick_ocr_complete")
         tray = tray_holder.get("tray")
@@ -620,6 +748,7 @@ def _build_tray_icon(
     update_keybind_actions()
     controller.settingsChanged.connect(update_keybind_actions)
     runtime_revision = 0
+    runtime_error_notices = RuntimeErrorNoticeController()
 
     def update_live_status(state: str, message: str) -> None:
         nonlocal runtime_revision
@@ -634,6 +763,9 @@ def _build_tray_icon(
         ):
             tray_icon_controller.flash_error()
             tray.showMessage("Glance", f"{message}\nSee log: {log_file}")
+            notice = runtime_error_notices.maybe_notice(message)
+            if notice:
+                controller.showStatus(notice, "error")
         runtime_revision += 1
         runtime_status = tray_icon_controller.runtime_status(
             message=message,

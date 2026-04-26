@@ -223,7 +223,7 @@ export function PreferencesTab({
 
         <CardContent className="px-5 py-5">
           {!stateReady ? (
-            <div className="rounded-2xl border border-dashed border-border bg-card p-4 text-sm text-muted-foreground">
+            <div className="rounded-2xl border border-dashed border-border bg-[var(--panel-bg-deep)] p-4 text-sm text-muted-foreground">
               Loading saved prompts.
             </div>
           ) : (
@@ -240,8 +240,8 @@ export function PreferencesTab({
                       className={cn(
                         "group grid gap-3 rounded-2xl border p-3 text-left transition-[background-color,border-color,box-shadow,transform] active:scale-[0.99] focus-visible:ring-4 focus-visible:ring-[color-mix(in_srgb,var(--prompt-accent)_14%,transparent)]",
                         isActive
-                          ? "border-[color-mix(in_srgb,var(--prompt-accent)_44%,transparent)] bg-[radial-gradient(circle_at_14%_20%,color-mix(in_srgb,var(--prompt-accent)_14%,transparent),transparent_34%),var(--card)] shadow-[0_0_0_1px_color-mix(in_srgb,var(--prompt-accent)_10%,transparent)]"
-                          : "border-white/10 bg-card hover:-translate-y-0.5 hover:border-[color-mix(in_srgb,var(--prompt-accent)_28%,transparent)] hover:bg-white/[0.025]",
+                          ? "border-[color-mix(in_srgb,var(--prompt-accent)_44%,transparent)] bg-[radial-gradient(circle_at_14%_20%,color-mix(in_srgb,var(--prompt-accent)_14%,transparent),transparent_34%),var(--panel-bg-deep)] shadow-[0_0_0_1px_color-mix(in_srgb,var(--prompt-accent)_10%,transparent)]"
+                          : "border-white/10 bg-[var(--panel-bg-deep)] hover:-translate-y-0.5 hover:border-[color-mix(in_srgb,var(--prompt-accent)_28%,transparent)] hover:bg-[var(--item-hover)]",
                       )}
                       style={promptStyle(row)}
                       aria-pressed={isActive}
@@ -287,7 +287,7 @@ export function PreferencesTab({
               </aside>
 
               <section
-                className="min-w-0 overflow-hidden rounded-3xl border border-[color-mix(in_srgb,var(--prompt-accent)_42%,transparent)] bg-[radial-gradient(circle_at_12%_0%,color-mix(in_srgb,var(--prompt-accent)_13%,transparent),transparent_28%),var(--card)]"
+                className="min-w-0 overflow-hidden rounded-3xl border border-[color-mix(in_srgb,var(--prompt-accent)_42%,transparent)] bg-[radial-gradient(circle_at_12%_0%,color-mix(in_srgb,var(--prompt-accent)_13%,transparent),transparent_28%),var(--panel-bg-deep)]"
                 style={promptStyle(activePrompt)}
                 aria-labelledby="active-prompt-title"
               >
@@ -345,7 +345,7 @@ export function PreferencesTab({
               </section>
 
               <aside
-                className="grid content-start gap-3 rounded-3xl border border-white/10 bg-card p-4"
+                className="grid content-start gap-3 rounded-3xl border border-white/10 bg-[var(--panel-bg-deep)] p-4"
                 style={promptStyle(activePrompt)}
                 aria-label="Prompt details"
               >

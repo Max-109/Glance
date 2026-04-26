@@ -198,7 +198,9 @@ class MemoryManagerTests(unittest.TestCase):
     def test_change_memory_requires_update_fields(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             manager = MemoryManager(Path(temp_dir) / "memories.json")
-            memory = manager.add_memory(title="First", description="First note")
+            memory = manager.add_memory(
+                title="First", description="First note"
+            )
 
             with self.assertRaisesRegex(
                 ValidationError, "Tell me what to change"

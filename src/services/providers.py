@@ -758,8 +758,9 @@ class OpenAICompatibleProvider:
                 "list when it fits: choose serious, bold, grounded, casual, "
                 "mysterious, polished, upbeat, or expressive voices according "
                 "to the moment instead of defaulting to one voice. Output the "
-                "first line exactly as `VOICE_ID: <id>`, then leave one blank "
-                "line, then output only the final speech text. Voice names are "
+                "first line exactly as `VOICE_ID: <id>`, then leave one "
+                "blank line, then output only the final speech text. Voice "
+                "names are "
                 "only labels; never output a name like `Mark`, `James`, or "
                 "`Hope` as the VOICE_ID. Never output any voice ID outside "
                 "this list."
@@ -1176,7 +1177,8 @@ def _build_tool_settings_prompt(
         ):
             disabled_capabilities.append(
                 "Screen inspection and OCR are not allowed in Settings. If "
-                "the user asks you to inspect the screen or copy visible text, "
+                "the user asks you to inspect the screen or copy visible "
+                "text, "
                 "say that those tools are not allowed in Settings and they "
                 "need to enable them to use screen or OCR tools."
             )
@@ -1197,7 +1199,8 @@ def _build_tool_settings_prompt(
         if settings.tool_change_memory_policy != "allow":
             disabled_capabilities.append(
                 "Memory changes are not allowed in Settings. If the user asks "
-                "you to edit or update a saved memory, say that memory changes "
+                "you to edit or update a saved memory, say that memory "
+                "changes "
                 "are not allowed in Settings and they need to enable them to "
                 "change memories."
             )
@@ -1207,9 +1210,11 @@ def _build_tool_settings_prompt(
             and "web_fetch" not in enabled_tools
         ):
             disabled_capabilities.append(
-                "Web search and web page fetching are not allowed in Settings. "
+                "Web search and web page fetching are not allowed in "
+                "Settings. "
                 "If the user asks for current web information, say that the "
-                "web tools are not allowed in Settings and they need to enable "
+                "web tools are not allowed in Settings and they need to "
+                "enable "
                 "them to use web lookup."
             )
         if (
@@ -1218,7 +1223,8 @@ def _build_tool_settings_prompt(
         ):
             disabled_capabilities.append(
                 "Screen inspection and OCR are not allowed in Settings. If "
-                "the user asks you to inspect the screen or copy visible text, "
+                "the user asks you to inspect the screen or copy visible "
+                "text, "
                 "say that those tools are not allowed in Settings and they "
                 "need to enable them to use screen or OCR tools."
             )
@@ -1239,7 +1245,8 @@ def _build_tool_settings_prompt(
         if "change_memory" not in enabled_tools:
             disabled_capabilities.append(
                 "Memory changes are not allowed in Settings. If the user asks "
-                "you to edit or update a saved memory, say that memory changes "
+                "you to edit or update a saved memory, say that memory "
+                "changes "
                 "are not allowed in Settings and they need to enable them to "
                 "change memories."
             )

@@ -339,7 +339,8 @@ class SettingsBridgeServer:
                     self.headers.get("Origin", "")
                 )
                 if allowed_origin:
-                    self.send_header("Access-Control-Allow-Origin", allowed_origin)
+                    self.send_header(
+                        "Access-Control-Allow-Origin", allowed_origin)
                     self.send_header("Vary", "Origin")
                 self.send_header(
                     "Access-Control-Allow-Headers",

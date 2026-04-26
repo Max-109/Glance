@@ -87,7 +87,8 @@ class ElectronShellControllerTests(unittest.TestCase):
                 else:
                     os.environ["GLANCE_ELECTRON_BIN"] = previous_binary
 
-        self.assertEqual(captured_env["GLANCE_BRIDGE_URL"], "http://127.0.0.1:8765")
+        self.assertEqual(
+            captured_env["GLANCE_BRIDGE_URL"], "http://127.0.0.1:8765")
         self.assertEqual(captured_env["GLANCE_BRIDGE_TOKEN"], "secret-token")
 
 

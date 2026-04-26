@@ -260,7 +260,9 @@ class LiveStrategy(ModeStrategy):
     ) -> tuple[str, list[ToolCallRecord], bool] | None:
         if self._settings is None:
             return None
-        if not _should_end_live_from_transcript(transcript, conversation_history):
+        if not _should_end_live_from_transcript(
+            transcript, conversation_history
+        ):
             return None
         registry = RuntimeToolRegistry(
             self._settings,
@@ -380,7 +382,7 @@ class LiveStrategy(ModeStrategy):
 
         # each pass saves the assistant tool-call message, runs the tools,
         # then feeds tool results and images back into the next provider turn.
-        # if the caps are hit, the last turn runs without tools and must answer.
+        # if caps are hit, the last turn runs without tools and must answer.
         for _step in range(_MAX_TOOL_STEPS_PER_LIVE_TURN):
             previous_messages = list(messages)
             turn = turn_runner(
@@ -484,8 +486,8 @@ class LiveStrategy(ModeStrategy):
     ) -> None:
         if not notice:
             return
-        # tool notices are quick spoken progress updates before the final reply.
-        # they use throwaway audio because the real reply audio is created later.
+        # tool notices are quick spoken progress updates before the final
+        # reply. they use throwaway audio because final audio is created later.
         _emit_stage_status(status_callback, "speaking", notice)
         notice_callback = context.get("tool_notice_callback")
         if callable(notice_callback):
@@ -679,7 +681,9 @@ def _should_end_live_from_final_reply(
     return has_closing_ack and has_goodbye
 
 
-def _last_assistant_invited_more(messages: list[dict[str, str]] | list[dict]) -> bool:
+def _last_assistant_invited_more(
+    messages: list[dict[str, str]] | list[dict],
+) -> bool:
     for message in reversed(messages):
         if message.get("role") != "assistant":
             continue
@@ -693,7 +697,9 @@ def _last_assistant_invited_more(messages: list[dict[str, str]] | list[dict]) ->
 
 def _strip_voice_reply_markup(text: str) -> str:
     stripped = str(text).strip()
-    stripped = re.sub(r"^VOICE_ID:\s*\S+\s*", "", stripped, flags=re.IGNORECASE)
+    stripped = re.sub(
+        r"^VOICE_ID:\s*\S+\s*", "", stripped, flags=re.IGNORECASE
+    )
     stripped = re.sub(r"\[[^\]]+\]", " ", stripped)
     return _squash_notice_text(stripped)
 

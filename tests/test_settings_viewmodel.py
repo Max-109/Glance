@@ -64,14 +64,15 @@ class SettingsViewModelTests(unittest.TestCase):
             viewmodel.startKeybindCapture("open_glance_keybind")
             viewmodel.assignKeybind("open_glance_keybind", "cmd+alt+g")
 
-        self.assertEqual(viewmodel.settings["open_glance_keybind"], "CMD+ALT+G")
+        self.assertEqual(
+            viewmodel.settings["open_glance_keybind"], "CMD+ALT+G")
         self.assertEqual(viewmodel.bindingField, "")
         self.assertEqual(
             viewmodel.statusMessage,
             "Open Glance shortcut saved.",
         )
 
-    def test_open_glance_keybind_conflicts_with_existing_shortcuts(self) -> None:
+    def test_open_glance_keybind_conflicts_with_shortcuts(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             viewmodel = self._build_viewmodel(Path(temp_dir))
 
@@ -80,7 +81,19 @@ class SettingsViewModelTests(unittest.TestCase):
         self.assertEqual(
             viewmodel.errors["open_glance_keybind"], "Already used by Live."
         )
-        self.assertEqual(viewmodel.statusMessage, "Each shortcut must be unique.")
+        self.assertEqual(viewmodel.statusMessage,
+                         "Each shortcut must be unique.")
+
+    def test_show_status_exposes_runtime_notifications(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            viewmodel = self._build_viewmodel(Path(temp_dir))
+
+            viewmodel.showStatus("Live failed: provider unavailable.", "error")
+
+        self.assertEqual(
+            viewmodel.statusMessage, "Live failed: provider unavailable."
+        )
+        self.assertEqual(viewmodel.statusKind, "error")
 
 
 if __name__ == "__main__":

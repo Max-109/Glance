@@ -35,7 +35,7 @@ class FakeViewModel:
 
 
 class SettingsBridgeSecurityTests(unittest.TestCase):
-    def test_bridge_token_matching_rejects_missing_or_wrong_token(self) -> None:
+    def test_bridge_token_matching_rejects_bad_token(self) -> None:
         self.assertTrue(_bridge_token_matches("secret", "secret"))
         self.assertFalse(_bridge_token_matches("", "secret"))
         self.assertFalse(_bridge_token_matches("wrong", "secret"))
@@ -63,7 +63,7 @@ class SettingsBridgeSecurityTests(unittest.TestCase):
 
         self.assertEqual(error.exception.code, 403)
 
-    def test_options_allows_token_header_for_local_renderer_origin(self) -> None:
+    def test_options_allows_token_header_for_local_origin(self) -> None:
         bridge = SettingsBridgeServer(FakeViewModel(), bridge_token="secret")
         try:
             request = Request(

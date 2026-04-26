@@ -408,7 +408,9 @@ class LiveStrategyTests(unittest.TestCase):
 
         self.assertEqual(notices, ["I’ll check the screen now."])
         self.assertEqual(announced, [tts_agent.calls[0][1]])
-        self.assertEqual(tts_agent.calls[0][0], "I’ll check the screen now....")
+        self.assertEqual(
+            tts_agent.calls[0][0], "I’ll check the screen now...."
+        )
         self.assertEqual(
             tts_agent.calls[1][0], "spoken:I used the screen context...."
         )
@@ -724,7 +726,9 @@ class LiveStrategyTests(unittest.TestCase):
         self.assertEqual(tts_agent.calls, [])
         self.assertEqual(interaction.response, "Live ended.")
         self.assertEqual(interaction.speech_path, "")
-        self.assertEqual(interaction.tool_calls[0].tool_name, "end_live_session")
+        self.assertEqual(
+            interaction.tool_calls[0].tool_name, "end_live_session"
+        )
 
     def test_tool_mode_ocr_tool_captures_extracts_and_copies_screen_text(
         self,
@@ -917,7 +921,9 @@ class LiveStrategyTests(unittest.TestCase):
         self.assertEqual(tts_agent.calls, [])
         self.assertEqual(interaction.response, "Live ended.")
         self.assertEqual(interaction.speech_path, "")
-        self.assertEqual(interaction.tool_calls[0].tool_name, "end_live_session")
+        self.assertEqual(
+            interaction.tool_calls[0].tool_name, "end_live_session"
+        )
         self.assertIn(("idle", "Live ended."), stages)
 
     def test_model_closing_reply_after_ocr_confirmation_ends_session(
@@ -966,7 +972,9 @@ class LiveStrategyTests(unittest.TestCase):
         self.assertEqual(tts_agent.calls, [])
         self.assertEqual(interaction.response, "Live ended.")
         self.assertEqual(interaction.speech_path, "")
-        self.assertEqual(interaction.tool_calls[0].tool_name, "end_live_session")
+        self.assertEqual(
+            interaction.tool_calls[0].tool_name, "end_live_session"
+        )
         self.assertIn(("idle", "Live ended."), stages)
 
     def test_tool_mode_invalid_arguments_do_not_execute_tool(self) -> None:
@@ -1031,6 +1039,7 @@ class LiveStrategyTests(unittest.TestCase):
             message["role"] for message in llm_agent.message_snapshots[1]
         ]
         self.assertEqual(second_turn_roles[-3:], ["tool", "tool", "user"])
+
 
 def _messages_include_image(messages: list[dict]) -> bool:
     for message in messages:

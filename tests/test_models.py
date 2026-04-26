@@ -100,7 +100,9 @@ class AppSettingsTests(unittest.TestCase):
             }
         )
 
-        self.assertEqual(settings.transcription_base_url, "https://api.naga.ac/v1")
+        self.assertEqual(
+            settings.transcription_base_url, "https://api.naga.ac/v1"
+        )
         self.assertEqual(settings.transcription_api_key, "")
 
     def test_default_audio_detection_is_balanced(self) -> None:
@@ -299,8 +301,12 @@ class AppSettingsTests(unittest.TestCase):
             }
         )
 
-        self.assertEqual(settings.electron_window_width, MIN_ELECTRON_WINDOW_WIDTH)
-        self.assertEqual(settings.electron_window_height, MIN_ELECTRON_WINDOW_HEIGHT)
+        self.assertEqual(
+            settings.electron_window_width, MIN_ELECTRON_WINDOW_WIDTH
+        )
+        self.assertEqual(
+            settings.electron_window_height, MIN_ELECTRON_WINDOW_HEIGHT
+        )
 
     def test_from_mapping_uses_default_electron_window_size_for_bad_values(
         self,
@@ -315,7 +321,9 @@ class AppSettingsTests(unittest.TestCase):
             }
         )
 
-        self.assertEqual(settings.electron_window_width, DEFAULT_ELECTRON_WINDOW_WIDTH)
+        self.assertEqual(
+            settings.electron_window_width, DEFAULT_ELECTRON_WINDOW_WIDTH
+        )
         self.assertEqual(
             settings.electron_window_height, DEFAULT_ELECTRON_WINDOW_HEIGHT
         )
@@ -330,13 +338,19 @@ class AppSettingsTests(unittest.TestCase):
                 "text_prompt_override": "Text mode custom prompt.",
                 "voice_prompt_override": "Voice mode custom prompt.",
                 "voice_polish_prompt_override": "Voice polish custom prompt.",
-                "transcription_prompt_override": ("Transcription custom prompt."),
+                "transcription_prompt_override": (
+                    "Transcription custom prompt."
+                ),
             }
         )
 
         self.assertEqual(settings.system_prompt_override, "Be crisp.")
-        self.assertEqual(settings.text_prompt_override, "Text mode custom prompt.")
-        self.assertEqual(settings.voice_prompt_override, "Voice mode custom prompt.")
+        self.assertEqual(
+            settings.text_prompt_override, "Text mode custom prompt."
+        )
+        self.assertEqual(
+            settings.voice_prompt_override, "Voice mode custom prompt."
+        )
         self.assertEqual(
             settings.voice_polish_prompt_override,
             "Voice polish custom prompt.",
@@ -361,8 +375,12 @@ class AppSettingsTests(unittest.TestCase):
             }
         )
 
-        self.assertEqual(settings.text_prompt_override, DEFAULT_TEXT_REPLY_PROMPT)
-        self.assertEqual(settings.voice_prompt_override, DEFAULT_VOICE_REPLY_PROMPT)
+        self.assertEqual(
+            settings.text_prompt_override, DEFAULT_TEXT_REPLY_PROMPT
+        )
+        self.assertEqual(
+            settings.voice_prompt_override, DEFAULT_VOICE_REPLY_PROMPT
+        )
         self.assertEqual(
             settings.voice_polish_prompt_override,
             DEFAULT_TTS_PREPARATION_PROMPT,
@@ -384,8 +402,12 @@ class AppSettingsTests(unittest.TestCase):
             }
         )
 
-        self.assertEqual(settings.text_prompt_override, DEFAULT_TEXT_REPLY_PROMPT)
-        self.assertEqual(settings.voice_prompt_override, DEFAULT_VOICE_REPLY_PROMPT)
+        self.assertEqual(
+            settings.text_prompt_override, DEFAULT_TEXT_REPLY_PROMPT
+        )
+        self.assertEqual(
+            settings.voice_prompt_override, DEFAULT_VOICE_REPLY_PROMPT
+        )
         self.assertEqual(
             settings.voice_polish_prompt_override,
             DEFAULT_TTS_PREPARATION_PROMPT,

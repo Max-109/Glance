@@ -238,7 +238,7 @@ export function VoiceTab({
           </div>
 
           <article
-            className="grid gap-5 rounded-3xl border border-[color-mix(in_srgb,var(--voice-accent)_48%,transparent)] bg-[radial-gradient(circle_at_18%_20%,color-mix(in_srgb,var(--voice-accent)_15%,transparent),transparent_34%),color-mix(in_srgb,var(--voice-accent)_4%,var(--card))] p-6 shadow-[0_0_0_1px_color-mix(in_srgb,var(--voice-accent)_10%,transparent)] lg:grid-cols-[minmax(0,1fr)_12rem]"
+            className="voice-deck-card grid gap-5 rounded-3xl border border-[color-mix(in_srgb,var(--voice-accent)_48%,transparent)] p-6 lg:grid-cols-[minmax(0,1fr)_12rem]"
             style={voiceCardStyle(selectedPersonality)}
           >
             <div className="min-w-0">
@@ -330,7 +330,7 @@ export function VoiceTab({
               return (
                 <article
                   key={voiceId}
-                  className="group grid min-h-44 gap-4 rounded-2xl border border-white/10 bg-[radial-gradient(circle_at_15%_18%,color-mix(in_srgb,var(--voice-accent)_10%,transparent),transparent_34%),var(--card)] p-4 transition-[background-color,border-color,box-shadow,transform] hover:-translate-y-0.5 hover:border-[color-mix(in_srgb,var(--voice-accent)_34%,transparent)] hover:bg-[radial-gradient(circle_at_15%_18%,color-mix(in_srgb,var(--voice-accent)_15%,transparent),transparent_36%),var(--card)]"
+                  className="voice-option-card group grid min-h-44 gap-4 rounded-2xl border border-white/10 p-4 transition-[background,border-color,box-shadow,transform] hover:-translate-y-0.5 hover:border-[color-mix(in_srgb,var(--voice-accent)_34%,transparent)]"
                   style={voiceCardStyle(personality)}
                 >
                   <button

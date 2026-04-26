@@ -102,7 +102,7 @@ export function HistoryTab({
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(20rem,0.8fr)]">
           <div
             className={cn(
-              "rounded-2xl border bg-card p-4 transition-[border-color,box-shadow]",
+              "rounded-2xl border bg-[var(--panel-bg-deep)] p-4 transition-[border-color,box-shadow]",
               retentionEnabled
                 ? "border-[color-mix(in_srgb,var(--accent)_34%,rgba(255,255,255,0.1))] shadow-[0_0_0_1px_color-mix(in_srgb,var(--accent)_8%,transparent)]"
                 : "border-white/10",
@@ -237,7 +237,7 @@ export function HistoryTab({
             </div>
           </section>
         ) : (
-          <div className="rounded-2xl border border-border bg-card p-5">
+          <div className="rounded-2xl border border-border bg-[var(--panel-bg-deep)] p-5">
             <span className="mb-4 grid size-12 place-items-center rounded-2xl border border-white/10 bg-white/[0.035] text-[var(--text-muted)]">
               <Icon name="history" className="size-5" />
             </span>
@@ -274,7 +274,7 @@ export function HistoryTab({
 
 function HistoryStat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-card p-4">
+    <div className="rounded-2xl border border-white/10 bg-[var(--panel-bg-deep)] p-4">
       <span className="block font-mono text-[0.64rem] font-bold uppercase tracking-[0.16em] text-[var(--text-muted)]">
         {label}
       </span>

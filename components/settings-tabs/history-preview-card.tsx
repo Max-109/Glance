@@ -96,7 +96,7 @@ export function HistoryPreviewCard({
   return (
     <article
       className={cn(
-        "group relative overflow-hidden rounded-2xl border bg-card transition-[background-color,border-color,box-shadow,transform] hover:-translate-y-px hover:bg-white/[0.035]",
+        "group relative overflow-hidden rounded-2xl border bg-[var(--panel-bg-deep)] transition-[background-color,border-color,box-shadow,transform] hover:-translate-y-px hover:bg-[var(--item-hover)]",
         featured
           ? "border-[color-mix(in_srgb,var(--accent)_38%,rgba(255,255,255,0.1))] shadow-[0_0_0_1px_color-mix(in_srgb,var(--accent)_8%,transparent)]"
           : "border-white/10",

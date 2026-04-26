@@ -44,6 +44,7 @@ PYNPUT_SPECIAL_KEYS = {
     "RIGHT": "right",
 }
 
+
 def normalize_keybind(value: str) -> str:
     parts = [
         segment.strip() for segment in str(value).split("+") if segment.strip()

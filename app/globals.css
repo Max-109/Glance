@@ -605,6 +605,34 @@ textarea:focus-visible{
   background: var(--chip-bg-soft);
   color: var(--accent-strong);
 }
+.voice-deck-card{
+  background:
+    radial-gradient(
+      circle at 18% 20%,
+      color-mix(in srgb, var(--voice-accent) 15%, transparent),
+      transparent 34%
+    ),
+    color-mix(in srgb, var(--voice-accent) 4%, var(--panel-bg-deep));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--voice-accent) 10%, transparent);
+}
+.voice-option-card{
+  background:
+    radial-gradient(
+      circle at 15% 18%,
+      color-mix(in srgb, var(--voice-accent) 10%, transparent),
+      transparent 34%
+    ),
+    var(--panel-bg-deep);
+}
+.voice-option-card:hover{
+  background:
+    radial-gradient(
+      circle at 15% 18%,
+      color-mix(in srgb, var(--voice-accent) 15%, transparent),
+      transparent 36%
+    ),
+    var(--panel-bg-deep);
+}
 .audio-listening-status{
   display: inline-flex;
   align-items: center;
