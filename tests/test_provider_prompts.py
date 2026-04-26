@@ -139,6 +139,10 @@ class ProviderPromptTests(unittest.TestCase):
         prompt = self.provider._build_live_speech_system_prompt()
 
         self.assertIn("Speak with dry, understated clarity.", prompt)
+        self.assertIn("spoken by a text-to-speech engine", prompt)
+        self.assertIn("Avoid bracketed stage directions", prompt)
+        self.assertIn("emotion labels", prompt)
+        self.assertIn("natural speech", prompt)
         self.assertNotIn(DEFAULT_VOICE_REPLY_PROMPT, prompt)
 
     def test_voice_polish_prompt_override_replaces_default_base(self) -> None:
@@ -152,6 +156,8 @@ class ProviderPromptTests(unittest.TestCase):
             "Polish the text gently, but keep the rhythm understated.",
             prompt,
         )
+        self.assertIn("spoken by a text-to-speech engine", prompt)
+        self.assertIn("Avoid bracketed stage directions", prompt)
         self.assertNotIn(DEFAULT_TTS_PREPARATION_PROMPT, prompt)
 
     def test_live_tool_prompts_answer_directly_after_tools(self) -> None:
@@ -180,6 +186,12 @@ class ProviderPromptTests(unittest.TestCase):
             with self.subTest(prompt=prompt[:40]):
                 self.assertIn("Do not narrate the tool work", prompt)
                 self.assertIn("answer with the result directly", prompt)
+                self.assertIn("you must include one short spoken", prompt)
+                self.assertIn("Match the user's current language", prompt)
+                self.assertIn("adaptive to the actual request", prompt)
+                self.assertIn("do not reuse the same stock phrase", prompt)
+                self.assertIn("speech-focused", prompt)
+                self.assertIn("Tool calls, tool names, JSON, ids", prompt)
                 self.assertIn("OCR is a clipboard action", prompt)
                 self.assertIn(
                     "copy, read, extract, grab, transcribe, or get visible "

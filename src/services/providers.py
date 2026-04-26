@@ -672,6 +672,7 @@ class OpenAICompatibleProvider:
         if override:
             prompt += f" Additional instructions: {override}"
         prompt += _language_reply_instruction()
+        prompt += _speech_output_instruction()
         if self._settings.tts_voice_id == AUTO_TTS_VOICE_ID:
             prompt += (
                 " Auto voice selection is active. First choose the single "
@@ -747,6 +748,7 @@ class OpenAICompatibleProvider:
         prompt = self._resolve_prompt_override(
             "voice_polish_prompt_override", DEFAULT_TTS_PREPARATION_PROMPT
         )
+        prompt += _speech_output_instruction()
         if self._settings.tts_voice_id == AUTO_TTS_VOICE_ID:
             prompt += (
                 " Auto voice selection is active. First choose the single "
@@ -1071,10 +1073,17 @@ def _build_live_tool_runtime_prompt(
             " Tools are available in this turn. You are running "
             "inside Glance Live mode. Use a tool only when it materially "
             "helps answer the user's spoken request. If you need a tool, call "
-            "the tool instead of giving a final answer. Tool calls, tool "
-            "names, JSON, arguments, raw fetched text, and screenshot "
-            "metadata are private runtime details; never say them to the "
-            "user."
+            "the tool instead of giving a final answer. Whenever you call "
+            "any user-visible tool, you must include one short spoken "
+            "progress sentence in your assistant content before the tool "
+            "call. The user will hear this while the tool runs. Match the "
+            "user's current language or explicit language preference. Make "
+            "the sentence adaptive to the actual request and user wording; "
+            "do not reuse the same stock phrase, and do not copy examples "
+            "verbatim. Keep it natural, speech-focused, brief, calm, and "
+            "useful. Tool calls, tool names, JSON, ids, arguments, raw "
+            "fetched text, screenshot metadata, and internal details are "
+            "private runtime details; never say them to the user."
         )
     if "ocr_screen" in enabled_tools:
         prompt += (
@@ -1590,6 +1599,17 @@ def _language_reply_instruction() -> str:
         "another language, answer in that language immediately in the same "
         "reply. Do not claim you are limited to English or cannot speak a "
         "requested language; attempt the requested language directly."
+    )
+
+
+def _speech_output_instruction() -> str:
+    return (
+        " The text you write will be spoken by a text-to-speech engine. Write "
+        "for the ear, not the page. Avoid bracketed stage directions, emotion "
+        "labels, sound effects, markdown, bullet formatting, parenthetical "
+        "asides, and punctuation that is meant only for reading. Voice names "
+        "and required VOICE_ID headers are allowed when the prompt asks for "
+        "them, but the spoken answer itself should sound like natural speech."
     )
 
 

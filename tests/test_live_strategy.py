@@ -10,11 +10,8 @@ from src.services.providers import LiveSpeechReply
 from src.strategies import live_strategy as live_strategy_module
 from src.strategies.live_strategy import (
     LiveStrategy,
-    ToolNoticeContext,
-    compose_tool_notice,
     static_live_speech_file_name,
 )
-from src.tools import ToolCallRequest
 
 
 class FakeTranscriptionAgent:
@@ -218,12 +215,6 @@ def _tool_call(name: str, arguments: dict) -> SimpleNamespace:
     )
 
 
-def _notice_call(name: str, arguments: dict) -> ToolCallRequest:
-    return ToolCallRequest(
-        call_id=f"call-{name}", name=name, arguments=arguments
-    )
-
-
 class LiveStrategyTests(unittest.TestCase):
     def test_execute_uses_single_llm_reply_for_tts(self) -> None:
         llm_agent = FakeLLMAgent()
@@ -319,6 +310,7 @@ class LiveStrategyTests(unittest.TestCase):
         llm_agent = FakeToolLLMAgent(
             [
                 _tool_turn(
+                    content="Pažiūrėsiu į kodą.",
                     tool_calls=[
                         _tool_call(
                             "take_screenshot", {"reason": "inspect code"}
@@ -332,6 +324,7 @@ class LiveStrategyTests(unittest.TestCase):
         screen_capture_agent = FakeToolScreenCaptureAgent()
         transcription_agent = FakeTranscriptionAgent()
         notices: list[str] = []
+        announced: list[str] = []
         stages: list[tuple[str, str]] = []
         strategy = LiveStrategy(
             transcription_agent=transcription_agent,
@@ -345,6 +338,7 @@ class LiveStrategyTests(unittest.TestCase):
             {
                 "recording_path": "input.wav",
                 "tool_notice_callback": notices.append,
+                "announce_audio_callback": announced.append,
                 "status_callback": lambda state, message: stages.append(
                     (state, message)
                 ),
@@ -359,14 +353,13 @@ class LiveStrategyTests(unittest.TestCase):
             stages[:2],
             [
                 ("generating", "Listening and checking..."),
-                ("speaking", "I'll take a quick screenshot of your code."),
+                ("speaking", "Pažiūrėsiu į kodą."),
             ],
         )
         self.assertNotIn(("transcribing", "Transcribing..."), stages)
         self.assertTrue(screen_capture_agent.called)
-        self.assertEqual(
-            notices, ["I'll take a quick screenshot of your code."]
-        )
+        self.assertEqual(notices, ["Pažiūrėsiu į kodą."])
+        self.assertEqual(announced, [tts_agent.calls[0][1]])
         self.assertEqual(llm_agent.prepare_inputs, [])
         self.assertEqual(
             interaction.response, "The screen shows a Python function."
@@ -376,9 +369,90 @@ class LiveStrategyTests(unittest.TestCase):
             interaction.tool_calls[0].tool_name, "take_screenshot"
         )
         self.assertEqual(
-            tts_agent.calls[0][0],
+            tts_agent.calls[1][0],
             "The screen shows a Python function....",
         )
+
+    def test_tool_progress_uses_model_spoken_english_content(self) -> None:
+        llm_agent = FakeToolLLMAgent(
+            [
+                _tool_turn(
+                    content="I’ll check the screen now.",
+                    tool_calls=[
+                        _tool_call(
+                            "take_screenshot", {"reason": "inspect screen"}
+                        )
+                    ],
+                ),
+                _tool_turn(content="I used the screen context."),
+            ]
+        )
+        tts_agent = FakeTTSAgent()
+        notices: list[str] = []
+        announced: list[str] = []
+        strategy = LiveStrategy(
+            transcription_agent=FakeTranscriptionAgent(),
+            llm_agent=llm_agent,
+            tts_agent=tts_agent,
+            screen_capture_agent=FakeToolScreenCaptureAgent(),
+            settings=_tool_settings(),
+        )
+
+        strategy.execute(
+            {
+                "recording_path": "input.wav",
+                "tool_notice_callback": notices.append,
+                "announce_audio_callback": announced.append,
+            }
+        )
+
+        self.assertEqual(notices, ["I’ll check the screen now."])
+        self.assertEqual(announced, [tts_agent.calls[0][1]])
+        self.assertEqual(tts_agent.calls[0][0], "I’ll check the screen now....")
+        self.assertEqual(
+            tts_agent.calls[1][0], "spoken:I used the screen context...."
+        )
+
+    def test_empty_tool_progress_does_not_use_english_fallback(self) -> None:
+        llm_agent = FakeToolLLMAgent(
+            [
+                _tool_turn(
+                    tool_calls=[
+                        _tool_call(
+                            "take_screenshot", {"reason": "inspect screen"}
+                        )
+                    ],
+                ),
+                _tool_turn(content="Screen checked."),
+            ]
+        )
+        tts_agent = FakeTTSAgent()
+        notices: list[str] = []
+        stages: list[tuple[str, str]] = []
+        strategy = LiveStrategy(
+            transcription_agent=FakeTranscriptionAgent(),
+            llm_agent=llm_agent,
+            tts_agent=tts_agent,
+            screen_capture_agent=FakeToolScreenCaptureAgent(),
+            settings=_tool_settings(),
+        )
+
+        strategy.execute(
+            {
+                "recording_path": "input.wav",
+                "tool_notice_callback": notices.append,
+                "status_callback": lambda state, message: stages.append(
+                    (state, message)
+                ),
+            }
+        )
+
+        self.assertEqual(notices, [])
+        self.assertNotIn(
+            ("speaking", "I'll take a quick screenshot of your screen."),
+            stages,
+        )
+        self.assertEqual(tts_agent.calls[0][0], "spoken:Screen checked....")
         second_turn_messages = llm_agent.message_snapshots[1]
         self.assertTrue(_messages_include_image(second_turn_messages))
 
@@ -895,14 +969,6 @@ class LiveStrategyTests(unittest.TestCase):
         self.assertEqual(interaction.tool_calls[0].tool_name, "end_live_session")
         self.assertIn(("idle", "Live ended."), stages)
 
-    def test_ocr_tool_notice_is_silent(self) -> None:
-        notice = compose_tool_notice(
-            _notice_call("ocr_screen", {"reason": "read text"}),
-            ToolNoticeContext(user_context="extract the text"),
-        )
-
-        self.assertEqual(notice, "")
-
     def test_tool_mode_invalid_arguments_do_not_execute_tool(self) -> None:
         screen_capture_agent = FakeToolScreenCaptureAgent()
         llm_agent = FakeToolLLMAgent(
@@ -965,99 +1031,6 @@ class LiveStrategyTests(unittest.TestCase):
             message["role"] for message in llm_agent.message_snapshots[1]
         ]
         self.assertEqual(second_turn_roles[-3:], ["tool", "tool", "user"])
-
-    def test_search_notice_mentions_weather_location(self) -> None:
-        notice = compose_tool_notice(
-            _notice_call(
-                "web_search", {"query": "current weather in Vilnius"}
-            ),
-            ToolNoticeContext(user_context="what is the weather in Vilnius"),
-        )
-
-        self.assertEqual(notice, "I'm checking the weather in Vilnius.")
-
-    def test_repeated_generic_search_notice_is_suppressed(self) -> None:
-        context = ToolNoticeContext(user_context="look that up")
-        call = _notice_call(
-            "web_search", {"query": "what is Gemini 3.1 Flash"}
-        )
-        next_call = _notice_call("web_search", {"query": "what is Flash Lite"})
-
-        notice = compose_tool_notice(call, context)
-        context.mark_spoken(call, notice)
-
-        self.assertEqual(notice, "I'm checking that.")
-        self.assertEqual(compose_tool_notice(next_call, context), "")
-
-    def test_open_after_search_mentions_short_source(self) -> None:
-        context = ToolNoticeContext()
-        context.last_search_results = [
-            {
-                "title": "Vilnius Weather Forecast",
-                "url": "https://weather.com/weather/today/l/Vilnius",
-                "site_name": "Weather.com",
-            }
-        ]
-
-        notice = compose_tool_notice(
-            _notice_call(
-                "web_fetch",
-                {"url": "https://weather.com/weather/today/l/Vilnius"},
-            ),
-            context,
-        )
-
-        self.assertEqual(notice, "I found Weather.com. I'm opening it.")
-
-    def test_open_after_search_uses_result_for_ugly_source(self) -> None:
-        context = ToolNoticeContext()
-        context.last_search_results = [
-            {
-                "title": "Weather thing",
-                "url": "https://very-long-dashed-source-name.example.com/page",
-                "site_name": "Very Long Dashed Source Name",
-            }
-        ]
-
-        notice = compose_tool_notice(
-            _notice_call(
-                "web_fetch",
-                {
-                    "url": (
-                        "https://very-long-dashed-source-name.example.com/"
-                        "page"
-                    )
-                },
-            ),
-            context,
-        )
-
-        self.assertEqual(notice, "I found a result. I'm opening it.")
-
-    def test_screenshot_notice_uses_reason(self) -> None:
-        cases = [
-            ("inspect code", "I'll take a quick screenshot of your code."),
-            (
-                "read the traceback error",
-                "I'll take a quick screenshot of the error.",
-            ),
-            (
-                "look at the screen",
-                "I'll take a quick screenshot of your screen.",
-            ),
-            ("", "I'll take a quick screenshot."),
-        ]
-
-        for reason, expected in cases:
-            with self.subTest(reason=reason):
-                self.assertEqual(
-                    compose_tool_notice(
-                        _notice_call("take_screenshot", {"reason": reason}),
-                        ToolNoticeContext(),
-                    ),
-                    expected,
-                )
-
 
 def _messages_include_image(messages: list[dict]) -> bool:
     for message in messages:
