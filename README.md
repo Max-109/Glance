@@ -21,7 +21,7 @@ I press a customizable shortcut, speak, and Glance runs a Live turn. If I only n
 
 - Customizable shortcuts.
 - Configurable OpenAI-compatible endpoints for reply, transcription, and voice. (Or use a multimodal model that can understand audio and write the reply in one step.)
-- Eleven v3 voice output, currently the best multilingual TTS model, with excellent voice quality and support for different emotions. (Supported by Glance.)
+- [Eleven v3](https://elevenlabs.io/docs/overview/models#eleven-v3) voice output, currently the best multilingual TTS model, with excellent voice quality and support for different emotions. (Supported by Glance.)
 - Advanced TEN VAD audio detection for natural speech turns.
 - Various tools available for the live agent to use.
 - Saved history with transcript, response, audio, screenshots, and tool records.
@@ -56,6 +56,13 @@ I press a customizable shortcut, speak, and Glance runs a Live turn. If I only n
 7. Press the OCR shortcut when you want visible text copied from the screen.
 
 Settings are saved in `~/.glance/config.json`. Sessions are saved under `~/.glance/sessions`. Memories are saved in `~/.glance/memories.json`.
+
+## Prerequisites
+
+- macOS.
+- Python 3 with `venv`.
+- Bun.
+- Node.js `>=20`.
 
 ## Running The App
 
@@ -178,6 +185,12 @@ bun run build
 
 The tests cover settings validation, storage, history, live strategy behavior, tool execution, providers, OCR capture, hotkeys, Electron window control, and runtime status sync.
 
+For coursework code style, the Python source check is:
+
+```bash
+.venv/bin/python -m pycodestyle main.py src tests
+```
+
 ## Results
 
 - Glance can run a full Live turn: listen, transcribe or use multimodal audio, call the model, use allowed tools, speak the answer, and save the session.
@@ -187,3 +200,5 @@ The tests cover settings validation, storage, history, live strategy behavior, t
 ## Conclusions
 
 It was fun to work on this project. Glance started as a coursework idea, but it became a real desktop app I can actually use.
+
+In the future, I would like to make Glance cross-platform. The Python backend and Electron frontend already make that realistic, but the current macOS-specific permissions, hotkeys, menu bar behavior, and screen capture integrations would need platform-specific handling.
