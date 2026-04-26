@@ -20,25 +20,41 @@ I press a customizable shortcut, speak, and Glance runs a Live turn. If I only n
 ## Features
 
 - Customizable shortcuts.
-- Configurable OpenAI-compatible endpoints for reply, transcription, and voice. (Multimodal models are also supported, so one model can handle audio input and reply generation.)
+- Configurable OpenAI-compatible endpoints for reply, transcription, and voice. (Or use a multimodal model that can understand audio and write the reply in one step.)
 - Eleven v3 voice output, currently the best multilingual TTS model, with excellent voice quality and support for different emotions. (Supported by Glance.)
 - Advanced TEN VAD audio detection for natural speech turns.
 - Various tools available for the live agent to use.
 - Saved history with transcript, response, audio, screenshots, and tool records.
 - Saved memories that the live agent can read and update.
 
-## Live Flow
+## How It Works
 
 ```mermaid
 flowchart TD
-    Shortcut[Press the Live shortcut]
-    Record[Glance records your voice]
-    Transcribe[Speech becomes text]
-    Agent[The live agent replies and can use tools]
-    Voice[Glance speaks the answer]
-    History[Session is saved]
+    LiveShortcut[Press the Live shortcut]
+    Vad[TEN VAD listens for speech]
+    Recording[Glance records the turn]
+    Mode{Live mode}
+    Transcription[Speech becomes text]
+    Multimodal[Audio goes straight to a multimodal model]
+    Agent[The live agent writes an answer]
+    Tools[Optional tools: screen, OCR, web, memories]
+    Speech[Eleven v3 turns the answer into voice]
+    Saved[Transcript, answer, audio, and tool results are saved]
 
-    Shortcut --> Record --> Transcribe --> Agent --> Voice --> History
+    OcrShortcut[Press the OCR shortcut]
+    Screen[Capture the screen]
+    Extract[Extract the requested text]
+    Clipboard[Copy the text to the clipboard]
+    OcrSaved[Save the OCR result]
+
+    LiveShortcut --> Vad --> Recording --> Mode
+    Mode -->|Normal| Transcription --> Agent
+    Mode -->|Multimodal| Multimodal --> Agent
+    Agent --> Tools --> Agent
+    Agent --> Speech --> Saved
+
+    OcrShortcut --> Screen --> Extract --> Clipboard --> OcrSaved
 ```
 
 ## Tools
