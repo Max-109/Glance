@@ -17,6 +17,7 @@ from PySide6.QtGui import (
 from PySide6.QtWidgets import QWidget
 
 from src.core.orchestrator import Orchestrator
+from src.models.settings import DEFAULT_ACCENT_COLOR
 
 
 logger = logging.getLogger("glance.ocr_capture")
@@ -236,5 +237,5 @@ class OCRSelectionOverlay(QWidget):
         painter.setCompositionMode(
             QPainter.CompositionMode.CompositionMode_SourceOver
         )
-        painter.setPen(QPen(QColor("#f0b100"), 2))
+        painter.setPen(QPen(QColor(DEFAULT_ACCENT_COLOR), 2))
         painter.drawRect(self._selection.adjusted(0, 0, -1, -1))

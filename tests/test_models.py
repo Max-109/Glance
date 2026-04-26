@@ -251,7 +251,7 @@ class AppSettingsTests(unittest.TestCase):
                 "llm_model_name": "model-a",
                 "tts_base_url": "https://tts.example.com/v1",
                 "llm_reasoning_enabled": "false",
-                "accent_color": "F0B100",
+                "accent_color": "EAABAB",
             }
         )
 

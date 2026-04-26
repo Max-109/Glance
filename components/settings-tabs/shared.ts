@@ -68,10 +68,10 @@ export const REASONING_ICONS: Record<string, string> = {
   high: "level-4",
 };
 
-export const DEFAULT_ACCENT_COLOR = "#f0b100";
+export const DEFAULT_ACCENT_COLOR = "#eaabab";
 
 export const ACCENT_PRESETS = [
-  { label: "Yellow", value: DEFAULT_ACCENT_COLOR },
+  { label: "Blush", value: DEFAULT_ACCENT_COLOR },
   { label: "Signal", value: "#a7ffde" },
   { label: "Clay", value: "#b58f70" },
   { label: "Violet", value: "#b7a6ff" },
