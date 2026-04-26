@@ -20,7 +20,7 @@ I press a customizable shortcut, speak, and Glance runs a Live turn. If I only n
 ## Features
 
 - Customizable shortcuts.
-- Configurable OpenAI-compatible endpoints for reply, transcription, and voice.
+- Configurable OpenAI-compatible endpoints for reply, transcription, voice, and multimodal models that can handle both listening and replying, like Gemini 3 Flash.
 - Eleven v3 voice output, currently the best multilingual TTS model, with excellent voice quality and support for different emotions. (Supported by Glance.)
 - Advanced TEN VAD audio detection for natural speech turns.
 - Various tools available for the live agent to use.
@@ -84,7 +84,7 @@ Glance is made of Python as the backend and Electron + Next.js + Bun as the fron
 | `src/strategies/ocr_strategy.py` | Runs screenshot capture and OCR extraction. |
 | `src/tools/runtime.py` | Defines and executes Live tools. |
 | `src/storage/json_storage.py` | Reads and writes settings, sessions, artifacts, and conversation Markdown. |
-| `components/` | Builds the Electron settings UI. |
+| `components/` | Main Tailwind CSS v4 frontend components for the app. |
 
 ## OOP Requirements
 
