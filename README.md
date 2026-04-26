@@ -60,7 +60,7 @@ Settings are saved in `~/.glance/config.json`. Sessions are saved under `~/.glan
 ## Prerequisites
 
 - macOS.
-- Python 3 with `venv`.
+- Python 3.10+.
 - Bun.
 - Node.js `>=20`.
 
