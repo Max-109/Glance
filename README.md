@@ -5,7 +5,7 @@
   <p>
     <img alt="Coursework" src="https://img.shields.io/badge/coursework-OOP%202026-%23eaabab?style=for-the-badge&labelColor=3f3f46" />
     <img alt="Backend" src="https://img.shields.io/badge/backend-Python-%23eaabab?style=for-the-badge&labelColor=3f3f46" />
-    <img alt="Frontend" src="https://img.shields.io/badge/frontend-Electron%20%2B%20Next.js-%23eaabab?style=for-the-badge&labelColor=3f3f46" />
+    <img alt="Frontend" src="https://img.shields.io/badge/frontend-Electron%20%2B%20Next.js%20%2B%20Bun-%23eaabab?style=for-the-badge&labelColor=3f3f46" />
     <img alt="Voice" src="https://img.shields.io/badge/voice-Eleven%20v3-%23eaabab?style=for-the-badge&labelColor=3f3f46" />
   </p>
   <img src="./docs/media/showcase.gif" alt="Glance app showcase" width="900" />
@@ -20,7 +20,7 @@ I press a customizable shortcut, speak, and Glance runs a Live turn. If I only n
 ## Features
 
 - Customizable shortcuts.
-- OpenAI-compatible provider fields for reply, transcription, and voice.
+- Configurable OpenAI-compatible endpoints for reply, transcription, and voice.
 - Eleven v3 voice output, currently the best multilingual TTS model, with excellent voice quality and support for different emotions. (Supported by Glance.)
 - Advanced TEN VAD audio detection for natural speech turns.
 - Various tools available for the live agent to use.
@@ -72,7 +72,7 @@ Glance needs macOS permissions for microphone, screen recording, and accessibili
 
 ## Implementation
 
-The app has two main parts: Python is the backend, and Electron + Next.js is the frontend.
+Glance is made of Python as the backend and Electron + Next.js + Bun as the frontend, styled with Tailwind CSS v4.
 
 | Area | Role |
 | --- | --- |
