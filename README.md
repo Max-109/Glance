@@ -106,7 +106,7 @@ Glance is made of Python as the backend and Electron + Next.js + Bun as the fron
 
 ### Abstraction
 
-Glance uses abstract base classes to define what objects must do, while hiding how they do it.
+Glance uses abstract base classes for the parts that need the same shape but different behavior.
 
 ```python
 class BaseAgent(ABC):
@@ -115,22 +115,22 @@ class BaseAgent(ABC):
         "Execute the agent's main behavior."
 ```
 
-`BaseAgent`, `ModeStrategy`, `BaseInteraction`, and `AbstractRepository` are the clearest examples. The rest of the app can depend on these contracts instead of concrete details.
+The clearest examples are `BaseAgent`, `ModeStrategy`, `BaseInteraction`, and `AbstractRepository`. The rest of the app can use those contracts without caring about the exact class behind them.
 
 ### Encapsulation
 
-State is kept inside focused classes. `AppSettings.validate()` owns settings validation, `TenVadAudioRecorder` owns audio capture details, and `RuntimeToolRegistry` owns tool availability rules.
+State stays inside the class that actually knows how to handle it. `AppSettings.validate()` checks settings, `TenVadAudioRecorder` handles audio capture, and `RuntimeToolRegistry` decides which tools are available.
 
 ```python
 if name == "web_fetch":
     return self._settings.tool_web_fetch_policy
 ```
 
-The caller does not need to know how every setting is stored. It asks the registry what is available.
+The caller does not need to know where every setting is stored. It asks the registry and gets the answer.
 
 ### Inheritance
 
-Several classes extend shared base types:
+Shared base classes are used where the app has several versions of the same kind of object:
 
 - `LiveStrategy` and `OCRStrategy` inherit from `ModeStrategy`.
 - `LLMAgent`, `OCRAgent`, `ScreenCaptureAgent`, `TranscriptionAgent`, and `TTSAgent` inherit from `BaseAgent`.
@@ -139,24 +139,24 @@ Several classes extend shared base types:
 
 ### Polymorphism
 
-The orchestrator can run different modes through the same `execute(...)` call:
+The orchestrator can call `execute(...)` without needing separate code for every mode:
 
 ```python
 strategy = self._strategy_factory.create(mode=mode, ...)
 interaction = strategy.execute(execution_context)
 ```
 
-That works because both Live and OCR strategies follow the same interface.
+That works because Live and OCR strategies follow the same interface.
 
 ### Composition And Aggregation
 
-`Orchestrator` is built from smaller objects: settings, history, memories, strategy factory, screen capture, transcription, LLM, OCR, TTS, and clipboard services.
+`Orchestrator` is made from smaller services: settings, history, memories, strategy factory, screen capture, transcription, LLM, OCR, TTS, and clipboard.
 
 ## Design Pattern
 
 Glance uses **Strategy** and **Factory Method**.
 
-`LiveStrategy` and `OCRStrategy` are separate workflows. `ModeStrategyFactory` chooses the right one at runtime:
+`LiveStrategy` and `OCRStrategy` are separate workflows. `ModeStrategyFactory` picks the right one at runtime:
 
 ```python
 if normalized_mode == "ocr":
@@ -165,11 +165,11 @@ if normalized_mode == "live":
     return LiveStrategy(...)
 ```
 
-This fits better than a Singleton because the app needs replaceable services for tests and runtime configuration.
+This fits better than a Singleton because the app needs replaceable services for tests and runtime settings.
 
 ## File Reading And Writing
 
-Glance reads and writes real files:
+Glance stores app data in real files:
 
 - `~/.glance/config.json` for settings.
 - `~/.glance/sessions/.../session.json` for saved sessions.
@@ -186,9 +186,9 @@ bun run typecheck
 bun run build
 ```
 
-The tests cover settings validation, storage, history, live strategy behavior, tool execution, providers, OCR capture, hotkeys, Electron window control, and runtime status sync.
+The tests check settings validation, storage, history, Live behavior, tools, providers, OCR capture, hotkeys, Electron window control, and runtime status sync.
 
-For coursework code style, the Python source check is:
+For Python style, I use:
 
 ```bash
 .venv/bin/python -m pycodestyle main.py src tests
