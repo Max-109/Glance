@@ -37,12 +37,12 @@ I press a customizable shortcut, speak, and Glance runs a Live turn. If I only n
 
 | Tool | Description |
 | --- | --- |
-| Screenshot | Captures the current screen when visual context is needed. |
+| Screenshot | Captures the screen for better context. |
 | OCR | Extracts requested text from the screen and copies it to the clipboard. |
-| Web search | Finds current public information for answers that may change over time. |
-| Web fetch | Reads one public web page and returns concise text for reasoning. |
-| Add memory | Saves a task, idea, preference, plan, follow-up, or project note. |
-| Read memory | Searches saved memories when the user asks what they saved or mentions an older note. |
+| Web search | Searches the web for latest information. |
+| Web fetch | Fetches data from a specific URL. |
+| Add memory | Saves a task, idea, preference, plan or a project note. |
+| Read memory | Searches saved memories. |
 | Change memory | Updates a saved memory when the user asks to edit or correct it. |
 
 ## Using The App
@@ -60,9 +60,11 @@ Settings are saved in `~/.glance/config.json`. Sessions are saved under `~/.glan
 ## Prerequisites
 
 - macOS.
-- Python 3 with `venv`.
-- Bun.
-- Node.js `>=20`.
+- Python 3.10+ with `venv` and `pip`.
+- Git or Xcode Command Line Tools, because `requirements.txt` installs TEN VAD from GitHub.
+- Bun 1.3.x.
+- Node.js 20+.
+- Microphone, Screen Recording, and Accessibility permissions in macOS settings.
 
 ## Running The App
 
@@ -81,23 +83,21 @@ bun run build
 python3 main.py
 ```
 
-Glance needs macOS permissions for microphone, screen recording, and accessibility.
-
 ## Implementation
 
 Glance is made of Python as the backend and Electron + Next.js + Bun as the frontend, styled with Tailwind CSS v4.
 
-| Area | Role |
+| File | What it does |
 | --- | --- |
-| `main.py` | Starts the desktop app or CLI mode. |
-| `src/ui/qt_app.py` | Owns the macOS menu bar behavior, tray mark, hotkeys, OCR, and Electron startup. |
-| `src/ui/electron_window.py` | Launches and controls the Electron settings window. |
-| `src/core/orchestrator.py` | Connects settings, agents, strategies, history, memories, providers, and clipboard services. |
-| `src/strategies/live_strategy.py` | Runs the Live pipeline, tool loop, transcription path, multimodal path, and speech output. |
-| `src/strategies/ocr_strategy.py` | Runs screenshot capture and OCR extraction. |
-| `src/tools/runtime.py` | Defines and executes Live tools. |
-| `src/storage/json_storage.py` | Reads and writes settings, sessions, artifacts, and conversation Markdown. |
-| `components/` | Main Tailwind CSS v4 frontend components for the app. |
+| `main.py` | Opens the desktop app, or CLI mode when `--cli` is used. |
+| `src/ui/qt_app.py` | macOS menu bar app, shortcuts, OCR overlay, Live control, and Electron startup. |
+| `src/ui/electron_window.py` | Opens the Electron settings window and sends runtime updates to it. |
+| `src/core/orchestrator.py` | Connects settings, history, memories, providers, strategies, and clipboard. |
+| `src/strategies/live_strategy.py` | Records speech, gets the reply, uses tools when enabled, and plays voice output. |
+| `src/strategies/ocr_strategy.py` | Captures the screen, extracts text, and copies it to the clipboard. |
+| `src/tools/runtime.py` | Tool definitions and tool execution for Live mode. |
+| `src/storage/json_storage.py` | Stores settings, sessions, artifacts, and conversation Markdown on disk. |
+| `components/` | Electron settings UI built with Next.js and Tailwind CSS v4. |
 
 ## OOP Requirements
 
