@@ -60,14 +60,11 @@ Settings are saved in `~/.glance/config.json`. Sessions are saved under `~/.glan
 ## Prerequisites
 
 - macOS.
-- Python 3.10+ with `venv` and `pip`.
+- Python 3.10+.
 - Git or Xcode Command Line Tools, because `requirements.txt` installs TEN VAD from GitHub.
 - Bun 1.3.x.
 - Node.js 20+.
 - Microphone, Screen Recording, and Accessibility permissions in macOS settings.
-- Python 3.10+.
-- Bun.
-- Node.js `>=20`.
 
 ## Running The App
 
