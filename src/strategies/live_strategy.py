@@ -100,11 +100,18 @@ class LiveStrategy(ModeStrategy):
         # audio-only, or transcript-only.
         if runtime_tools_allowed and user_tools_available and multimodal:
             _emit_stage_status(
+                status_callback, "transcribing", "Transcribing..."
+            )
+            transcript = self._transcription_agent.run(
+                audio_path=recording_path
+            )
+            _emit_stage_status(
                 status_callback, "generating", "Listening and checking..."
             )
             final_text, tool_records, terminal_tool = (
                 self._generate_multimodal_tool_reply(
                     audio_path=recording_path,
+                    transcript=transcript,
                     conversation_history=conversation_history,
                     context=context,
                     session_id=session_id,
@@ -114,7 +121,7 @@ class LiveStrategy(ModeStrategy):
                 return LiveInteraction(
                     mode="live",
                     recording_path=recording_path,
-                    transcript="",
+                    transcript=transcript,
                     response=final_text,
                     speech_path="",
                     tool_calls=tool_records,
@@ -124,7 +131,6 @@ class LiveStrategy(ModeStrategy):
                 live_reply = self._llm_agent.parse_live_speech_reply(
                     final_text
                 )
-            transcript = ""
         elif runtime_tools_allowed and user_tools_available:
             _emit_stage_status(
                 status_callback, "transcribing", "Transcribing..."
@@ -159,16 +165,22 @@ class LiveStrategy(ModeStrategy):
                 live_reply = _guard_speech_prep_drift(final_text, live_reply)
         elif multimodal:
             _emit_stage_status(
+                status_callback, "transcribing", "Transcribing..."
+            )
+            transcript = self._transcription_agent.run(
+                audio_path=recording_path
+            )
+            _emit_stage_status(
                 status_callback,
                 "generating",
                 "Listening and writing a reply...",
             )
             live_reply = self._llm_agent.generate_live_speech_reply_from_audio(
                 audio_path=recording_path,
+                transcript=transcript,
                 conversation_history=conversation_history,
                 session_id=session_id,
             )
-            transcript = ""
         else:
             _emit_stage_status(
                 status_callback, "transcribing", "Transcribing..."
@@ -323,6 +335,7 @@ class LiveStrategy(ModeStrategy):
         self,
         *,
         audio_path: str,
+        transcript: str,
         conversation_history: list[dict[str, str]],
         context: dict,
         session_id: str | None,
@@ -347,6 +360,7 @@ class LiveStrategy(ModeStrategy):
         enabled_tool_names = {definition.name for definition in enabled_tools}
         messages = self._llm_agent.build_live_tool_messages_from_audio(
             audio_path=audio_path,
+            transcript=transcript,
             conversation_history=conversation_history,
             enabled_tool_names=enabled_tool_names,
         )
@@ -361,7 +375,7 @@ class LiveStrategy(ModeStrategy):
             context=context,
             session_id=session_id,
             turn_runner=self._llm_agent.run_multimodal_tool_turn,
-            user_context="",
+            user_context=transcript,
         )
 
     def _run_tool_reply_loop(

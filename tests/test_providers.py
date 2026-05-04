@@ -326,12 +326,20 @@ class ProviderAudioUploadTests(unittest.TestCase):
             ):
                 reply = provider.generate_live_speech_reply_from_audio(
                     audio_path=wav_file.name,
+                    transcript="open settings",
                 )
 
         self.assertEqual(reply.text, "hello there")
         audio_part = completions_create.call_args.kwargs["messages"][1][
             "content"
         ][1]
+        instruction_part = completions_create.call_args.kwargs["messages"][1][
+            "content"
+        ][0]
+        self.assertIn(
+            "Recognized transcript: open settings", instruction_part["text"]
+        )
+        self.assertIn("source of truth", instruction_part["text"])
         self.assertEqual(audio_part["input_audio"]["format"], "mp3")
 
     def test_multimodal_tool_messages_include_audio_and_speech_tool_prompt(
@@ -364,6 +372,7 @@ class ProviderAudioUploadTests(unittest.TestCase):
             ):
                 messages = provider.build_live_tool_messages_from_audio(
                     audio_path=wav_file.name,
+                    transcript="search for weather",
                     conversation_history=[
                         {"role": "assistant", "content": "previous"}
                     ],
@@ -376,6 +385,12 @@ class ProviderAudioUploadTests(unittest.TestCase):
             messages[1], {"role": "assistant", "content": "previous"}
         )
         audio_part = messages[2]["content"][1]
+        instruction_part = messages[2]["content"][0]
+        self.assertIn(
+            "Recognized transcript: search for weather",
+            instruction_part["text"],
+        )
+        self.assertIn("source of truth", instruction_part["text"])
         self.assertEqual(audio_part["type"], "input_audio")
         self.assertEqual(audio_part["input_audio"]["format"], "mp3")
 

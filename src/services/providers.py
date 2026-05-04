@@ -286,6 +286,7 @@ class OpenAICompatibleProvider:
         self,
         *,
         audio_path: str,
+        transcript: str = "",
         conversation_history: list[dict[str, str]] | None = None,
         session_id: str | None = None,
         client=None,
@@ -328,10 +329,11 @@ class OpenAICompatibleProvider:
                 "content": [
                     {
                         "type": "text",
-                        "text": (
+                        "text": _audio_turn_instruction_text(
                             "Listen to the user's spoken audio below and "
                             "reply with the final spoken text following all "
-                            "the system instructions."
+                            "the system instructions.",
+                            transcript=transcript,
                         ),
                     },
                     {
@@ -389,6 +391,7 @@ class OpenAICompatibleProvider:
         self,
         *,
         audio_path: str,
+        transcript: str = "",
         conversation_history: list[dict[str, str]] | None = None,
         enabled_tool_names: set[str] | None = None,
     ) -> list[dict]:
@@ -407,11 +410,12 @@ class OpenAICompatibleProvider:
             "content": [
                 {
                     "type": "text",
-                    "text": (
+                    "text": _audio_turn_instruction_text(
                         "Listen to the user's spoken audio below. Decide "
                         "whether to call an enabled tool or give the final "
-                        "spoken answer. If no tool is needed, answer directly "
-                        "with the final speech text."
+                        "spoken answer. If no tool is needed, answer "
+                        "directly with the final speech text.",
+                        transcript=transcript,
                     ),
                 },
                 audio_part,
@@ -1597,6 +1601,18 @@ def _input_audio_payload_from_path(audio_path: Path) -> dict[str, str]:
         "data": base64.b64encode(audio_bytes).decode("ascii"),
         "format": audio_format,
     }
+
+
+def _audio_turn_instruction_text(instruction: str, *, transcript: str) -> str:
+    cleaned_transcript = str(transcript).strip()
+    if not cleaned_transcript:
+        return instruction
+    return (
+        f"{instruction}\n\nRecognized transcript: {cleaned_transcript}\n"
+        "Use the recognized transcript as the source of truth for the user's "
+        "words. Use the audio only to clarify tone or resolve obvious "
+        "transcription mistakes."
+    )
 
 
 def _language_reply_instruction() -> str:

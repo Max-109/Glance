@@ -62,11 +62,13 @@ class LLMAgent(BaseAgent):
         self,
         *,
         audio_path: str,
+        transcript: str = "",
         conversation_history: list[dict[str, str]] | None = None,
         enabled_tool_names: set[str] | None = None,
     ):
         return self._provider.build_live_tool_messages_from_audio(
             audio_path=audio_path,
+            transcript=transcript,
             conversation_history=conversation_history,
             enabled_tool_names=enabled_tool_names,
         )
@@ -116,12 +118,14 @@ class LLMAgent(BaseAgent):
         self,
         *,
         audio_path: str,
+        transcript: str = "",
         conversation_history: list[dict[str, str]] | None = None,
         session_id: str | None = None,
     ):
         if self._transcription_provider is not None:
             return self._provider.generate_live_speech_reply_from_audio(
                 audio_path=audio_path,
+                transcript=transcript,
                 conversation_history=conversation_history,
                 session_id=session_id,
                 client=self._transcription_provider.client,
@@ -133,6 +137,7 @@ class LLMAgent(BaseAgent):
             )
         return self._provider.generate_live_speech_reply_from_audio(
             audio_path=audio_path,
+            transcript=transcript,
             conversation_history=conversation_history,
             session_id=session_id,
         )

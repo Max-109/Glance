@@ -89,6 +89,7 @@ class FakeToolLLMAgent:
         self.message_snapshots: list[list[dict]] = []
         self.enabled_tool_name_sets: list[set[str]] = []
         self.audio_paths: list[str] = []
+        self.audio_transcripts: list[str] = []
         self.multimodal_turn_count = 0
         self.prepare_inputs: list[str] = []
         self.prepared_reply_text = prepared_reply_text
@@ -104,10 +105,16 @@ class FakeToolLLMAgent:
         ]
 
     def build_live_tool_messages_from_audio(
-        self, *, audio_path, conversation_history=None, enabled_tool_names=None
+        self,
+        *,
+        audio_path,
+        transcript="",
+        conversation_history=None,
+        enabled_tool_names=None,
     ):
         self.enabled_tool_name_sets.append(set(enabled_tool_names or set()))
         self.audio_paths.append(audio_path)
+        self.audio_transcripts.append(transcript)
         return [
             {"role": "system", "content": "multimodal tool system"},
             *list(conversation_history or []),
@@ -151,8 +158,12 @@ class FakeToolLLMAgent:
         )
 
     def generate_live_speech_reply_from_audio(self, **kwargs):
-        del kwargs
-        raise AssertionError("tool mode must use the multimodal tool loop")
+        self.audio_paths.append(kwargs["audio_path"])
+        self.audio_transcripts.append(kwargs.get("transcript", ""))
+        return LiveSpeechReply(
+            voice_id="UgBBYS2sOqTuMpoF3BR0",
+            text="[curious] Audio reply.",
+        )
 
 
 class FakeToolScreenCaptureAgent:
@@ -345,18 +356,21 @@ class LiveStrategyTests(unittest.TestCase):
             }
         )
 
-        self.assertEqual(interaction.transcript, "")
-        self.assertEqual(transcription_agent.calls, [])
+        self.assertEqual(interaction.transcript, "transcript for input.wav")
+        self.assertEqual(transcription_agent.calls, ["input.wav"])
         self.assertEqual(llm_agent.audio_paths, ["input.wav"])
+        self.assertEqual(
+            llm_agent.audio_transcripts, ["transcript for input.wav"]
+        )
         self.assertEqual(llm_agent.multimodal_turn_count, 2)
         self.assertEqual(
-            stages[:2],
+            stages[:3],
             [
+                ("transcribing", "Transcribing..."),
                 ("generating", "Listening and checking..."),
                 ("speaking", "Pažiūrėsiu į kodą."),
             ],
         )
-        self.assertNotIn(("transcribing", "Transcribing..."), stages)
         self.assertTrue(screen_capture_agent.called)
         self.assertEqual(notices, ["Pažiūrėsiu į kodą."])
         self.assertEqual(announced, [tts_agent.calls[0][1]])
@@ -477,6 +491,37 @@ class LiveStrategyTests(unittest.TestCase):
         self.assertEqual(llm_agent.audio_paths, [])
         self.assertEqual(interaction.transcript, "transcript for input.wav")
         self.assertEqual(interaction.response, "spoken:No tool needed.")
+
+    def test_multimodal_without_tools_saves_transcript_and_anchors_audio_reply(
+        self,
+    ) -> None:
+        llm_agent = FakeToolLLMAgent([])
+        transcription_agent = FakeTranscriptionAgent()
+        strategy = LiveStrategy(
+            transcription_agent=transcription_agent,
+            llm_agent=llm_agent,
+            tts_agent=FakeTTSAgent(),
+            settings=AppSettings.from_mapping(
+                {
+                    "llm_base_url": "https://api.example.com/v1",
+                    "llm_model_name": "model-a",
+                    "tts_base_url": "https://tts.example.com/v1",
+                    "tools_enabled": False,
+                    "multimodal_live_enabled": True,
+                },
+                validate=False,
+            ),
+        )
+
+        interaction = strategy.execute({"recording_path": "input.wav"})
+
+        self.assertEqual(transcription_agent.calls, ["input.wav"])
+        self.assertEqual(interaction.transcript, "transcript for input.wav")
+        self.assertEqual(llm_agent.audio_paths, ["input.wav"])
+        self.assertEqual(
+            llm_agent.audio_transcripts, ["transcript for input.wav"]
+        )
+        self.assertEqual(interaction.response, "[curious] Audio reply.")
 
     def test_tool_mode_uses_original_answer_when_speech_prep_drifts(
         self,
@@ -875,6 +920,7 @@ class LiveStrategyTests(unittest.TestCase):
             }
         )
 
+        self.assertEqual(interaction.transcript, "transcript for input.wav")
         self.assertEqual(tts_agent.calls, [])
         self.assertEqual(interaction.response, "Live ended.")
         self.assertEqual(interaction.speech_path, "")
