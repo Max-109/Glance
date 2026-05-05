@@ -246,11 +246,83 @@ class ProviderToolTurnTests(unittest.TestCase):
             kwargs["messages"][0]["content"][0]["cache_control"],
             {"type": "ephemeral"},
         )
-        self.assertEqual(
-            kwargs["messages"][0]["content"][0]["text"],
-            "stable tool prompt",
+        self.assertTrue(
+            kwargs["messages"][0]["content"][0]["text"].startswith(
+                "stable tool prompt"
+            )
+        )
+        self.assertGreater(
+            len(kwargs["messages"][0]["content"][0]["text"]), 2000
         )
         self.assertEqual(kwargs["messages"][1]["content"], "look at this")
+
+    def test_openrouter_cache_marks_only_stable_prompt_when_runtime_changes(
+        self,
+    ) -> None:
+        settings = AppSettings.from_mapping(
+            {
+                "llm_base_url": "https://openrouter.ai/api/v1",
+                "llm_model_name": "google/gemini-3-flash-preview",
+                "tts_base_url": "https://tts.example.com/v1",
+            },
+            validate=False,
+        )
+        provider = OpenAICompatibleProvider.__new__(OpenAICompatibleProvider)
+        provider._settings = settings
+        completions_create = unittest.mock.Mock(
+            return_value=SimpleNamespace(
+                usage=None,
+                choices=[
+                    SimpleNamespace(
+                        message=SimpleNamespace(content="done", tool_calls=[])
+                    )
+                ],
+            )
+        )
+        provider._client = SimpleNamespace(
+            chat=SimpleNamespace(
+                completions=SimpleNamespace(create=completions_create)
+            )
+        )
+
+        provider.run_tool_turn(
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "Current day and time: Tuesday, May 5, 2026, "
+                        "16:31 EEST (UTC+03:00).\n"
+                        "User country: Lithuania.\n"
+                        "Use the current day, date, time, year, timezone, "
+                        "and user country above as the source of truth.\n\n"
+                        "Stable Glance tool instructions."
+                    ),
+                },
+                {"role": "user", "content": "look at this"},
+            ],
+            tools=[],
+            session_id="session-123",
+        )
+
+        messages = completions_create.call_args.kwargs["messages"]
+        self.assertEqual(messages[0]["role"], "system")
+        self.assertEqual(messages[0]["content"][0]["type"], "text")
+        self.assertTrue(
+            messages[0]["content"][0]["text"].startswith(
+                "Stable Glance tool instructions."
+            )
+        )
+        self.assertGreater(len(messages[0]["content"][0]["text"]), 2000)
+        self.assertEqual(
+            messages[0]["content"][0]["cache_control"],
+            {"type": "ephemeral"},
+        )
+        self.assertEqual(messages[1]["role"], "user")
+        self.assertIn("Runtime context for this request", messages[1][
+            "content"
+        ])
+        self.assertIn("Current day and time", messages[1]["content"])
+        self.assertEqual(messages[2]["content"], "look at this")
 
     def test_non_openrouter_tool_turn_leaves_cache_options_out(self) -> None:
         settings = AppSettings.from_mapping(
