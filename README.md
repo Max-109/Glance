@@ -170,10 +170,27 @@ tool = registry.get("web_fetch")
 
 ##### Inheritance
 
-Shared base classes are used where the app has several versions of the same kind of object:
+The best example of inheritance in Glance is `BaseAgent`. The app has several concrete agents, and they all share the same base agent structure.
+
+```python
+class BaseAgent(ABC):
+    @abstractmethod
+    def run(self, **kwargs):
+        "Execute the agent's main behavior."
+
+class OCRAgent(BaseAgent):
+    def run(self, *, image_path: str, instruction: str = "") -> str:
+        return self._provider.extract_text(image_path, instruction=instruction)
+
+class TranscriptionAgent(BaseAgent):
+    def run(self, *, audio_path: str) -> str:
+        return self._provider.transcribe(audio_path)
+```
+
+`OCRAgent` and `TranscriptionAgent` do different work, but both inherit from `BaseAgent` and implement their own `run(...)` method. The same pattern is used in other parts of the app:
 
 - `LiveStrategy` and `OCRStrategy` inherit from `ModeStrategy`.
-- `LLMAgent`, `OCRAgent`, `ScreenCaptureAgent`, `TranscriptionAgent`, and `TTSAgent` inherit from `BaseAgent`.
+- `LLMAgent`, `ScreenCaptureAgent`, and `TTSAgent` also inherit from `BaseAgent`.
 - `LiveInteraction`, `OCRInteraction`, and `QuickInteraction` inherit from `BaseInteraction`.
 - `SessionDirectoryRepository` inherits from `AbstractRepository[SessionRecord]`.
 
