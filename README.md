@@ -127,13 +127,13 @@ The main runtime path starts in `main.py`, passes through the UI and orchestrati
 Glance uses abstract base classes for the parts that need the same shape but different behavior.
 
 ```python
-class BaseAgent(ABC):
+class ModeStrategy(ABC):
     @abstractmethod
-    def run(self, **kwargs):
-        "Execute the agent's main behavior."
+    def execute(self, context: dict) -> BaseInteraction:
+        "Run one mode workflow and return the resulting interaction."
 ```
 
-The clearest examples are `BaseAgent`, `ModeStrategy`, `BaseInteraction`, and `AbstractRepository`. The rest of the app can use those contracts without caring about the exact class behind them.
+The clearest example is `ModeStrategy`: `LiveStrategy` and `OCRStrategy` follow the same `execute(...)` contract even though their internal workflows are different. The `Orchestrator` can run the selected mode without caring about the exact strategy class behind it.
 
 ##### Encapsulation
 
