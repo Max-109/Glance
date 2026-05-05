@@ -238,7 +238,56 @@ The `Orchestrator` calls the same method, `execute(...)`, but the result depends
 
 ##### Composition And Aggregation
 
-`Orchestrator` is made from smaller services: settings, history, memories, strategy factory, screen capture, transcription, LLM, OCR, TTS, and clipboard.
+The best example of composition and aggregation in Glance is `Orchestrator`. It does not do every task itself. Instead, it is built from smaller objects: settings, history, memories, strategy factory, screen capture, transcription, LLM, OCR, TTS, and clipboard.
+
+```python
+class Orchestrator:
+    def __init__(
+        self,
+        *,
+        settings: AppSettings,
+        history_manager: HistoryManager,
+        memory_manager: MemoryManager,
+        strategy_factory: ModeStrategyFactory,
+        screen_capture_agent: ScreenCaptureAgent,
+        transcription_agent: TranscriptionAgent,
+        llm_agent: LLMAgent,
+        ocr_agent: OCRAgent,
+        tts_agent: TTSAgent,
+        clipboard_service: ClipboardService,
+    ) -> None:
+        self._settings = settings
+        self._history_manager = history_manager
+        self._memory_manager = memory_manager
+        self._strategy_factory = strategy_factory
+        self._screen_capture_agent = screen_capture_agent
+        self._transcription_agent = transcription_agent
+        self._llm_agent = llm_agent
+        self._ocr_agent = ocr_agent
+        self._tts_agent = tts_agent
+        self._clipboard_service = clipboard_service
+```
+
+Those objects are then used together when a mode runs:
+
+```python
+strategy = self._strategy_factory.create(
+    mode=mode,
+    screen_capture_agent=self._screen_capture_agent,
+    transcription_agent=self._transcription_agent,
+    llm_agent=self._llm_agent,
+    ocr_agent=self._ocr_agent,
+    tts_agent=self._tts_agent,
+    clipboard_service=self._clipboard_service,
+    settings=self._settings,
+    memory_manager=self._memory_manager,
+)
+
+interaction = strategy.execute(execution_context)
+self._history_manager.save_interaction(active_session, interaction)
+```
+
+This is composition because the runtime workflow is assembled from smaller focused objects. It is also aggregation because `Orchestrator` keeps references to these objects and coordinates them instead of owning all of their internal logic.
 
 #### Design Pattern
 
