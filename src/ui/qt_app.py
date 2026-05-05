@@ -72,6 +72,11 @@ _INPUT_AUDIO_UNSUPPORTED_NOTICE = (
     "Live failed: the selected model does not support input audio. "
     "Choose an audio-capable live model in Providers."
 )
+_PROVIDER_SETUP_MESSAGE = "Finish setting up your providers to use Live."
+
+
+class RuntimeConfigurationError(Exception):
+    "Raised when Live cannot start because user settings are incomplete."
 
 
 def _summarize_runtime_error_notice(message: str) -> str:
@@ -529,8 +534,13 @@ def run_settings_app() -> int:
                     paths=paths,
                 )
             )
+        except RuntimeConfigurationError as exc:
+            live_controller.set_orchestrator(
+                None, unavailable_message=_PROVIDER_SETUP_MESSAGE
+            )
+            logger.info("Live orchestrator not configured: %s", exc)
         except Exception as exc:
-            live_controller.set_orchestrator(None)
+            live_controller.set_orchestrator(None, unavailable_message=str(exc))
             logger.exception("Live orchestrator unavailable during refresh")
             tray.showMessage("Glance", f"Live unavailable: {exc}")
         try:
@@ -964,6 +974,7 @@ def _build_runtime_orchestrator(
     paths,
 ):
     settings = settings_manager.current()
+    _ensure_provider_settings_ready(settings)
     return build_orchestrator_with_dependencies(
         settings=settings,
         paths=paths,
@@ -973,6 +984,31 @@ def _build_runtime_orchestrator(
         transcription_provider=NagaTranscriptionProvider(settings),
         tts_provider=NagaSpeechProvider(settings),
     )
+
+
+def _ensure_provider_settings_ready(settings) -> None:
+    missing_fields = _missing_provider_setting_labels(settings)
+    if not missing_fields:
+        return
+    raise RuntimeConfigurationError(
+        "Missing provider settings: " + ", ".join(missing_fields)
+    )
+
+
+def _missing_provider_setting_labels(settings) -> list[str]:
+    required_fields = (
+        ("llm_base_url", "LLM base URL"),
+        ("llm_api_key", "LLM API key"),
+        ("transcription_base_url", "transcription base URL"),
+        ("transcription_api_key", "transcription API key"),
+        ("tts_base_url", "TTS base URL"),
+        ("tts_api_key", "TTS API key"),
+    )
+    return [
+        label
+        for field_name, label in required_fields
+        if not str(getattr(settings, field_name, "")).strip()
+    ]
 
 
 def _build_live_controller(
@@ -991,6 +1027,9 @@ def _build_live_controller(
             memory_manager=memory_manager,
             paths=paths,
         )
+    except RuntimeConfigurationError:
+        orchestrator = None
+        unavailable_message = _PROVIDER_SETUP_MESSAGE
     except Exception as exc:
         orchestrator = None
         unavailable_message = str(exc)
