@@ -124,9 +124,7 @@ The main runtime path starts in `main.py`, passes through the UI and orchestrati
 
 ##### Abstraction
 
-Glance uses `ModeStrategy` as the main abstraction for its runtime modes. The app has two main modes: `live` and `OCR`.
-
-In `live` mode, the app works with audio: it records speech, transcribes it, sends the text to the LLM, and returns an audio answer. In `OCR` mode, it works with the screen: it receives a screenshot or selected area and extracts text from it.
+Glance uses `ModeStrategy` to hide the details of its two runtime modes. `live` works with audio: record, transcribe, send to the LLM, then return speech. `OCR` works with the screen: capture an image and extract text.
 
 ```python
 class ModeStrategy(ABC):
@@ -135,13 +133,11 @@ class ModeStrategy(ABC):
         "Run one mode workflow and return the resulting interaction."
 ```
 
-The modes use different input and different internal steps, but both start through `execute(context)`. `Orchestrator` asks `ModeStrategyFactory` for the right strategy, such as `LiveStrategy` or `OCRStrategy`, and then runs it.
+Both modes start through `execute(context)`, so `Orchestrator` can run the selected mode without knowing every internal step.
 
 ##### Encapsulation
 
-Glance uses encapsulation in `RuntimeToolRegistry`. This class decides which live agent tools are available and which ones are blocked.
-
-The user can enable or disable tools globally, and can also allow or deny individual tools such as screenshots, OCR, web search, web fetch, and memories. That permission logic stays in one place instead of being repeated across the app.
+`RuntimeToolRegistry` keeps tool permission logic in one place. It checks whether tools are enabled globally and whether a specific tool, such as `web_fetch`, is allowed.
 
 ```python
 def get(self, name: str) -> ToolDefinition | None:
@@ -158,19 +154,15 @@ def _policy_for_tool(self, name: str) -> str:
     if name == "web_fetch":
         return self._settings.tool_web_fetch_policy
     return "deny"
-```
 
-Other parts of the app only ask `RuntimeToolRegistry` for a tool by name. They do not need to know where every setting is stored or how each policy is checked.
-
-Usage example:
-
-```python
 tool = registry.get("web_fetch")
 ```
 
+Other parts of the app ask for a tool by name. They do not need to know where every setting is stored or how each policy is checked.
+
 ##### Inheritance
 
-`BaseAgent` is the simplest inheritance example in Glance. The app has several concrete agents, and they all share the same base agent structure.
+`BaseAgent` gives all agent classes the same base shape. It does not decide which agent to run; it only says that each agent must implement `run(...)`.
 
 ```python
 class BaseAgent(ABC):
@@ -187,16 +179,11 @@ class TranscriptionAgent(BaseAgent):
         return self._provider.transcribe(audio_path)
 ```
 
-`OCRAgent` and `TranscriptionAgent` do different work, but both inherit from `BaseAgent` and implement `run(...)` in their own way. The same pattern appears elsewhere:
-
-- `LiveStrategy` and `OCRStrategy` inherit from `ModeStrategy`.
-- `LLMAgent`, `ScreenCaptureAgent`, and `TTSAgent` also inherit from `BaseAgent`.
-- `LiveInteraction`, `OCRInteraction`, and `QuickInteraction` inherit from `BaseInteraction`.
-- `SessionDirectoryRepository` inherits from `AbstractRepository[SessionRecord]`.
+`OCRAgent` works with images. `TranscriptionAgent` works with audio. Both inherit from `BaseAgent`, but each implements `run(...)` for its own task.
 
 ##### Polymorphism
 
-Polymorphism shows up when `Orchestrator` runs mode strategies. `LiveStrategy` and `OCRStrategy` both have `execute(...)`, but the method does different work depending on the actual object.
+Polymorphism appears when `Orchestrator` calls `execute(...)`. The call looks the same, but the behavior depends on the actual strategy object.
 
 ```python
 class OCRStrategy(ModeStrategy):
@@ -234,13 +221,11 @@ strategy = self._strategy_factory.create(mode=mode, ...)
 interaction = strategy.execute(execution_context)
 ```
 
-`Orchestrator` calls the same method, `execute(...)`, either way. If the strategy is `OCRStrategy`, the OCR workflow runs. If the strategy is `LiveStrategy`, the live audio workflow runs.
+If the strategy is `OCRStrategy`, the OCR workflow runs. If it is `LiveStrategy`, the live audio workflow runs.
 
 ##### Composition And Aggregation
 
-Composition and aggregation are easiest to see in the `Orchestrator` class.
-
-`Orchestrator` is built from smaller objects: `LLMAgent`, `OCRAgent`, `TranscriptionAgent`, `HistoryManager`, `MemoryManager`, `ModeStrategyFactory`, `ClipboardService`, and others. Instead of putting the whole runtime in one large class, each object keeps its own job.
+`Orchestrator` shows both composition and aggregation. It is built from smaller objects, and it keeps references to them while coordinating the workflow.
 
 ```python
 class Orchestrator:
@@ -268,13 +253,7 @@ class Orchestrator:
         self._ocr_agent = ocr_agent
         self._tts_agent = tts_agent
         self._clipboard_service = clipboard_service
-```
 
-Aggregation is the other side of that relationship. `Orchestrator` keeps references to these objects and coordinates them, but they still have their own logic. `LLMAgent` and `OCRAgent` are not internal methods inside `Orchestrator`; they are separate objects used by it.
-
-When a mode runs, `Orchestrator` combines those objects into one workflow:
-
-```python
 strategy = self._strategy_factory.create(
     mode=mode,
     screen_capture_agent=self._screen_capture_agent,
@@ -291,13 +270,11 @@ interaction = strategy.execute(execution_context)
 self._history_manager.save_interaction(active_session, interaction)
 ```
 
-That keeps the runtime flow readable: `Orchestrator` coordinates the work, while the smaller objects handle their own tasks.
+`LLMAgent`, `OCRAgent`, `HistoryManager`, and the other objects are not just methods inside `Orchestrator`. They are separate objects with their own logic. `Orchestrator` wires them together.
 
 #### Design Pattern
 
-The main design patterns in Glance are **Strategy** and **Factory Method**.
-
-Strategy is used because the app has two modes, `live` and `OCR`, with different internal logic. Both still use the same `ModeStrategy` interface and start through `execute(context)`.
+Glance uses **Strategy** and **Factory Method**. Strategy is used because `live` and `OCR` have different logic but the same `ModeStrategy` interface.
 
 ```python
 class ModeStrategy(ABC):
@@ -306,7 +283,7 @@ class ModeStrategy(ABC):
         "Run one mode workflow and return the resulting interaction."
 ```
 
-Factory Method is used in `ModeStrategyFactory`. It receives the selected `mode` and creates the correct strategy object. If the mode is `ocr`, it returns `OCRStrategy`. If the mode is `live`, it returns `LiveStrategy`.
+Factory Method is used in `ModeStrategyFactory`: it receives `mode` and returns the right strategy object.
 
 ```python
 class ModeStrategyFactory:
@@ -319,7 +296,7 @@ class ModeStrategyFactory:
         raise ValidationError(f"Unsupported mode: {mode!r}")
 ```
 
-This keeps strategy creation out of `Orchestrator`. It asks the factory for the correct strategy and then runs it.
+This keeps strategy creation out of `Orchestrator`; it asks the factory for the strategy and runs it.
 
 #### File Reading And Writing
 
