@@ -137,18 +137,30 @@ class ModeStrategy(ABC):
 
 These modes receive different data and have different internal logic, but both are started through the same `execute(context)` method. The `Orchestrator` uses `ModeStrategyFactory` to get the correct strategy for the selected mode, such as `LiveStrategy` or `OCRStrategy`, and then runs it.
 
-This is abstraction because the `Orchestrator` only sees the shared `execute(...)` method, while each concrete strategy hides its own internal workflow.
-
 ##### Encapsulation
 
-State stays inside the class that actually knows how to handle it. `AppSettings.validate()` checks settings, `TenVadAudioRecorder` handles audio capture, and `RuntimeToolRegistry` decides which tools are available.
+The best example of encapsulation in Glance is `RuntimeToolRegistry`. This class keeps the logic for deciding which live agent tools are allowed and which ones are blocked.
+
+The user can enable or disable tools globally, and can also allow or deny individual tools such as screenshots, OCR, web search, web fetch, and memories. Instead of making the whole program check those settings directly, the logic stays inside one class.
 
 ```python
-if name == "web_fetch":
-    return self._settings.tool_web_fetch_policy
+def get(self, name: str) -> ToolDefinition | None:
+    definition = self._definitions.get(name)
+    if definition is None:
+        return None
+    if not self._settings.tools_enabled:
+        return None
+    if self._policy_for_tool(name) == "allow":
+        return definition
+    return None
+
+def _policy_for_tool(self, name: str) -> str:
+    if name == "web_fetch":
+        return self._settings.tool_web_fetch_policy
+    return "deny"
 ```
 
-The caller does not need to know where every setting is stored. It asks the registry and gets the answer.
+Other parts of the app only ask `RuntimeToolRegistry` for a tool by name. They do not need to know where every setting is stored or how each policy is checked.
 
 ##### Inheritance
 
