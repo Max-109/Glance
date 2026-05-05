@@ -425,6 +425,7 @@ class LiveStrategy(ModeStrategy):
                     turn.content,
                     context=context,
                     status_callback=status_callback,
+                    user_context=user_context,
                 )
 
             image_messages: list[dict] = []
@@ -501,10 +502,16 @@ class LiveStrategy(ModeStrategy):
         *,
         context: dict,
         status_callback: object,
+        user_context: str,
     ) -> None:
         if not notice:
             return
         speech_notice = _tool_notice_speech_reply(notice, self._settings)
+        if _tool_notice_language_mismatch(
+            speech_notice.text,
+            user_context,
+        ):
+            return
         # tool notices are quick spoken progress updates before the final
         # reply. they use throwaway audio because final audio is created later.
         _emit_stage_status(status_callback, "speaking", speech_notice.text)
@@ -649,6 +656,63 @@ def _tool_notice_speech_reply(
     return _LocalSpeechReply(
         voice_id=voice_id,
         text=remaining_text or stripped_notice,
+    )
+
+
+def _tool_notice_language_mismatch(
+    notice_text: str,
+    user_context: str,
+) -> bool:
+    return _looks_lithuanian(user_context) and _looks_english(notice_text)
+
+
+def _looks_lithuanian(text: str) -> bool:
+    lowered = f" {str(text).lower()} "
+    if re.search(r"[ąčęėįšųūž]", lowered):
+        return True
+    return any(
+        marker in lowered
+        for marker in (
+            " aš ",
+            " ar ",
+            " būtų ",
+            " dabar ",
+            " gal ",
+            " gali ",
+            " galėtum ",
+            " gerai ",
+            " kiek ",
+            " ką ",
+            " mano ",
+            " pasakyti ",
+            " rytoj ",
+            " surast ",
+            " sveikas ",
+            " vyksta ",
+        )
+    )
+
+
+def _looks_english(text: str) -> bool:
+    lowered = f" {str(text).lower()} "
+    if re.search(r"[ąčęėįšųūž]", lowered):
+        return False
+    return any(
+        marker in lowered
+        for marker in (
+            " i'll ",
+            " i’ll ",
+            " i will ",
+            " let me ",
+            " checking ",
+            " check ",
+            " search ",
+            " look up ",
+            " screen ",
+            " screenshot ",
+            " memory ",
+            " web ",
+        )
     )
 
 

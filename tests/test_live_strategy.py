@@ -2,11 +2,13 @@ import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import patch
 
 from src.models.interactions import LiveInteraction, SessionRecord
 from src.models.settings import AppSettings
 from src.services.memory_manager import MemoryManager
 from src.services.providers import LiveSpeechReply
+from src.tools import ToolResult
 from src.strategies import live_strategy as live_strategy_module
 from src.strategies.live_strategy import (
     LiveStrategy,
@@ -428,6 +430,87 @@ class LiveStrategyTests(unittest.TestCase):
         self.assertEqual(
             tts_agent.calls[1][0], "spoken:I used the screen context...."
         )
+
+    def test_lithuanian_turn_suppresses_english_tool_progress(self) -> None:
+        for tool_name, arguments in (
+            ("take_screenshot", {"reason": "inspect screen"}),
+            ("web_search", {"query": "weather tomorrow"}),
+            ("web_fetch", {"url": "https://example.com"}),
+            (
+                "add_memory",
+                {
+                    "title": "Homework",
+                    "description": "Do Lithuanian homework.",
+                },
+            ),
+            ("read_memory", {"query": "homework"}),
+            (
+                "change_memory",
+                {
+                    "query": "homework",
+                    "description": "Do Lithuanian homework.",
+                },
+            ),
+        ):
+            with self.subTest(tool_name=tool_name):
+                llm_agent = FakeToolLLMAgent(
+                    [
+                        _tool_turn(
+                            content="I'll check that now.",
+                            tool_calls=[_tool_call(tool_name, arguments)],
+                        ),
+                        _tool_turn(content="Atlikta."),
+                    ]
+                )
+                tts_agent = FakeTTSAgent()
+                notices: list[str] = []
+                stages: list[tuple[str, str]] = []
+                with tempfile.TemporaryDirectory() as temp_dir:
+                    with (
+                        patch(
+                            "src.tools.runtime._web_search",
+                            return_value=ToolResult(content="Search result."),
+                        ),
+                        patch(
+                            "src.tools.runtime._web_fetch",
+                            return_value=ToolResult(content="Fetched page."),
+                        ),
+                    ):
+                        strategy = LiveStrategy(
+                            transcription_agent=FakePhraseTranscriptionAgent(
+                                "Sveikas, gal gali patikrinti?"
+                            ),
+                            llm_agent=llm_agent,
+                            tts_agent=tts_agent,
+                            screen_capture_agent=FakeToolScreenCaptureAgent(),
+                            settings=_tool_settings(),
+                            memory_manager=MemoryManager(
+                                Path(temp_dir) / "memories.json"
+                            ),
+                        )
+
+                        strategy.execute(
+                            {
+                                "recording_path": "input.wav",
+                                "tool_notice_callback": notices.append,
+                                "announce_audio_callback": lambda _path: None,
+                                "status_callback": (
+                                    lambda state, message: stages.append(
+                                        (state, message)
+                                    )
+                                ),
+                            }
+                        )
+
+                self.assertEqual(notices, [])
+                self.assertNotIn(
+                    ("speaking", "I'll check that now."),
+                    stages,
+                )
+                self.assertTrue(
+                    all("I'll check that now" not in call[0]
+                        for call in tts_agent.calls)
+                )
 
     def test_tool_progress_strips_voice_id_before_speaking(self) -> None:
         voice_id = "tnSpp4vdxKPjI9w0GnoV"
