@@ -295,18 +295,31 @@ This keeps the runtime flow easier to understand: `Orchestrator` coordinates the
 
 #### Design Pattern
 
-Glance uses **Strategy** and **Factory Method**.
+The main design patterns in Glance are **Strategy** and **Factory Method**.
 
-`LiveStrategy` and `OCRStrategy` are separate workflows. `ModeStrategyFactory` picks the right one at runtime:
+The Strategy pattern is used because the app has different workflows for different modes. `LiveStrategy` handles the live audio workflow, while `OCRStrategy` handles the screenshot-to-text workflow. Both follow the same `ModeStrategy` interface:
 
 ```python
-if normalized_mode == "ocr":
-    return OCRStrategy(...)
-if normalized_mode == "live":
-    return LiveStrategy(...)
+class ModeStrategy(ABC):
+    @abstractmethod
+    def execute(self, context: dict) -> BaseInteraction:
+        "Run one mode workflow and return the resulting interaction."
 ```
 
-This fits better than a Singleton because the app needs replaceable services for tests and runtime settings.
+The Factory Method pattern is used in `ModeStrategyFactory`. It receives the selected mode and creates the correct strategy object:
+
+```python
+class ModeStrategyFactory:
+    def create(self, *, mode: str, ...) -> ModeStrategy:
+        normalized_mode = mode.strip().lower()
+        if normalized_mode == "ocr":
+            return OCRStrategy(...)
+        if normalized_mode == "live":
+            return LiveStrategy(...)
+        raise ValidationError(f"Unsupported mode: {mode!r}")
+```
+
+This fits better than a Singleton because the app does not need one global object. It needs separate, replaceable workflows that can receive different agents, settings, providers, and test doubles.
 
 #### File Reading And Writing
 
