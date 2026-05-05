@@ -238,7 +238,9 @@ The `Orchestrator` calls the same method, `execute(...)`, but the result depends
 
 ##### Composition And Aggregation
 
-The best example of composition and aggregation in Glance is `Orchestrator`. It does not do every task itself. Instead, it is built from smaller objects: settings, history, memories, strategy factory, screen capture, transcription, LLM, OCR, TTS, and clipboard.
+The best example of composition and aggregation in Glance is the `Orchestrator` class.
+
+Composition is visible because `Orchestrator` is made from smaller objects: `LLMAgent`, `OCRAgent`, `TranscriptionAgent`, `HistoryManager`, `MemoryManager`, `ModeStrategyFactory`, `ClipboardService`, and others. Instead of keeping all runtime logic in one large class, each object has its own responsibility.
 
 ```python
 class Orchestrator:
@@ -268,7 +270,9 @@ class Orchestrator:
         self._clipboard_service = clipboard_service
 ```
 
-Those objects are then used together when a mode runs:
+Aggregation is visible because `Orchestrator` keeps references to those objects and coordinates them, but the objects still have their own separate logic. For example, `LLMAgent` and `OCRAgent` are not just internal methods inside `Orchestrator`; they are separate objects used by it.
+
+When a mode runs, `Orchestrator` combines these objects into one workflow:
 
 ```python
 strategy = self._strategy_factory.create(
@@ -287,7 +291,7 @@ interaction = strategy.execute(execution_context)
 self._history_manager.save_interaction(active_session, interaction)
 ```
 
-This is composition because the runtime workflow is assembled from smaller focused objects. It is also aggregation because `Orchestrator` keeps references to these objects and coordinates them instead of owning all of their internal logic.
+This keeps the runtime flow easier to understand: `Orchestrator` coordinates the work, while the smaller objects handle their own specific tasks.
 
 #### Design Pattern
 
