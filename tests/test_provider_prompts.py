@@ -383,6 +383,23 @@ class ProviderPromptTests(unittest.TestCase):
             ),
         )
 
+    def test_parse_live_speech_reply_extracts_same_line_voice_header(
+        self,
+    ) -> None:
+        self.provider._settings.tts_voice_id = "auto"
+
+        reply = self.provider._parse_live_speech_reply(
+            "VOICE_ID: tnSpp4vdxKPjI9w0GnoV [warmly] Gerai, įrašiau."
+        )
+
+        self.assertEqual(
+            reply,
+            LiveSpeechReply(
+                voice_id="tnSpp4vdxKPjI9w0GnoV",
+                text="[warmly] Gerai, įrašiau.",
+            ),
+        )
+
     def test_preview_text_normalizes_whitespace_and_truncates(self) -> None:
         preview = _preview_text(
             "Hello\n\nthere   general   kenobi" * 40, limit=40

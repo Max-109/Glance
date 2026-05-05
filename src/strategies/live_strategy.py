@@ -19,6 +19,7 @@ from src.models.settings import (
     AUTO_TTS_VOICE_ID,
     AppSettings,
     DEFAULT_FIXED_TTS_VOICE,
+    ELEVEN_V3_VOICE_BY_ID,
 )
 from src.services.clipboard import ClipboardService
 from src.services.memory_manager import MemoryManager
@@ -461,12 +462,15 @@ class LiveStrategy(ModeStrategy):
                         status_callback, "idle", terminal_status
                     )
                     return terminal_status, tool_records, True
-                if call.name == "change_memory":
+                messages.append(_tool_result_message(call, result))
+                image_messages.extend(_image_context_messages(call, result))
+                if call.name == "change_memory" and (
+                    record.status != "success"
+                    or result.metadata.get("status") != "updated"
+                ):
                     status = _memory_change_followup(record, result)
                     _emit_stage_status(status_callback, "idle", status)
                     return status, tool_records, False
-                messages.append(_tool_result_message(call, result))
-                image_messages.extend(_image_context_messages(call, result))
             messages.extend(image_messages)
 
         messages.append(
@@ -500,12 +504,13 @@ class LiveStrategy(ModeStrategy):
     ) -> None:
         if not notice:
             return
+        speech_notice = _tool_notice_speech_reply(notice, self._settings)
         # tool notices are quick spoken progress updates before the final
         # reply. they use throwaway audio because final audio is created later.
-        _emit_stage_status(status_callback, "speaking", notice)
+        _emit_stage_status(status_callback, "speaking", speech_notice.text)
         notice_callback = context.get("tool_notice_callback")
         if callable(notice_callback):
-            notice_callback(notice)
+            notice_callback(speech_notice.text)
         audio_callback = context.get("announce_audio_callback")
         if not callable(audio_callback):
             return
@@ -519,8 +524,9 @@ class LiveStrategy(ModeStrategy):
         generated_notice_path = notice_path
         try:
             generated_notice_path = self._tts_agent.run(
-                text=force_pause_at_end_for_tts(notice),
+                text=force_pause_at_end_for_tts(speech_notice.text),
                 output_path=notice_path,
+                voice_id=speech_notice.voice_id,
             )
             audio_callback(generated_notice_path)
         except (
@@ -559,7 +565,7 @@ class LiveStrategy(ModeStrategy):
 
 @dataclass
 class _LocalSpeechReply:
-    voice_id: str
+    voice_id: str | None
     text: str
 
 
@@ -612,6 +618,38 @@ def _local_speech_reply(
         else settings.tts_voice_id
     )
     return _LocalSpeechReply(voice_id=voice_id, text=text)
+
+
+def _tool_notice_speech_reply(
+    notice: str,
+    settings: AppSettings | None,
+) -> _LocalSpeechReply:
+    stripped_notice = str(notice).strip()
+    match = re.match(
+        r"^VOICE_ID:\s*(\S+)(?:\s+|$)",
+        stripped_notice,
+        flags=re.IGNORECASE,
+    )
+    if match is None:
+        return _LocalSpeechReply(voice_id=None, text=stripped_notice)
+
+    parsed_voice_id = match.group(1).strip()
+    remaining_text = stripped_notice[match.end():].strip()
+    voice_id = (
+        DEFAULT_FIXED_TTS_VOICE
+        if settings is None or settings.tts_voice_id == AUTO_TTS_VOICE_ID
+        else settings.tts_voice_id
+    )
+    if (
+        settings is not None
+        and settings.tts_voice_id == AUTO_TTS_VOICE_ID
+        and parsed_voice_id in ELEVEN_V3_VOICE_BY_ID
+    ):
+        voice_id = parsed_voice_id
+    return _LocalSpeechReply(
+        voice_id=voice_id,
+        text=remaining_text or stripped_notice,
+    )
 
 
 def static_live_speech_file_name(text: str, voice_id: str) -> str:

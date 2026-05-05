@@ -429,6 +429,54 @@ class LiveStrategyTests(unittest.TestCase):
             tts_agent.calls[1][0], "spoken:I used the screen context...."
         )
 
+    def test_tool_progress_strips_voice_id_before_speaking(self) -> None:
+        voice_id = "tnSpp4vdxKPjI9w0GnoV"
+        llm_agent = FakeToolLLMAgent(
+            [
+                _tool_turn(
+                    content=(
+                        f"VOICE_ID: {voice_id} Gerai, tuojau įrašysiu tavo "
+                        "matematikos namų darbus į atmintį."
+                    ),
+                    tool_calls=[
+                        _tool_call(
+                            "take_screenshot", {"reason": "inspect screen"}
+                        )
+                    ],
+                ),
+                _tool_turn(content="[warmly] Done."),
+            ]
+        )
+        tts_agent = FakeTTSAgent()
+        notices: list[str] = []
+        stages: list[tuple[str, str]] = []
+        strategy = LiveStrategy(
+            transcription_agent=FakeTranscriptionAgent(),
+            llm_agent=llm_agent,
+            tts_agent=tts_agent,
+            screen_capture_agent=FakeToolScreenCaptureAgent(),
+            settings=_tool_settings(),
+        )
+
+        strategy.execute(
+            {
+                "recording_path": "input.wav",
+                "tool_notice_callback": notices.append,
+                "announce_audio_callback": lambda _path: None,
+                "status_callback": lambda state, message: stages.append(
+                    (state, message)
+                ),
+            }
+        )
+
+        expected_notice = (
+            "Gerai, tuojau įrašysiu tavo matematikos namų darbus į atmintį."
+        )
+        self.assertEqual(notices, [expected_notice])
+        self.assertIn(("speaking", expected_notice), stages)
+        self.assertEqual(tts_agent.calls[0][0], f"{expected_notice}...")
+        self.assertEqual(tts_agent.calls[0][2], voice_id)
+
     def test_empty_tool_progress_does_not_use_english_fallback(self) -> None:
         llm_agent = FakeToolLLMAgent(
             [
@@ -627,6 +675,78 @@ class LiveStrategyTests(unittest.TestCase):
                 "Remember billing email follow-up.",
                 "Remember billing CSV export.",
             ],
+        )
+
+    def test_successful_change_memory_uses_model_followup(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            memory_manager = MemoryManager(Path(temp_dir) / "memories.json")
+            memory = memory_manager.add_memory(
+                title="Architecture grade",
+                description="Computer architecture grade was 4.",
+            )
+            llm_agent = FakeToolLLMAgent(
+                [
+                    _tool_turn(
+                        tool_calls=[
+                            _tool_call(
+                                "change_memory",
+                                {
+                                    "memory_id": memory.entity_id,
+                                    "description": (
+                                        "Computer architecture grade was 10."
+                                    ),
+                                },
+                            )
+                        ]
+                    ),
+                    _tool_turn(
+                        content=(
+                            "VOICE_ID: Mark\n\n[relieved] Pataisiau: "
+                            "įrašyta, kad gavai dešimt."
+                        )
+                    ),
+                ]
+            )
+            tts_agent = FakeTTSAgent()
+            strategy = LiveStrategy(
+                transcription_agent=FakeTranscriptionAgent(),
+                llm_agent=llm_agent,
+                tts_agent=tts_agent,
+                settings=_tool_settings(),
+                memory_manager=memory_manager,
+            )
+
+            interaction = strategy.execute({"recording_path": "input.wav"})
+            memories = memory_manager.list_memories()
+
+        self.assertEqual(len(interaction.tool_calls), 1)
+        self.assertEqual(interaction.tool_calls[0].tool_name, "change_memory")
+        self.assertEqual(interaction.tool_calls[0].status, "success")
+        self.assertEqual(len(llm_agent.message_snapshots), 2)
+        self.assertEqual(
+            [message["role"] for message in llm_agent.message_snapshots[1]],
+            ["system", "user", "assistant", "tool"],
+        )
+        self.assertEqual(
+            llm_agent.prepare_inputs,
+            [
+                "VOICE_ID: Mark\n\n[relieved] Pataisiau: įrašyta, kad "
+                "gavai dešimt."
+            ],
+        )
+        self.assertEqual(
+            interaction.response,
+            "spoken:VOICE_ID: Mark\n\n[relieved] Pataisiau: įrašyta, kad "
+            "gavai dešimt.",
+        )
+        self.assertEqual(
+            tts_agent.calls[0][0],
+            "spoken:VOICE_ID: Mark\n\n[relieved] Pataisiau: įrašyta, kad "
+            "gavai dešimt....",
+        )
+        self.assertEqual(
+            memories[0].description,
+            "Computer architecture grade was 10.",
         )
 
     def test_change_memory_missing_id_uses_clear_followup(self) -> None:

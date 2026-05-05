@@ -135,6 +135,68 @@ class ProviderToolTurnTests(unittest.TestCase):
             completions_create.call_args.kwargs["tool_choice"], "auto"
         )
 
+    def test_run_tool_turn_extracts_textual_default_api_tool_call(
+        self,
+    ) -> None:
+        settings = AppSettings.from_mapping(
+            {
+                "llm_base_url": "https://api.example.com/v1",
+                "llm_model_name": "model-a",
+                "tts_base_url": "https://tts.example.com/v1",
+            },
+            validate=False,
+        )
+        provider = OpenAICompatibleProvider.__new__(OpenAICompatibleProvider)
+        provider._settings = settings
+        completions_create = unittest.mock.Mock(
+            return_value=SimpleNamespace(
+                usage=None,
+                choices=[
+                    SimpleNamespace(
+                        message=SimpleNamespace(
+                            content=(
+                                "voicetranscription:default_api:"
+                                "read_memory{query:namų darbai matematika}"
+                            ),
+                            tool_calls=[],
+                        )
+                    )
+                ],
+            )
+        )
+        provider._client = SimpleNamespace(
+            chat=SimpleNamespace(
+                completions=SimpleNamespace(create=completions_create)
+            )
+        )
+
+        turn = provider.run_tool_turn(
+            messages=[{"role": "user", "content": "change homework memory"}],
+            tools=[
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "read_memory",
+                        "description": "Read memory",
+                        "parameters": {"type": "object"},
+                    },
+                }
+            ],
+        )
+
+        self.assertEqual(len(turn.tool_calls), 1)
+        self.assertEqual(turn.tool_calls[0].name, "read_memory")
+        self.assertEqual(
+            turn.tool_calls[0].arguments,
+            {"query": "namų darbai matematika"},
+        )
+        self.assertEqual(turn.content, "")
+        self.assertIsNone(turn.assistant_message["content"])
+        self.assertEqual(
+            turn.assistant_message["tool_calls"][0]["function"]["name"],
+            "read_memory",
+        )
+
     def test_openrouter_tool_turn_adds_cache_and_session_options(self) -> None:
         settings = AppSettings.from_mapping(
             {

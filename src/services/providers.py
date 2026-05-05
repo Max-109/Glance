@@ -514,14 +514,21 @@ class OpenAICompatibleProvider:
         message = response.choices[0].message
         content = _extract_text_content(getattr(message, "content", ""))
         tool_calls = _extract_provider_tool_calls(message)
+        text_tool_call_content = ""
+        if not tool_calls:
+            text_tool_calls = _extract_text_tool_calls(content, tools)
+            if text_tool_calls:
+                tool_calls = text_tool_calls
+                text_tool_call_content = content
+                content = ""
         assistant_message: dict = {
             "role": "assistant",
-            "content": content or None,
+            "content": None if tool_calls else content or None,
         }
         if tool_calls:
             assistant_message["tool_calls"] = [
                 _provider_tool_call_to_message_payload(tool_call)
-                for tool_call in getattr(message, "tool_calls", []) or []
+                for tool_call in tool_calls
             ]
         logger.info(
             "llm tool turn completed\nmodel      %s\nreasoning  %s\ntime      "
@@ -533,7 +540,7 @@ class OpenAICompatibleProvider:
             ", ".join(
                 call.name for call in tool_calls) or "none",
             _preview_text(
-                content,
+                text_tool_call_content or content,
                 limit=140),
         )
         return ProviderToolTurn(
@@ -720,7 +727,7 @@ class OpenAICompatibleProvider:
                 text=stripped_text,
             )
 
-        match = re.match(r"^VOICE_ID:\s*(\S+)\s*(?:\n+|$)", stripped_text)
+        match = re.match(r"^VOICE_ID:\s*(\S+)(?:\s+|$)", stripped_text)
         if match is None:
             logger.warning(
                 "Auto voice reply was missing a VOICE_ID header; falling "
@@ -1667,14 +1674,79 @@ def _extract_provider_tool_calls(message) -> list[ProviderToolCall]:
     return parsed_calls
 
 
-def _provider_tool_call_to_message_payload(tool_call) -> dict:
-    function = _tool_call_attr(tool_call, "function")
+def _extract_text_tool_calls(
+    content: str,
+    tools: list[dict],
+) -> list[ProviderToolCall]:
+    text = str(content).strip()
+    match = re.fullmatch(
+        r"(?:[A-Za-z_][\w-]*:)*default_api:"
+        r"(?P<name>[A-Za-z_]\w*)\{(?P<body>.*)\}",
+        text,
+        flags=re.DOTALL,
+    )
+    if match is None:
+        return []
+    tool_names = {
+        str(
+            tool.get("function", {}).get("name", "")
+            if isinstance(tool, dict)
+            else ""
+        )
+        for tool in tools
+    }
+    name = match.group("name")
+    if name not in tool_names:
+        return []
+    return [
+        ProviderToolCall(
+            call_id=f"text-call-{name}",
+            name=name,
+            arguments=_parse_text_tool_arguments(match.group("body")),
+        )
+    ]
+
+
+def _parse_text_tool_arguments(body: str) -> dict:
+    text = str(body).strip()
+    if not text:
+        return {}
+    try:
+        parsed = json.loads("{" + text + "}")
+    except json.JSONDecodeError:
+        parsed = None
+    if isinstance(parsed, dict):
+        return parsed
+
+    arguments: dict[str, str] = {}
+    for match in re.finditer(
+        r"(?P<key>[A-Za-z_]\w*)\s*:\s*"
+        r"(?P<value>\"[^\"]*\"|'[^']*'|[^,]+)",
+        text,
+    ):
+        value = match.group("value").strip()
+        if (
+            len(value) >= 2
+            and value[0] == value[-1]
+            and value[0] in {"'", '"'}
+        ):
+            value = value[1:-1]
+        arguments[match.group("key")] = value.strip()
+    return arguments or {"_raw_arguments": text}
+
+
+def _provider_tool_call_to_message_payload(
+    tool_call: ProviderToolCall,
+) -> dict:
     return {
-        "id": str(_tool_call_attr(tool_call, "id") or ""),
+        "id": tool_call.call_id,
         "type": "function",
         "function": {
-            "name": str(_tool_call_attr(function, "name") or ""),
-            "arguments": str(_tool_call_attr(function, "arguments") or "{}"),
+            "name": tool_call.name,
+            "arguments": json.dumps(
+                tool_call.arguments,
+                ensure_ascii=False,
+            ),
         },
     }
 
