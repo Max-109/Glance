@@ -319,7 +319,7 @@ class ModeStrategyFactory:
         raise ValidationError(f"Unsupported mode: {mode!r}")
 ```
 
-This keeps strategy creation out of `Orchestrator`. It asks the factory for the correct strategy and then runs it.
+This keeps strategy creation out of `Orchestrator`. It asks the factory for the correct strategy and then runs it. This fits better than a Singleton because the app does not need one shared global strategy. It needs separate strategy objects for different modes, with different agents, settings, and providers.
 
 #### File Reading And Writing
 
