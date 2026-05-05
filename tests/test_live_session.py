@@ -209,6 +209,26 @@ class LiveSessionControllerTests(unittest.TestCase):
             [("idle", "Finish setting up your providers to use Live.")],
         )
 
+    def test_missing_orchestrator_uses_runtime_setup_message(self) -> None:
+        statuses: list[tuple[str, str]] = []
+        playback_service = FakePlaybackService()
+
+        controller = LiveSessionController(
+            orchestrator=None,
+            recorder=FakeRecorder(),
+            playback_service=playback_service,
+            on_status=lambda state, message: statuses.append((state, message)),
+        )
+
+        controller.set_orchestrator(
+            None, unavailable_message="Configure providers first."
+        )
+        controller.start()
+
+        self.assertIsNone(controller._thread)
+        self.assertEqual(playback_service.calls, [])
+        self.assertEqual(statuses, [("idle", "Configure providers first.")])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,12 +1,44 @@
 import unittest
 
 from src.ui.qt_app import (
+    RuntimeConfigurationError,
     RuntimeErrorNoticeController,
+    _ensure_provider_settings_ready,
+    _missing_provider_setting_labels,
     _summarize_runtime_error_notice,
 )
+from src.models.settings import AppSettings
 
 
 class RuntimeErrorNoticeTests(unittest.TestCase):
+    def test_missing_provider_settings_are_detected_before_client_build(
+        self,
+    ) -> None:
+        settings = AppSettings()
+
+        self.assertEqual(
+            _missing_provider_setting_labels(settings),
+            [
+                "LLM base URL",
+                "LLM API key",
+                "transcription API key",
+                "TTS API key",
+            ],
+        )
+        with self.assertRaises(RuntimeConfigurationError):
+            _ensure_provider_settings_ready(settings)
+
+    def test_complete_provider_settings_pass_runtime_preflight(self) -> None:
+        settings = AppSettings(
+            llm_base_url="https://api.example.test/v1",
+            llm_api_key="llm-key",
+            transcription_api_key="transcription-key",
+            tts_api_key="tts-key",
+        )
+
+        self.assertEqual(_missing_provider_setting_labels(settings), [])
+        _ensure_provider_settings_ready(settings)
+
     def test_input_audio_error_becomes_actionable_notice(self) -> None:
         notice = _summarize_runtime_error_notice(
             "Live failed: Tool-capable live request failed: "

@@ -39,9 +39,13 @@ class LiveSessionController:
     def state(self) -> str:
         return self._state
 
-    def set_orchestrator(self, orchestrator: Orchestrator | None) -> None:
+    def set_orchestrator(
+        self, orchestrator: Orchestrator | None, unavailable_message: str = ""
+    ) -> None:
         with self._lock:
             self._orchestrator = orchestrator
+            if unavailable_message:
+                self._unavailable_message = str(unavailable_message).strip()
 
     def set_recorder(self, recorder, unavailable_message: str = "") -> None:
         with self._lock:
@@ -75,7 +79,8 @@ class LiveSessionController:
         if self._orchestrator is None:
             self._set_status(
                 "idle",
-                "Finish setting up your providers to use Live.",
+                self._unavailable_message
+                or "Finish setting up your providers to use Live.",
             )
             return
         if self._recorder is None:
