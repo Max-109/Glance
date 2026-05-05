@@ -474,6 +474,10 @@ class SettingsViewModel(QObject):
             stop_event.set()
         if self._preview_playback_service is not None:
             self._preview_playback_service.stop()
+        if self._previewing_voice:
+            self._previewing_voice = ""
+            self._preview_stop_event = None
+            self.previewChanged.emit()
 
     @Slot()
     def refreshAudioDevices(self) -> None:
@@ -881,19 +885,6 @@ class SettingsViewModel(QObject):
 
         payload = settings.to_dict()
         payload["tts_voice_id"] = voice_name
-        missing_fields: list[str] = []
-        for field_name, label in (
-            ("tts_base_url", "voice base URL"),
-            ("tts_api_key", "voice API key"),
-            ("tts_model", "voice model"),
-        ):
-            if not str(payload.get(field_name, "")).strip():
-                missing_fields.append(label)
-        if missing_fields:
-            self._set_status(
-                f"Voice preview needs {', '.join(missing_fields)}.", "error"
-            )
-            return None
 
         try:
             return AppSettings.from_mapping(payload, validate=False)
@@ -925,7 +916,7 @@ class SettingsViewModel(QObject):
                         f"No recorded sample for {
                             self._voice_preview_label(voice_name)
                         }. "
-                        "Generate voice previews first."
+                        "The checked-in preview asset is missing."
                     ),
                     "error",
                 )

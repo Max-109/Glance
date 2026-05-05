@@ -310,7 +310,11 @@ export function VoiceTab({
                       : "border-white/10 bg-[var(--timing-input-bg,#28282b)] text-[var(--text-strong)] hover:border-[color-mix(in_srgb,var(--voice-accent)_36%,transparent)] hover:text-[var(--voice-accent)]",
                   )}
                   aria-label={`${selectedPreviewActive ? "Stop" : "Play"} ${selectedVoiceMeta.name} preview`}
-                  onClick={() => onRunAction("previewVoice", { voiceName: selectedVoice })}
+                  onClick={() =>
+                    selectedPreviewActive
+                      ? onRunAction("stopVoicePreview")
+                      : onRunAction("previewVoice", { voiceName: selectedVoice })
+                  }
                 >
                   <Icon name={selectedPreviewActive ? "stop" : "play"} className="size-4" />
                   {selectedPreviewActive ? "Stop" : "Play sample"}
@@ -387,10 +391,14 @@ export function VoiceTab({
                           : "border-white/10 bg-white/[0.025] text-[var(--text-muted)] hover:border-[color-mix(in_srgb,var(--voice-accent)_30%,transparent)] hover:text-[var(--voice-accent)]",
                       )}
                       aria-label={`${previewActive ? "Stop" : "Play"} ${name} preview`}
-                      onClick={() => onRunAction("previewVoice", { voiceName: voiceId })}
+                      onClick={() =>
+                        previewActive
+                          ? onRunAction("stopVoicePreview")
+                          : onRunAction("previewVoice", { voiceName: voiceId })
+                      }
                     >
                       <Icon name={previewActive ? "stop" : "play"} className="size-4" />
-                      {previewActive ? "Stop" : "Sample"}
+                      {previewActive ? "Stop" : "Play"}
                     </button>
                   )}
                 </article>

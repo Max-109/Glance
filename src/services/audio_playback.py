@@ -143,6 +143,8 @@ class QtAudioPlaybackService(QObject):
     ) -> str:
         if not Path(audio_path).exists():
             raise ProviderError(f"Speech file does not exist: {audio_path}")
+        if stop_event and stop_event.is_set():
+            return audio_path
 
         completion_event = Event()
         with self._lock:
@@ -152,6 +154,8 @@ class QtAudioPlaybackService(QObject):
             self._completion_playback_id = playback_id
             self._error_message = ""
         self._play_requested.emit(playback_id, audio_path)
+        if stop_event and stop_event.is_set():
+            self.stop()
 
         while not completion_event.wait(0.1):
             if stop_event and stop_event.is_set():

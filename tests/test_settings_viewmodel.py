@@ -1,7 +1,9 @@
 import tempfile
+from threading import Event
 import unittest
 from pathlib import Path
 
+from src.models.settings import DEFAULT_FIXED_TTS_VOICE, ELEVEN_V3_VOICES
 from src.services.history_manager import HistoryManager
 from src.services.memory_manager import MemoryManager
 from src.services.settings_manager import SettingsManager
@@ -18,6 +20,14 @@ class FakeAudioDeviceService:
 
     def list_output_devices(self):
         return []
+
+
+class FakePlaybackService:
+    def __init__(self) -> None:
+        self.stopped = False
+
+    def stop(self) -> None:
+        self.stopped = True
 
 
 class SettingsViewModelTests(unittest.TestCase):
@@ -94,6 +104,44 @@ class SettingsViewModelTests(unittest.TestCase):
             viewmodel.statusMessage, "Live failed: provider unavailable."
         )
         self.assertEqual(viewmodel.statusKind, "error")
+
+    def test_voice_preview_does_not_need_tts_api_key(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            viewmodel = self._build_viewmodel(Path(temp_dir))
+            viewmodel.setField("tts_api_key", "")
+
+            settings = viewmodel._build_preview_settings(
+                DEFAULT_FIXED_TTS_VOICE)
+
+        self.assertIsNotNone(settings)
+        self.assertEqual(settings.tts_voice_id, DEFAULT_FIXED_TTS_VOICE)
+
+    def test_voice_preview_assets_exist_for_configured_voices(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            viewmodel = self._build_viewmodel(Path(temp_dir))
+
+            for voice in ELEVEN_V3_VOICES:
+                with self.subTest(voice=voice.name):
+                    preview_path = viewmodel._voice_preview_sample_path(
+                        voice.id)
+                    self.assertTrue(preview_path.exists(), preview_path)
+                    self.assertGreater(preview_path.stat().st_size, 0)
+
+    def test_stop_voice_preview_clears_active_preview_immediately(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            viewmodel = self._build_viewmodel(Path(temp_dir))
+            stop_event = Event()
+            playback_service = FakePlaybackService()
+            viewmodel._previewing_voice = DEFAULT_FIXED_TTS_VOICE
+            viewmodel._preview_stop_event = stop_event
+            viewmodel._preview_playback_service = playback_service
+
+            viewmodel.stopVoicePreview()
+
+        self.assertTrue(stop_event.is_set())
+        self.assertTrue(playback_service.stopped)
+        self.assertEqual(viewmodel.previewingVoice, "")
+        self.assertFalse(viewmodel.previewActive)
 
 
 if __name__ == "__main__":

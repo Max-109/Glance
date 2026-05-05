@@ -40,6 +40,14 @@ class FakeSignal:
         return None
 
 
+class FakeEmitSignal:
+    def __init__(self) -> None:
+        self.calls: list[tuple[object, ...]] = []
+
+    def emit(self, *args) -> None:
+        self.calls.append(args)
+
+
 class FakeAudioSink:
     def __init__(self, *, error=None) -> None:
         self.stateChanged = FakeSignal()
@@ -194,6 +202,25 @@ class AudioPlaybackServiceStateMachineTests(unittest.TestCase):
             self.assertFalse(
                 service._should_use_audio_sink(str(fake_wav_path))
             )
+
+    def test_play_blocking_does_not_queue_playback_when_already_stopped(
+        self,
+    ) -> None:
+        service = self._make_service()
+        play_requested = FakeEmitSignal()
+        service._play_requested = play_requested
+        service._stop_requested = FakeEmitSignal()
+        stop_event = Event()
+        stop_event.set()
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            audio_path = Path(temp_dir) / "sample.wav"
+            audio_path.write_bytes(b"RIFF\x00\x00\x00\x00WAVEfmt ")
+
+            result = service.play_blocking(str(audio_path), stop_event)
+
+        self.assertEqual(result, str(audio_path))
+        self.assertEqual(play_requested.calls, [])
 
     @staticmethod
     def _make_service() -> audio_playback.QtAudioPlaybackService:
