@@ -162,6 +162,12 @@ def _policy_for_tool(self, name: str) -> str:
 
 Other parts of the app only ask `RuntimeToolRegistry` for a tool by name. They do not need to know where every setting is stored or how each policy is checked.
 
+Usage example:
+
+```python
+tool = registry.get("web_fetch")
+```
+
 ##### Inheritance
 
 Shared base classes are used where the app has several versions of the same kind of object:
