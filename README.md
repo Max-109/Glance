@@ -124,7 +124,9 @@ The main runtime path starts in `main.py`, passes through the UI and orchestrati
 
 ##### Abstraction
 
-Glance uses abstract base classes for the parts that need the same shape but different behavior.
+The best example of abstraction in Glance is `ModeStrategy`, an abstract class used with the Strategy pattern. The program has two main modes: `live` and `OCR`.
+
+In `live` mode, the user speaks, the program receives an audio file, transcribes it, sends the text to the LLM, and returns the answer as audio. In `OCR` mode, the program receives a screenshot or selected screen area, analyzes it, and extracts the needed text.
 
 ```python
 class ModeStrategy(ABC):
@@ -133,7 +135,9 @@ class ModeStrategy(ABC):
         "Run one mode workflow and return the resulting interaction."
 ```
 
-The clearest example is `ModeStrategy`: `LiveStrategy` and `OCRStrategy` follow the same `execute(...)` contract even though their internal workflows are different. The `Orchestrator` can run the selected mode without caring about the exact strategy class behind it.
+These modes receive different data and have different internal logic, but both are started through the same `execute(context)` method. The `Orchestrator` uses `ModeStrategyFactory` to get the correct strategy for the selected mode, such as `LiveStrategy` or `OCRStrategy`, and then runs it.
+
+This is abstraction because the `Orchestrator` only sees the shared `execute(...)` method, while each concrete strategy hides its own internal workflow.
 
 ##### Encapsulation
 
