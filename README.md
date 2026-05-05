@@ -196,14 +196,45 @@ class TranscriptionAgent(BaseAgent):
 
 ##### Polymorphism
 
-The orchestrator can call `execute(...)` without needing separate code for every mode:
+The best example of polymorphism in Glance is how the `Orchestrator` runs mode strategies. `LiveStrategy` and `OCRStrategy` both have an `execute(...)` method, but each one performs a different workflow.
 
 ```python
+class OCRStrategy(ModeStrategy):
+    def execute(self, context: dict) -> OCRInteraction:
+        image_path = self._screen_capture_agent.run(
+            image_path=context["image_path"]
+        )
+        result = self._ocr_service.extract_to_clipboard(
+            image_path=image_path,
+            instruction=str(context.get("instruction", "")).strip(),
+        )
+        return OCRInteraction(
+            mode="ocr",
+            image_path=image_path,
+            extracted_text=result.text,
+        )
+
+class LiveStrategy(ModeStrategy):
+    def execute(self, context: dict) -> LiveInteraction:
+        recording_path = str(context["recording_path"])
+        transcript = self._transcription_agent.run(
+            audio_path=recording_path
+        )
+        response = self._llm_agent.run(user_prompt=transcript)
+        speech_path = self._tts_agent.run(text=response, output_path="reply.wav")
+        return LiveInteraction(
+            mode="live",
+            recording_path=recording_path,
+            transcript=transcript,
+            response=response,
+            speech_path=speech_path,
+        )
+
 strategy = self._strategy_factory.create(mode=mode, ...)
 interaction = strategy.execute(execution_context)
 ```
 
-That works because Live and OCR strategies follow the same interface.
+The `Orchestrator` calls the same method, `execute(...)`, but the result depends on the actual strategy object. If the object is `OCRStrategy`, it runs the OCR workflow. If the object is `LiveStrategy`, it runs the live audio workflow.
 
 ##### Composition And Aggregation
 
