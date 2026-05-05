@@ -227,9 +227,3 @@ For Python style, I use:
 This coursework resulted in a working desktop assistant that demonstrates OOP principles in a practical application. The program uses abstract contracts, inherited strategy and agent classes, encapsulated service state, polymorphic workflow execution, composition, file storage, and automated tests.
 
 In the future, I would like to make Glance cross-platform. The Python backend and Electron frontend already make that realistic, but the current macOS-specific permissions, hotkeys, menu bar behavior, and screen capture integrations would need platform-specific handling.
-
-### 4. Resources
-
-- [Eleven v3 documentation](https://elevenlabs.io/docs/overview/models#eleven-v3)
-- [Python unittest documentation](https://docs.python.org/3/library/unittest.html)
-- [PEP 8 style guide](https://peps.python.org/pep-0008/)
