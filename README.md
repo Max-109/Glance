@@ -3,7 +3,6 @@
   <h1>Glance</h1>
   <p><strong>Press a shortcut. Speak. Get the answer back out loud.</strong></p>
   <p>
-    <img alt="Coursework" src="https://img.shields.io/badge/coursework-OOP%202026-%23eaabab?style=for-the-badge&labelColor=3f3f46" />
     <img alt="Backend" src="https://img.shields.io/badge/backend-Python-%23eaabab?style=for-the-badge&labelColor=3f3f46" />
     <img alt="Frontend" src="https://img.shields.io/badge/frontend-Electron%20%2B%20Next.js%20%2B%20Bun-%23eaabab?style=for-the-badge&labelColor=3f3f46" />
     <img alt="Voice" src="https://img.shields.io/badge/voice-Eleven%20v3-%23eaabab?style=for-the-badge&labelColor=3f3f46" />
@@ -11,29 +10,24 @@
   <img src="./docs/media/showcase.gif" alt="Glance app showcase" width="900" />
 </div>
 
-## Coursework Report
+## What is Glance?
 
-### 1. Introduction
+Glance is a macOS live agent app that stays out of the way until you need it.
 
-#### What Is The Application?
+In Live mode, press a shortcut, speak, and Glance records your request, gets a response from the configured model, speaks the answer out loud, and saves the session. In OCR mode, press a shortcut when you need visible text from the screen, and Glance extracts that text and copies it to the clipboard.
 
-Glance is my OOP coursework project: a macOS live agent app that stays out of the way until I need it.
+## Features
 
-The application has two main workflows. In Live mode, I press a customizable shortcut, speak, and Glance records the request, gets a response from the configured model, speaks the answer out loud, and saves the session. In OCR mode, I press a shortcut when I need visible text from the screen, and Glance extracts that text and copies it to the clipboard.
-
-Main features:
-
-- Customizable shortcuts.
-- Configurable OpenAI-compatible endpoints for reply, transcription, and voice. A multimodal model can also understand audio and write the reply in one step.
-- [Eleven v3](https://elevenlabs.io/docs/overview/models#eleven-v3) voice output, currently the best multilingual TTS model, with excellent voice quality and support for different emotions.
-- Advanced TEN VAD audio detection for natural speech turns.
-- Tools available for the live agent to use.
-- Saved history with transcript, response, audio, screenshots, and tool records.
+- Customizable shortcuts for Live mode, OCR, and opening Glance.
+- Configurable OpenAI-compatible endpoints for reply, transcription, and voice.
+- Multimodal audio support when your chosen model can understand audio directly.
+- Eleven v3 voice output with multilingual TTS and emotion support.
+- TEN VAD audio detection for natural speech turns.
+- Optional tools for the live agent, including screenshot, OCR, web search, web fetch, and memory tools.
+- Saved sessions with transcript, response, audio, screenshots, and tool records.
 - Saved memories that the live agent can read and update.
 
-#### How To Run The Program
-
-Prerequisites:
+## Requirements
 
 - macOS.
 - Python 3.10+.
@@ -42,24 +36,22 @@ Prerequisites:
 - Node.js 20+.
 - Microphone, Screen Recording, and Accessibility permissions in macOS settings.
 
-Run the application:
+## Run locally
+
+From the repo root:
 
 ```bash
-# Create and enter the Python virtual environment.
 python3 -m venv .venv
 source .venv/bin/activate
-
-# Install Python and frontend dependencies.
 python -m pip install -r requirements.txt
 
 bun install
 bun run build
 
-# Open the Python backend and Electron frontend.
 python3 main.py
 ```
 
-#### How To Use The Program
+## How to use it
 
 1. Open Glance.
 2. Configure reply, transcription, and voice providers in settings.
@@ -71,15 +63,13 @@ python3 main.py
 
 Settings are saved in `~/.glance/config.json`. Sessions are saved under `~/.glance/sessions`. Memories are saved in `~/.glance/memories.json`.
 
-### 2. Body / Analysis
-
-#### Application Structure
+## How it works
 
 <p align="center">
   <img src="./docs/media/glance-how-it-works.svg" alt="How Glance works" width="900" />
 </p>
 
-Glance uses Python as the backend and Electron + Next.js + Tailwind CSS as the frontend.
+Glance uses Python for the backend and Electron, Next.js, and Tailwind CSS for the frontend.
 
 | File | What it does |
 | --- | --- |
@@ -89,26 +79,11 @@ Glance uses Python as the backend and Electron + Next.js + Tailwind CSS as the f
 | `src/core/orchestrator.py` | Connects settings, history, memories, providers, strategies, and clipboard. |
 | `src/strategies/live_strategy.py` | Records speech, gets the reply, uses tools when enabled, and plays voice output. |
 | `src/strategies/ocr_strategy.py` | Captures the screen, extracts text, and copies it to the clipboard. |
-| `src/tools/runtime.py` | Tool definitions and tool execution for Live mode. |
+| `src/tools/runtime.py` | Handles tool definitions and tool execution for Live mode. |
 | `src/storage/json_storage.py` | Stores settings, sessions, artifacts, and conversation Markdown on disk. |
 | `components/` | Electron settings UI built with Next.js and Tailwind CSS v4. |
 
-#### Functional Requirements Coverage
-
-The main runtime path starts in `main.py`, passes through the UI and orchestration layer, and then runs either the Live or OCR strategy.
-
-| Requirement | How Glance implements it |
-| --- | --- |
-| GitHub usage | The program and Markdown report are kept in one GitHub repository. |
-| Python program | The main backend is written in Python and starts from `main.py`. |
-| 4 OOP pillars | Abstraction, encapsulation, inheritance, and polymorphism are used in the backend classes. |
-| Composition / aggregation | `Orchestrator` is composed from smaller services such as settings, history, memory, providers, strategies, and clipboard. |
-| Design pattern | `ModeStrategyFactory` creates the correct workflow strategy at runtime. |
-| Reading and writing files | Settings, sessions, conversation exports, memories, audio, screenshots, OCR results, and tool results are saved to disk. |
-| Testing | Python unit tests cover the main backend behavior, and Node tests cover Electron window control. |
-| Code style | Python coursework code is checked with `pycodestyle` against `main.py`, `src`, and `tests`. |
-
-#### Tools
+## Tools
 
 | Tool | Description |
 | --- | --- |
@@ -118,220 +93,11 @@ The main runtime path starts in `main.py`, passes through the UI and orchestrati
 | Web fetch | Fetches data from a specific URL. |
 | Add memory | Saves a task, idea, preference, plan, or project note. |
 | Read memory | Searches saved memories. |
-| Change memory | Updates a saved memory when the user asks to edit or correct it. |
+| Change memory | Updates a saved memory when you ask to edit or correct it. |
 
-#### OOP Requirements
+## Development
 
-##### Abstraction
-
-Glance uses `ModeStrategy` as the main abstraction for its runtime modes. The app has two main modes: `live` and `OCR`.
-
-In `live` mode, the app works with audio: it records speech, transcribes it, sends the text to the LLM, and returns an audio answer. In `OCR` mode, it works with the screen: it receives a screenshot or selected area and extracts text from it.
-
-```python
-class ModeStrategy(ABC):
-    @abstractmethod
-    def execute(self, context: dict) -> BaseInteraction:
-        "Run one mode workflow and return the resulting interaction."
-```
-
-The modes use different input and different internal steps, but both start through `execute(context)`. `Orchestrator` asks `ModeStrategyFactory` for the right strategy, such as `LiveStrategy` or `OCRStrategy`, and then runs it.
-
-##### Encapsulation
-
-Glance uses encapsulation in `RuntimeToolRegistry`. This class decides which live agent tools are available and which ones are blocked.
-
-The user can enable or disable tools globally, and can also allow or deny individual tools such as screenshots, OCR, web search, web fetch, and memories. That permission logic stays in one place instead of being repeated across the app.
-
-```python
-def get(self, name: str) -> ToolDefinition | None:
-    definition = self._definitions.get(name)
-    if definition is None:
-        return None
-    if not self._settings.tools_enabled:
-        return None
-    if self._policy_for_tool(name) == "allow":
-        return definition
-    return None
-
-def _policy_for_tool(self, name: str) -> str:
-    if name == "web_fetch":
-        return self._settings.tool_web_fetch_policy
-    return "deny"
-```
-
-Other parts of the app only ask `RuntimeToolRegistry` for a tool by name. They do not need to know where every setting is stored or how each policy is checked.
-
-Usage example:
-
-```python
-tool = registry.get("web_fetch")
-```
-
-##### Inheritance
-
-`BaseAgent` is the simplest inheritance example in Glance. The app has several concrete agents, and they all share the same base agent structure.
-
-```python
-class BaseAgent(ABC):
-    @abstractmethod
-    def run(self, **kwargs):
-        "Execute the agent's main behavior."
-
-class OCRAgent(BaseAgent):
-    def run(self, *, image_path: str, instruction: str = "") -> str:
-        return self._provider.extract_text(image_path, instruction=instruction)
-
-class TranscriptionAgent(BaseAgent):
-    def run(self, *, audio_path: str) -> str:
-        return self._provider.transcribe(audio_path)
-```
-
-`OCRAgent` and `TranscriptionAgent` do different work, but both inherit from `BaseAgent` and implement `run(...)` in their own way. The same pattern appears elsewhere:
-
-- `LiveStrategy` and `OCRStrategy` inherit from `ModeStrategy`.
-- `LLMAgent`, `ScreenCaptureAgent`, and `TTSAgent` also inherit from `BaseAgent`.
-- `LiveInteraction`, `OCRInteraction`, and `QuickInteraction` inherit from `BaseInteraction`.
-- `SessionDirectoryRepository` inherits from `AbstractRepository[SessionRecord]`.
-
-##### Polymorphism
-
-Polymorphism shows up when `Orchestrator` runs mode strategies. `LiveStrategy` and `OCRStrategy` both have `execute(...)`, but the method does different work depending on the actual object.
-
-```python
-class OCRStrategy(ModeStrategy):
-    def execute(self, context: dict) -> OCRInteraction:
-        image_path = self._screen_capture_agent.run(
-            image_path=context["image_path"]
-        )
-        result = self._ocr_service.extract_to_clipboard(
-            image_path=image_path,
-            instruction=str(context.get("instruction", "")).strip(),
-        )
-        return OCRInteraction(
-            mode="ocr",
-            image_path=image_path,
-            extracted_text=result.text,
-        )
-
-class LiveStrategy(ModeStrategy):
-    def execute(self, context: dict) -> LiveInteraction:
-        recording_path = str(context["recording_path"])
-        transcript = self._transcription_agent.run(
-            audio_path=recording_path
-        )
-        response = self._llm_agent.run(user_prompt=transcript)
-        speech_path = self._tts_agent.run(text=response, output_path="reply.wav")
-        return LiveInteraction(
-            mode="live",
-            recording_path=recording_path,
-            transcript=transcript,
-            response=response,
-            speech_path=speech_path,
-        )
-
-strategy = self._strategy_factory.create(mode=mode, ...)
-interaction = strategy.execute(execution_context)
-```
-
-`Orchestrator` calls the same method, `execute(...)`, either way. If the strategy is `OCRStrategy`, the OCR workflow runs. If the strategy is `LiveStrategy`, the live audio workflow runs.
-
-##### Composition And Aggregation
-
-Composition and aggregation are easiest to see in the `Orchestrator` class.
-
-`Orchestrator` is built from smaller objects: `LLMAgent`, `OCRAgent`, `TranscriptionAgent`, `HistoryManager`, `MemoryManager`, `ModeStrategyFactory`, `ClipboardService`, and others. Instead of putting the whole runtime in one large class, each object keeps its own job.
-
-```python
-class Orchestrator:
-    def __init__(
-        self,
-        *,
-        settings: AppSettings,
-        history_manager: HistoryManager,
-        memory_manager: MemoryManager,
-        strategy_factory: ModeStrategyFactory,
-        screen_capture_agent: ScreenCaptureAgent,
-        transcription_agent: TranscriptionAgent,
-        llm_agent: LLMAgent,
-        ocr_agent: OCRAgent,
-        tts_agent: TTSAgent,
-        clipboard_service: ClipboardService,
-    ) -> None:
-        self._settings = settings
-        self._history_manager = history_manager
-        self._memory_manager = memory_manager
-        self._strategy_factory = strategy_factory
-        self._screen_capture_agent = screen_capture_agent
-        self._transcription_agent = transcription_agent
-        self._llm_agent = llm_agent
-        self._ocr_agent = ocr_agent
-        self._tts_agent = tts_agent
-        self._clipboard_service = clipboard_service
-```
-
-Aggregation is the other side of that relationship. `Orchestrator` keeps references to these objects and coordinates them, but they still have their own logic. `LLMAgent` and `OCRAgent` are not internal methods inside `Orchestrator`; they are separate objects used by it.
-
-When a mode runs, `Orchestrator` combines those objects into one workflow:
-
-```python
-strategy = self._strategy_factory.create(
-    mode=mode,
-    screen_capture_agent=self._screen_capture_agent,
-    transcription_agent=self._transcription_agent,
-    llm_agent=self._llm_agent,
-    ocr_agent=self._ocr_agent,
-    tts_agent=self._tts_agent,
-    clipboard_service=self._clipboard_service,
-    settings=self._settings,
-    memory_manager=self._memory_manager,
-)
-
-interaction = strategy.execute(execution_context)
-self._history_manager.save_interaction(active_session, interaction)
-```
-
-That keeps the runtime flow readable: `Orchestrator` coordinates the work, while the smaller objects handle their own tasks.
-
-#### Design Pattern
-
-The main design patterns in Glance are **Strategy** and **Factory Method**.
-
-Strategy is used because the app has two modes, `live` and `OCR`, with different internal logic. Both still use the same `ModeStrategy` interface and start through `execute(context)`.
-
-```python
-class ModeStrategy(ABC):
-    @abstractmethod
-    def execute(self, context: dict) -> BaseInteraction:
-        "Run one mode workflow and return the resulting interaction."
-```
-
-Factory Method is used in `ModeStrategyFactory`. It receives the selected `mode` and creates the correct strategy object. If the mode is `ocr`, it returns `OCRStrategy`. If the mode is `live`, it returns `LiveStrategy`.
-
-```python
-class ModeStrategyFactory:
-    def create(self, *, mode: str, ...) -> ModeStrategy:
-        normalized_mode = mode.strip().lower()
-        if normalized_mode == "ocr":
-            return OCRStrategy(...)
-        if normalized_mode == "live":
-            return LiveStrategy(...)
-        raise ValidationError(f"Unsupported mode: {mode!r}")
-```
-
-This keeps strategy creation out of `Orchestrator`. It asks the factory for the correct strategy and then runs it. This fits better than a Singleton because the app does not need one shared global strategy. It needs separate strategy objects for different modes, with different agents, settings, and providers.
-
-#### File Reading And Writing
-
-Glance stores app data in real files:
-
-- `~/.glance/config.json` for settings.
-- `~/.glance/sessions/.../session.json` for saved sessions.
-- `~/.glance/sessions/.../conversation.md` for readable conversation export.
-- `~/.glance/memories.json` for saved memories.
-- Audio, speech, screenshot, OCR, and tool result artifacts.
-
-#### Testing
+Run tests and checks:
 
 ```bash
 .venv/bin/python -m unittest discover -s tests
@@ -340,26 +106,12 @@ bun run typecheck
 bun run build
 ```
 
-The tests check settings validation, storage, history, Live behavior, tools, providers, OCR capture, hotkeys, Electron window control, and runtime status sync.
-
-For Python style, I use:
+Run Python style checks:
 
 ```bash
 .venv/bin/python -m pycodestyle main.py src tests
 ```
 
-### 3. Results And Summary
+## License
 
-#### Results
-
-- Glance can run a full Live turn: listen, transcribe or use multimodal audio, call the model, use allowed tools, speak the answer, and save the session.
-- OCR works as a quick workflow for extracting visible text and copying it to the clipboard.
-- The tool system is permission-based, so disabled tools are not shown to the model.
-- The application stores useful output, including session metadata, conversation Markdown, screenshots, audio, OCR output, and tool results.
-- The main implementation challenge was connecting desktop app behavior, audio processing, model providers, tools, and persistent storage into one stable workflow.
-
-#### Conclusions
-
-This coursework resulted in a working desktop assistant that demonstrates OOP principles in a practical application. The program uses abstract contracts, inherited strategy and agent classes, encapsulated service state, polymorphic workflow execution, composition, file storage, and automated tests.
-
-In the future, I would like to make Glance cross-platform. The Python backend and Electron frontend already make that realistic, but the current macOS-specific permissions, hotkeys, menu bar behavior, and screen capture integrations would need platform-specific handling.
+See [LICENSE](./LICENSE).
